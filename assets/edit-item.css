@@ -1,0 +1,1 @@
+.edit-grid{padding:24px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.edit-grid label{font-weight:700;color:#344054}.edit-grid input,.edit-grid textarea{margin-top:7px}.edit-grid .wide{grid-column:1/-1}@media(max-width:800px){.edit-grid{grid-template-columns:1fr}.edit-grid .wide{grid-column:auto}}

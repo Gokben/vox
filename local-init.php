@@ -1,0 +1,44 @@
+<?php
+putenv('APP_ENV=local');
+require __DIR__ . '/config.php';
+if (!is_dir(__DIR__ . '/storage')) mkdir(__DIR__ . '/storage', 0775, true);
+$pdo = db();
+$pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,role TEXT NOT NULL DEFAULT 'User',active INTEGER NOT NULL DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT,item_no TEXT NOT NULL UNIQUE,found_at TEXT NOT NULL,location TEXT NOT NULL,category TEXT NOT NULL,name TEXT NOT NULL,brand TEXT DEFAULT '',color TEXT DEFAULT '',details TEXT,storage_location TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'Depoda',recorded_by TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL DEFAULT '')");
+$pdo->exec("CREATE TABLE IF NOT EXISTS location_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS department_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS storage_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0)");
+$pdo->exec("CREATE TABLE IF NOT EXISTS item_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL, name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0, UNIQUE(category,name))");
+$locations=['Lobby','Oven Restoran','Kış Bahçesi','Lobby WC','Teras','Spa alanları','Kat Ofisleri','Teras Havuz','Toplantı Salonları','Mescit','La Table','Club Millésime'];
+$locationStmt=$pdo->prepare('INSERT OR IGNORE INTO location_definitions (name,sort_order) VALUES (?,?)');
+foreach($locations as $index=>$location) $locationStmt->execute([$location,$index+1]);
+$departments=['Front Office','F&B','Güvenlik','Housekeeping','Diğer'];
+$departmentStmt=$pdo->prepare('INSERT OR IGNORE INTO department_definitions (name,sort_order) VALUES (?,?)');
+foreach($departments as $index=>$department) $departmentStmt->execute([$department,$index+1]);
+$storages=['Nurcan Hanım Kasa','Nurcan Hanım Ofis','Güvenlik Kasa','HK Buzdolabı','HK Depo'];
+$storageStmt=$pdo->prepare('INSERT OR IGNORE INTO storage_definitions (name,sort_order) VALUES (?,?)');
+foreach($storages as $index=>$storage) $storageStmt->execute([$storage,$index+1]);
+$itemDefinitions=[['Altın','Altın Bilezik'],['Altın','Altın Kolye'],['Altın','Altın Küpe'],['Altın','Altın Yüzük'],['Altın','Çeyrek Altın'],['Altın','Diğer Altın'],['Altın','Gram Altın'],['Altın','Tam Altın'],['Altın','Yarım Altın'],['Bagaj','Alışveriş Çantası'],['Bagaj','Bagaj Etiketi'],['Bagaj','Bavul'],['Bagaj','Bay El Çantası'],['Bebek ve Çocuk','Araba Koltuğu']];
+$itemDefinitionStmt=$pdo->prepare('INSERT OR IGNORE INTO item_definitions (category,name,sort_order) VALUES (?,?,?)');
+foreach($itemDefinitions as $index=>$definition) $itemDefinitionStmt->execute([$definition[0],$definition[1],$index+1]);
+$importFile=__DIR__.'/item-definitions.json';
+if(is_file($importFile)){
+ $importedDefinitions=json_decode(file_get_contents($importFile),true)?:[];
+ foreach($importedDefinitions as $index=>$definition) $itemDefinitionStmt->execute([$definition['category'],$definition['name'],$index+100]);
+}
+$itemColumns=array_column($pdo->query('PRAGMA table_info(items)')->fetchAll(),'name');
+if(!in_array('found_department',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN found_department TEXT DEFAULT ''");
+if(!in_array('found_by',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN found_by TEXT DEFAULT ''");
+if(!in_array('quantity',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1");
+if(!in_array('serial_no',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN serial_no TEXT DEFAULT ''");
+if(!in_array('related_items',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN related_items TEXT DEFAULT ''");
+if(!in_array('import_order',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN import_order INTEGER");
+if(!in_array('delivered_at',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN delivered_at TEXT");
+if(!in_array('delivery_method',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN delivery_method TEXT DEFAULT ''");
+if(!in_array('delivered_by',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN delivered_by TEXT DEFAULT ''");
+if(!in_array('delivery_form_no',$itemColumns,true)) $pdo->exec("ALTER TABLE items ADD COLUMN delivery_form_no TEXT DEFAULT ''");
+$pdo->prepare('DELETE FROM users WHERE email = ?')->execute(['admin@krpsoft.com.tr']);
+$stmt = $pdo->prepare('INSERT INTO users (name,email,password_hash,role,active) VALUES (?,?,?,?,1) ON CONFLICT(email) DO UPDATE SET password_hash=excluded.password_hash, role=excluded.role, active=1');
+$stmt->execute(['Sofitel Yönetici','admin@sofitel.com',password_hash('112233', PASSWORD_DEFAULT),'Admin']);
+echo "Vox yerel veritabanı hazır.\nKullanıcı: admin@sofitel.com\nŞifre: 112233\n";

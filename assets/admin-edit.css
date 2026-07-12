@@ -1,0 +1,2 @@
+.row-actions{display:flex;gap:6px;align-items:center}.row-actions form{margin:0}.edit-button{padding:7px 10px;background:#edf5ff;color:#1677ff}.edit-button:hover{background:#dcecff}
+.user-edit-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:6px}.admin-protected{color:#8c8898;font-size:12px}

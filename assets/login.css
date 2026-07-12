@@ -1,0 +1,45 @@
+.login-page {
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(4, 12, 24, .36), rgba(4, 12, 24, .52)),
+    url('sofitel-login.jpg') center center / cover no-repeat fixed !important;
+}
+
+.login-card {
+  width: min(430px, calc(100% - 32px));
+  padding: 38px 42px 32px;
+  background: rgba(255, 255, 255, .97);
+  border: 1px solid rgba(255, 255, 255, .82);
+  border-radius: 16px;
+  box-shadow: 0 28px 80px rgba(4, 14, 28, .42);
+  backdrop-filter: blur(8px);
+}
+
+.sofitel-brand { text-align: center; color: #302d27; }
+.sofitel-brand img { display: block; width: 86px; height: 58px; object-fit: cover; margin: 0 auto 5px; }
+.sofitel-brand span { display: block; font: 600 23px Georgia, serif; letter-spacing: 8px; padding-left: 8px; }
+.sofitel-brand small { display: block; margin-top: 5px; color: #8a7130; font-size: 8px; letter-spacing: 3px; }
+.login-heading { text-align: center; margin: 25px 0 24px; }
+.login-heading h1 { margin: 0 0 6px; font: 600 24px Georgia, serif; color: #25282e; }
+.login-heading p { margin: 0; color: #7a8190; }
+.login-card form { display: grid; gap: 18px; margin: 0; }
+.login-card label { color: #252b36; font-size: 13px; font-weight: 600; }
+.login-card input { height: 46px; margin-top: 8px; border: 1px solid #d5dbe4; background: #f8fafc; }
+.login-card input:focus { outline: 2px solid rgba(184, 144, 16, .18); border-color: #b89010; }
+.password-field { position: relative; display: block; }
+.password-field input { padding-right: 48px; }
+.password-toggle { position: absolute; right: 0; top: 8px; width: 46px; height: 46px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; }
+.password-toggle:hover { background: #eef2f7; }
+.eye-icon { position: relative; display: block; width: 17px; height: 17px; border: 2px solid #718096; border-radius: 75% 12%; transform: rotate(45deg); }
+.eye-icon::after { content: ''; position: absolute; width: 5px; height: 5px; top: 4px; left: 4px; border-radius: 50%; background: #718096; }
+.password-toggle.is-visible .eye-icon::before { content: ''; position: absolute; z-index: 2; width: 24px; height: 2px; left: -5px; top: 3px; background: #718096; transform: rotate(-90deg); box-shadow: 0 0 0 2px #f8fafc; }
+.remember { display: flex; align-items: center; gap: 9px; font-weight: 500 !important; }
+.remember input { width: 18px; height: 18px; margin: 0; accent-color: #a7830b; }
+.login-submit { height: 46px; border-radius: 7px; background: #f4772e; color: #111; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; transition: background .2s, transform .2s; }
+.login-submit:hover { background: #dc601c; }
+.login-submit:active { transform: translateY(1px); }
+.secure-note { display: block; margin-top: 24px; text-align: center; color: #8b929e; }
+
+@media (max-width: 480px) {
+  .login-card { padding: 30px 24px 26px; }
+}

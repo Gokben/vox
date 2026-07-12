@@ -1,0 +1,7 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=$HOME/public_html/vox/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R assets $DEPLOYPATH
+    - /bin/cp .htaccess admin.php user-edit.php index.php item-new.php item-edit.php item-delete.php login.php logout.php profile.php $DEPLOYPATH
