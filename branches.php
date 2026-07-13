@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);require __DIR__.'/config.php';require_admin();ensure_branch_schema();require __DIR__.'/patient-layout.php';$message='';$error='';
+declare(strict_types=1);require __DIR__.'/config.php';require_admin();if(function_exists('ensure_branch_schema'))ensure_branch_schema();require __DIR__.'/patient-layout.php';$message='';$error='';
 if($_SERVER['REQUEST_METHOD']==='POST'){verify_csrf();$action=$_POST['action']??'save';$id=(int)($_POST['id']??0);
  if($action==='toggle'&&$id){db()->prepare('UPDATE branches SET active=CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=?')->execute([$id]);$message='Şube durumu güncellendi.';}
  else{$name=trim((string)($_POST['name']??''));$code=mb_strtoupper(trim((string)($_POST['code']??'')));$phone=trim((string)($_POST['phone']??''));$address=trim((string)($_POST['address']??''));if($name==='')$error='Şube adı zorunludur.';else try{if($id){db()->prepare('UPDATE branches SET name=?,code=?,phone=?,address=? WHERE id=?')->execute([$name,$code,$phone,$address,$id]);$message='Şube güncellendi.';}else{db()->prepare('INSERT INTO branches(name,code,phone,address,active) VALUES(?,?,?,?,1)')->execute([$name,$code,$phone,$address]);$message='Şube eklendi.';}}catch(PDOException $e){$error='Bu şube adı daha önce kullanılmış.';}}

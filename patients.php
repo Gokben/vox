@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/config.php';
 require_login();
-ensure_branch_schema();
+if (function_exists('ensure_branch_schema')) ensure_branch_schema();
 require __DIR__ . '/patient-layout.php';
 
 $q = trim($_GET['q'] ?? '');
