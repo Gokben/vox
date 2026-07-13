@@ -1,0 +1,2 @@
+-- Vox hasta kayıt modülü - yerel SQLite ve MySQL uyumlu temel alan listesi
+-- Uygulama tabloları PHP kurulum betiği tarafından veritabanı motoruna göre oluşturulur.

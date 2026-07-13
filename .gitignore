@@ -47,3 +47,4 @@ next-env.d.ts
 /assets/uploads/profiles/*
 !/assets/uploads/profiles/.gitkeep
 /.openai/
+/config.local.php

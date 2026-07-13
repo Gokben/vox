@@ -1,17 +1,17 @@
-:root{--app-green:#f4772e;--app-green-dark:#d95f18;--app-green-soft:#fff0e6}
+:root{--app-green:#20a447;--app-green-dark:#168238;--app-green-soft:#e8f7ed}
 button,.button,.primary,.save-button,.login-submit,.save-profile,.upload-button,.edit-button,.new-button,.tool-button,.action-button,.edit-action,.delete-action,.folder-action,.home-link{background:var(--app-green)!important;border-color:var(--app-green)!important;color:#fff!important}
 button:hover,.button:hover,.primary:hover,.save-button:hover,.login-submit:hover,.save-profile:hover,.upload-button:hover,.edit-button:hover,.new-button:hover,.tool-button:hover,.action-button:hover,.edit-action:hover,.delete-action:hover,.folder-action:hover,.home-link:hover{background:var(--app-green-dark)!important;border-color:var(--app-green-dark)!important;color:#fff!important}
-.app-header .main-nav a.active,.app-header .main-nav a:hover,.profile-tabs a.active{background:linear-gradient(135deg,#ff9a5d,var(--app-green))!important;box-shadow:0 4px 12px rgba(244,119,46,.3)!important;color:#fff!important}
+.app-header .main-nav a.active,.app-header .main-nav a:hover,.profile-tabs a.active{background:linear-gradient(135deg,#66c936,var(--app-green))!important;box-shadow:0 4px 12px rgba(32,164,71,.3)!important;color:#fff!important}
 .account-dropdown .dropdown-logout,.account-dropdown .dropdown-logout:hover{background:var(--app-green)!important;color:#fff!important}
-.reset-button,.profile-actions a,.secondary{background:var(--app-green-soft)!important;border-color:#ffd1b5!important;color:#a8430a!important}
-.reset-button:hover,.profile-actions a:hover,.secondary:hover{background:#ffe2cf!important;color:#873607!important}
+.reset-button,.profile-actions a,.secondary{background:var(--app-green-soft)!important;border-color:#bfe6ca!important;color:#157336!important}
+.reset-button:hover,.profile-actions a:hover,.secondary:hover{background:#d7f1df!important;color:#0f5d2a!important}
 .header-tools button,.account-toggle,.row-toggle,.password-toggle{background:transparent!important;border-color:transparent!important;color:#5d596c!important}
 .header-tools button:hover,.account-toggle:hover,.row-toggle:hover,.password-toggle:hover{background:var(--app-green-soft)!important;color:var(--app-green-dark)!important}
-input:focus,select:focus,textarea:focus{border-color:var(--app-green)!important;box-shadow:0 0 0 3px rgba(244,119,46,.14)!important}
+input:focus,select:focus,textarea:focus{border-color:var(--app-green)!important;box-shadow:0 0 0 3px rgba(32,164,71,.14)!important}
 .filters button[type="submit"]{background:var(--app-green)!important;border-color:var(--app-green)!important;color:#fff!important}
 .filters button[type="submit"]:hover{background:var(--app-green-dark)!important;border-color:var(--app-green-dark)!important}
 .item-actions{grid-template-columns:repeat(2,30px)!important;gap:4px!important}.item-actions .action-button{width:30px!important;height:27px!important;font-size:12px!important;line-height:1!important}.item-actions form{width:30px!important}
-.item-actions .folder-action{background:#f4772e!important;border-color:#f4772e!important;color:#fff!important}.item-actions .edit-action{background:#e46a22!important;border-color:#e46a22!important;color:#fff!important}.item-actions .delete-action{background:#bd4b0d!important;border-color:#bd4b0d!important;color:#fff!important}.item-actions .folder-action:hover,.item-actions .edit-action:hover,.item-actions .delete-action:hover{background:#a63e07!important}
+.item-actions .folder-action{background:#31b75a!important;border-color:#31b75a!important;color:#fff!important}.item-actions .edit-action{background:#20994a!important;border-color:#20994a!important;color:#fff!important}.item-actions .delete-action{background:#147737!important;border-color:#147737!important;color:#fff!important}.item-actions .folder-action:hover,.item-actions .edit-action:hover,.item-actions .delete-action:hover{background:#0f642d!important}
 button.save-button,button.save-profile,.actions button.primary{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;color:#111!important;font-weight:700!important}
 button.save-button:hover,button.save-profile:hover,.actions button.primary:hover{color:#111!important}
 .brand-back-link{display:flex!important;align-items:center;color:inherit!important;text-decoration:none!important;cursor:pointer}.brand-back-link:hover{text-decoration:none!important;opacity:.9}
@@ -21,3 +21,23 @@ button.save-button:hover,button.save-profile:hover,.actions button.primary:hover
 :root[data-theme="dark"] .stats article{background:#2f3349!important;border-color:#43475d!important}:root[data-theme="dark"] .stats span,:root[data-theme="dark"] .stats strong{color:#fff!important}:root[data-theme="dark"] table,:root[data-theme="dark"] thead,:root[data-theme="dark"] tbody,:root[data-theme="dark"] th,:root[data-theme="dark"] td{background:#2f3349!important;color:#fff!important;border-color:#43475d!important}:root[data-theme="dark"] .item-no,:root[data-theme="dark"] .status-text{color:#ffad7b!important}:root[data-theme="dark"] .badge{background:#5b463b!important;color:#ffd1b5!important}:root[data-theme="dark"] .form-grid,:root[data-theme="dark"] .definition-card,:root[data-theme="dark"] .admin-card{background:#2f3349!important;color:#fff!important;border-color:#43475d!important}:root[data-theme="dark"] .title-row h1,:root[data-theme="dark"] .title-row p,:root[data-theme="dark"] .user-name,:root[data-theme="dark"] .user-name small{color:#fff!important}
 :root[data-theme="dark"] body.login-page,body.login-page{background:linear-gradient(rgba(4,12,24,.36),rgba(4,12,24,.52)),url('sofitel-login.jpg') center center/cover no-repeat fixed!important}
 .profile-tabs .profile-tab.active,.profile-tabs .profile-tab.active span{color:#111!important}
+
+/* VOX ortak alt sayfa görünümü */
+body:not(.login-page){background:#f7f7fb!important;color:#343348!important}
+body:not(.login-page)>header{min-height:57px!important;height:auto!important;background:#fff!important;border-bottom:1px solid #e4e3eb!important;box-shadow:0 1px 7px rgba(30,31,48,.12)!important;padding:7px 31px!important}
+.brand .brand-mark{display:block!important;width:116px!important;height:42px!important;border-radius:0!important;background:transparent url('vox-logo-02.png?v=20260713-9') center/contain no-repeat!important;color:transparent!important;font-size:0!important}
+.brand>span:last-child,.brand-back-link>span{display:none!important}
+.entry-brand-logo,.profile-brand-logo{content:url('vox-logo-02.png?v=20260713-9')!important;display:block!important;width:116px!important;min-width:116px!important;max-width:116px!important;height:42px!important;min-height:42px!important;max-height:42px!important;object-fit:contain!important}
+.profile-container,.container{width:100%!important;max-width:none!important}
+.profile-card,.panel,.entry-panel,.edit-grid{border-radius:9px!important;box-shadow:0 4px 14px rgba(34,35,58,.09)!important}
+
+/* Gece modu başlık görünürlüğü */
+:root[data-theme="dark"] h1,:root[data-theme="dark"] h2,:root[data-theme="dark"] h3,:root[data-theme="dark"] .title-row h1,:root[data-theme="dark"] .entry-title h1,:root[data-theme="dark"] nav a,:root[data-theme="dark"] .profile-tabs a{color:#fff!important}
+
+/* Ekrana sığmayan liste ve tablolar */
+body:not(.login-page) .table-wrap,body:not(.login-page) .found-items-table,body:not(.login-page) .panel:has(>table){display:block;width:100%;max-width:100%;overflow-x:auto!important;scrollbar-gutter:stable}
+body:not(.login-page) .table-wrap>table,body:not(.login-page) .found-items-table>table,body:not(.login-page) .panel>table{width:max-content;min-width:100%}
+.location-list,.search-select-options,.settings-menu,.account-dropdown{max-height:calc(100vh - 150px);overflow:auto!important;scrollbar-gutter:stable}
+.table-wrap::-webkit-scrollbar,.found-items-table::-webkit-scrollbar,.panel::-webkit-scrollbar,.location-list::-webkit-scrollbar,.search-select-options::-webkit-scrollbar{height:10px;width:10px}
+.table-wrap::-webkit-scrollbar-thumb,.found-items-table::-webkit-scrollbar-thumb,.panel::-webkit-scrollbar-thumb,.location-list::-webkit-scrollbar-thumb,.search-select-options::-webkit-scrollbar-thumb{background:#20a447;border-radius:10px}
+.table-wrap::-webkit-scrollbar-track,.found-items-table::-webkit-scrollbar-track,.panel::-webkit-scrollbar-track,.location-list::-webkit-scrollbar-track,.search-select-options::-webkit-scrollbar-track{background:#e8f7ed}
