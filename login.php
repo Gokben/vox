@@ -17,15 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Giriş | <?= APP_NAME ?></title><link rel="icon" type="image/png" href="<?= url('assets/favicon.png') ?>"><link rel="stylesheet" href="<?= url('assets/style.css') ?>"><link rel="stylesheet" href="<?= url('assets/login.css') ?>"><link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce/icon/icomoon/style.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce/css/bootstrap.min.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce/css/styles.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce-lf.css')?>"><link rel="stylesheet" href="<?=url('assets/green-buttons.css?v=20260712-3')?>"><script src="<?=url('assets/theme.js?v=20260712-2')?>"></script></head>
-<body class="login-page">
+<link rel="stylesheet" href="<?=url('assets/login.css?v=20260713-6')?>">
+<body class="login-page" style="background-image:linear-gradient(rgba(4,12,24,.12),rgba(4,12,24,.22)),url('<?=url('assets/vox-login-signia-1920x1080.jpg?v=20260713-4')?>')!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important;background-attachment:fixed!important">
 <main class="login-card">
   <div class="sofitel-brand">
-    <img src="<?= url('assets/sofitel-logo.png') ?>" alt="Sofitel">
-    <span>SOFITEL</span>
-    <small>ISTANBUL TAKSIM</small>
-  </div>
-  <div class="login-heading">
-    <h1>Lost &amp; Found</h1>
+    <img src="<?= url('assets/vox-logo-02.png?v=20260713-5') ?>" alt="VOX">
   </div>
   <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
   <form method="post">
