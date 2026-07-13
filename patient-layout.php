@@ -7,7 +7,7 @@ function patient_header(string $title, string $active = 'patients'): void
     $rawName = (string)($_SESSION['user']['name'] ?? 'Kullanıcı');
     $name = e($rawName);
     $role = e((string)($_SESSION['user']['role'] ?? 'User'));
-    $initial = e(mb_strtoupper(mb_substr($rawName, 0, 1)));
+    $initial = e(function_exists('mb_substr') ? mb_strtoupper(mb_substr($rawName, 0, 1)) : strtoupper(substr($rawName, 0, 1)));
     $avatar = '';
     if ($userId > 0) {
         try {
