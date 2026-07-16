@@ -1,0 +1,12 @@
+<?php
+declare(strict_types=1);
+putenv('APP_ENV=local'); require __DIR__.'/config.php';
+$xlsx=$argv[1]??'F:\\2023-24 HASTA KAYIT MERKEZ ŞUBE (1).xlsx';if(!is_file($xlsx))exit("Excel bulunamadı.\n");
+$zip=new ZipArchive();if($zip->open($xlsx)!==true)exit("Excel açılamadı.\n");$shared=[];if(($xml=$zip->getFromName('xl/sharedStrings.xml'))!==false){$sx=simplexml_load_string($xml);foreach($sx->si as $si){$parts=[];if(isset($si->t))$parts[]=(string)$si->t;foreach($si->r as $run)$parts[]=(string)$run->t;$shared[]=implode('',$parts);}}
+function refresh_col(string $ref):int{preg_match('/^[A-Z]+/',$ref,$m);$n=0;foreach(str_split($m[0])as$ch)$n=$n*26+ord($ch)-64;return$n;}
+function refresh_name(string $value):string{return mb_strtoupper(preg_replace('/\s+/u',' ',trim($value)),'UTF-8');}
+function refresh_number(string $value,bool $phone=false):string{$value=trim($value);if($value===''||mb_strtoupper($value,'UTF-8')==='YOK')return $value;if(is_numeric($value))$value=sprintf('%.0f',(float)$value);$digits=preg_replace('/\D/','',$value);if($phone&&strlen($digits)===10)$digits='0'.$digits;return $digits?:$value;}
+$pdo=db();$patients=$pdo->query('SELECT id,full_name,record_date FROM patients')->fetchAll();$lookup=[];$names=[];foreach($patients as $patient){$year=substr((string)$patient['record_date'],0,4);$name=refresh_name($patient['full_name']);$lookup[$year.'|'.$name][]=$patient['id'];$names[$name][]=$patient['id'];}$update=$pdo->prepare('UPDATE patients SET national_id=?,phone_primary=?,phone_secondary=? WHERE id=?');$updated=0;$unmatched=[];
+foreach([2023=>[1,6],2024=>[2,8]] as $year=>[$sheetNo,$firstRow]){$sheetXml=$zip->getFromName("xl/worksheets/sheet{$sheetNo}.xml");$sheet=simplexml_load_string($sheetXml);foreach($sheet->sheetData->row as $row){if((int)$row['r']<$firstRow)continue;$v=array_fill(1,6,'');foreach($row->c as $cell){$i=refresh_col((string)$cell['r']);if($i>5)continue;$raw=(string)$cell->v;$v[$i]=(string)$cell['t']==='s'?($shared[(int)$raw]??''):$raw;}if(trim($v[2])==='')continue;$name=refresh_name($v[2]);$ids=$lookup[$year.'|'.$name]??[];if(!$ids&&count($names[$name]??[])===1)$ids=$names[$name];if(!$ids){$unmatched[]=$year.' | '.trim($v[2]);continue;}foreach($ids as $id){$update->execute([refresh_number($v[3]),refresh_number($v[4],true),refresh_number($v[5],true),$id]);$updated++;}}}
+$zip->close();echo "{$updated} hasta kaydının T.C. ve telefon bilgileri güncellendi. Eşleşmeyen: ".count($unmatched).".\n";
+if($unmatched)echo implode(PHP_EOL,array_slice($unmatched,0,20)).PHP_EOL;
