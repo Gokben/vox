@@ -1,15 +1,24 @@
 <?php
 require __DIR__ . '/config.php';
+require __DIR__ . '/social-security-bootstrap.php';
 require_login();
 if (function_exists('ensure_branch_schema')) ensure_branch_schema();
 require __DIR__ . '/patient-layout.php';
+require __DIR__ . '/employee-patient-link.php';
+ensure_patient_staff_yeliz_schema();
+$staffNames = patient_staff_names();
 
 $id = (int)($_GET['id'] ?? 0);
 $fields = ['branch_id','record_date','full_name','national_id','phone_primary','phone_secondary','birth_date','address','social_security','report_info','service_location','service_type','source_primary','source_marketing','source_detail','anamnesis','notes'];
 $patient = array_fill_keys($fields, '');
 $patient += ['approval'=>0,'considering'=>0,'rejected'=>0,'staff_cansu'=>0,'staff_busra'=>0,'staff_belma'=>0];
 $error = '';
+$patient['staff_yeliz'] = (int)($patient['staff_yeliz'] ?? 0);
+$patient['staff_gunes'] = (int)($patient['staff_gunes'] ?? 0);
+$patient['staff_erva'] = (int)($patient['staff_erva'] ?? 0);
+$patient['staff_merve'] = (int)($patient['staff_merve'] ?? 0);
 $branches=db()->query('SELECT id,name FROM branches WHERE active=1 ORDER BY name')->fetchAll();
+$socialSecurityOptions=social_security_definitions();
 if ($id) {
     $stmt=db()->prepare('SELECT * FROM patients WHERE id=?'); $stmt->execute([$id]); $found=$stmt->fetch();
     if (!$found) { http_response_code(404); exit('Hasta kaydı bulunamadı.'); }
@@ -19,9 +28,17 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     verify_csrf();
     foreach($fields as $field) $patient[$field]=trim((string)($_POST[$field]??''));
     foreach(['approval','considering','rejected','staff_cansu','staff_busra','staff_belma'] as $field) $patient[$field]=isset($_POST[$field])?1:0;
+    $patient['staff_yeliz']=isset($_POST['staff_yeliz'])?1:0;
+    $patient['staff_gunes']=isset($_POST['staff_gunes'])?1:0;
+    $patient['staff_erva']=isset($_POST['staff_erva'])?1:0;
+    $patient['staff_merve']=isset($_POST['staff_merve'])?1:0;
     if ($patient['full_name']==='') $error='Ad soyad alanı zorunludur.';
     else {
         $values=[]; foreach(array_merge($fields,['approval','considering','rejected','staff_cansu','staff_busra','staff_belma']) as $field) $values[$field]=$patient[$field];
+        $values['staff_yeliz']=$patient['staff_yeliz'];
+        $values['staff_gunes']=$patient['staff_gunes'];
+        $values['staff_erva']=$patient['staff_erva'];
+        $values['staff_merve']=$patient['staff_merve'];
         if ($id) {
             $set=implode(',',array_map(fn($field)=>$field.'=?',array_keys($values)));
             $stmt=db()->prepare("UPDATE patients SET $set,updated_at=CURRENT_TIMESTAMP WHERE id=?"); $stmt->execute([...array_values($values),$id]);
@@ -32,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         redirect('patients.php');
     }
 }
+start_patient_staff_ui_link($staffNames, ['staff_yeliz'=>!empty($patient['staff_yeliz']),'staff_gunes'=>!empty($patient['staff_gunes']),'staff_erva'=>!empty($patient['staff_erva']),'staff_merve'=>!empty($patient['staff_merve'])]);
 patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 ?>
 <style>
@@ -63,4 +81,7 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="icon-form-row"><span class="icon-form-label">Sonuç</span><div class="check-row"><label><input type="checkbox" name="approval" value="1" <?=$patient['approval']?'checked':''?>> Onay</label><label><input type="checkbox" name="considering" value="1" <?=$patient['considering']?'checked':''?>> Düşünecek</label><label><input type="checkbox" name="rejected" value="1" <?=$patient['rejected']?'checked':''?>> Red</label></div></div>
 <div class="icon-form-row"><span class="icon-form-label">İlgili Personel</span><div class="check-row"><label><input type="checkbox" name="staff_cansu" value="1" <?=$patient['staff_cansu']?'checked':''?>> Cansu</label><label><input type="checkbox" name="staff_busra" value="1" <?=$patient['staff_busra']?'checked':''?>> Büşra</label><label><input type="checkbox" name="staff_belma" value="1" <?=$patient['staff_belma']?'checked':''?>> Belma Baysan</label></div></div>
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=url('patients.php')?>">İptal</a></div></form></section></main>
+<script>
+(()=>{const input=document.querySelector('input[name="social_security"]');if(!input)return;const select=document.createElement('select');select.name='social_security';select.innerHTML='<option value="">Seçiniz</option>'+<?=json_encode(array_map(fn($item)=>['name'=>$item['name']],$socialSecurityOptions),JSON_UNESCAPED_UNICODE)?>.map(item=>'<option value="'+item.name.replace(/"/g,'&quot;')+'">'+item.name+'</option>').join('');select.value=input.value;input.replaceWith(select)})();
+</script>
 <?php patient_footer();

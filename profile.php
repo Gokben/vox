@@ -17,7 +17,28 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
    else{$update=db()->prepare('UPDATE users SET password_hash=? WHERE id=?');$update->execute([password_hash($password,PASSWORD_DEFAULT),$userId]);$success='Şifreniz değiştirildi.';}
   }
   else{
-  $name=trim($_POST['name']??'');$email=trim(strtolower($_POST['email']??''));if($name===''||!filter_var($email,FILTER_VALIDATE_EMAIL))$error='Geçerli ad ve e-posta girin.';else{foreach(['phone','organization','address','state','zip_code','country','language','timezone','currency'] as $field)$profile[$field]=trim($_POST[$field]??'');try{$update=db()->prepare('UPDATE users SET name=?,email=? WHERE id=?');$update->execute([$name,$email,$userId]);$_SESSION['user']['name']=$name;$_SESSION['user']['email']=$email;$success='Profil bilgileri kaydedildi.';}catch(PDOException $e){$error='E-posta adresi başka bir kullanıcı tarafından kullanılıyor.';}}
+  $name=trim($_POST['name']??'');
+  $email=trim(strtolower($_POST['email']??''));
+  $password=(string)($_POST['password']??'');
+  $confirm=(string)($_POST['password_confirm']??'');
+  if($name===''||!filter_var($email,FILTER_VALIDATE_EMAIL))$error='Geçerli ad ve e-posta girin.';
+  elseif($password!==''&&strlen($password)<6)$error='Şifre en az 6 karakter olmalıdır.';
+  elseif($password!==$confirm)$error='Şifre ve şifre tekrarı aynı olmalıdır.';
+  else{
+   $profile['phone']=trim($_POST['phone']??'');
+   try{
+    db()->beginTransaction();
+    $update=db()->prepare('UPDATE users SET name=?,email=? WHERE id=?');
+    $update->execute([$name,$email,$userId]);
+    if($password!==''){
+     $passwordUpdate=db()->prepare('UPDATE users SET password_hash=? WHERE id=?');
+     $passwordUpdate->execute([password_hash($password,PASSWORD_DEFAULT),$userId]);
+    }
+    db()->commit();
+    $_SESSION['user']['name']=$name;$_SESSION['user']['email']=$email;
+    $success=$password!==''?'Profil bilgileriniz ve şifreniz kaydedildi.':'Profil bilgileri kaydedildi.';
+   }catch(PDOException $e){if(db()->inTransaction())db()->rollBack();$error='E-posta adresi başka bir kullanıcı tarafından kullanılıyor.';}
+  }
  }
  if(!$error){$upsert=db()->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?'INSERT INTO settings(setting_key,setting_value) VALUES(?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)':'INSERT INTO settings(setting_key,setting_value) VALUES(?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value';$save=db()->prepare($upsert);$save->execute([$key,json_encode($profile,JSON_UNESCAPED_UNICODE)]);}
 }

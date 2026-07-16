@@ -1,0 +1,345 @@
+.employee-form .actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.employee-form .actions button,
+.employee-form .actions a,
+.employee-card .edit,
+.employee-card .delete {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  min-width: 96px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 16px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.employee-form .actions button,
+.employee-card .edit {
+  background: #19a94b !important;
+  color: #fff !important;
+}
+
+.employee-form .actions a {
+  background: #eef0f3 !important;
+  color: #4b4f5c !important;
+}
+
+.employee-card .delete {
+  background: #dc4c4c !important;
+  color: #fff !important;
+}
+
+.employee-card td:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.employee-card td:last-child form {
+  display: inline-flex !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.employee-form .actions button:hover,
+.employee-card .edit:hover { background: #148b3e !important; }
+.employee-form .actions a:hover { background: #dfe2e7 !important; }
+.employee-card .delete:hover { background: #bd3838 !important; }
+[data-theme="dark"] .employee-form .actions a { background: #454a63 !important; color: #fff !important; }
+
+@media (max-width: 700px) {
+  .employee-form .actions { flex-wrap: wrap; }
+  .employee-form .actions button,
+  .employee-form .actions a { flex: 1 1 120px; }
+}
+
+/* Şube formu ve liste işlem butonları */
+.branch-form > .wide:last-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.branch-form > .wide:last-child button,
+.branch-form > .wide:last-child a,
+.branch-card .edit,
+.branch-card .toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  min-width: 108px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 16px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.branch-form > .wide:last-child button,
+.branch-card .edit {
+  background: #19a94b !important;
+  color: #fff !important;
+}
+
+.branch-form > .wide:last-child a {
+  background: #eef0f3 !important;
+  color: #4b4f5c !important;
+}
+
+.branch-card .toggle {
+  background: #687080 !important;
+  color: #fff !important;
+}
+
+.branch-card td:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.branch-card td:last-child form {
+  display: inline-flex !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.branch-form > .wide:last-child button:hover,
+.branch-card .edit:hover { background: #148b3e !important; }
+.branch-form > .wide:last-child a:hover { background: #dfe2e7 !important; }
+.branch-card .toggle:hover { background: #535a68 !important; }
+[data-theme="dark"] .branch-form > .wide:last-child a { background: #454a63 !important; color: #fff !important; }
+
+@media (max-width: 700px) {
+  .branch-form > .wide:last-child { flex-wrap: wrap; }
+  .branch-form > .wide:last-child button,
+  .branch-form > .wide:last-child a { flex: 1 1 120px; }
+}
+
+/* Sosyal güvence tanımları form ve işlem butonları */
+.social-settings > form > button,
+.social-settings td > a,
+.social-settings td .inline button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  min-width: 96px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 16px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+.social-settings > form > button,
+.social-settings td > a {
+  background: #19a94b !important;
+  color: #fff !important;
+}
+
+.social-settings td .inline button {
+  background: #dc4c4c !important;
+  color: #fff !important;
+}
+
+.social-settings td:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.social-settings td .inline {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.social-settings > form > button:hover,
+.social-settings td > a:hover { background: #148b3e !important; }
+.social-settings td .inline button:hover { background: #bd3838 !important; }
+
+@media (max-width: 700px) {
+  .social-settings > form > button { width: 100% !important; }
+}
+
+/* Tüm Ayarlar sayfalarında ortak sekme görünümü */
+.settings-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 20px !important;
+}
+
+.settings-tabs a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: 7px !important;
+  background: #e8f7ed !important;
+  color: #16883d !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+}
+
+.settings-tabs a:hover {
+  background: #d4f1dd !important;
+}
+
+.settings-tabs a.active {
+  background: #19a94b !important;
+  color: #fff !important;
+}
+
+[data-theme="dark"] .settings-tabs a {
+  background: #343a50 !important;
+  color: #a8e8bd !important;
+}
+
+[data-theme="dark"] .settings-tabs a.active {
+  background: #19a94b !important;
+  color: #fff !important;
+}
+
+/* Çalışanlar sayfasını Kullanıcı Yönetimi sayfasıyla eşleştir */
+.employee-page {
+  width: 100% !important;
+  max-width: 1180px !important;
+  margin: 0 auto !important;
+  padding: 28px 20px 48px !important;
+}
+
+.employee-page .employee-card {
+  width: 100% !important;
+  margin: 0 0 24px !important;
+  border: 1px solid #e1e2e8 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  box-shadow: 0 3px 12px rgba(30,40,60,.06) !important;
+  overflow: hidden !important;
+}
+
+.employee-page .employee-card > header {
+  display: block !important;
+  padding: 22px 24px !important;
+  border-bottom: 1px solid #e1e2e8 !important;
+}
+
+.employee-page .employee-card h1,
+.employee-page .employee-card h2 {
+  margin: 0 0 5px !important;
+  color: #2f2b3d !important;
+  font-size: 21px !important;
+  line-height: 1.25 !important;
+}
+
+.employee-page .employee-card header p {
+  margin: 0 !important;
+  color: #7b7b8d !important;
+}
+
+.employee-page .employee-form {
+  display: grid !important;
+  grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  gap: 18px 24px !important;
+  padding: 24px !important;
+}
+
+.employee-page .employee-form label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  color: #2f2b3d !important;
+  font-size: 14px !important;
+}
+
+.employee-page .employee-form input {
+  width: 100% !important;
+  height: 43px !important;
+  padding: 0 12px !important;
+  border: 1px solid #d2d2dc !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: inherit !important;
+  box-sizing: border-box !important;
+}
+
+.employee-page .employee-card table {
+  width: 100% !important;
+  min-width: 850px !important;
+  border-collapse: collapse !important;
+}
+
+.employee-page .employee-card th,
+.employee-page .employee-card td {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid #e1e2e8 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+.employee-page .employee-card tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+[data-theme="dark"] .employee-page .employee-card {
+  background: #2f3349 !important;
+  border-color: #454a63 !important;
+}
+
+[data-theme="dark"] .employee-page .employee-card > header,
+[data-theme="dark"] .employee-page .employee-card th,
+[data-theme="dark"] .employee-page .employee-card td {
+  border-color: #454a63 !important;
+}
+
+[data-theme="dark"] .employee-page .employee-card h1,
+[data-theme="dark"] .employee-page .employee-card h2,
+[data-theme="dark"] .employee-page .employee-form label {
+  color: #fff !important;
+}
+
+[data-theme="dark"] .employee-page .employee-card header p {
+  color: #c4c7d6 !important;
+}
+
+@media (max-width: 720px) {
+  .employee-page { padding: 20px 12px 40px !important; }
+  .employee-page .employee-form { grid-template-columns: 1fr !important; padding: 18px !important; }
+  .employee-page .employee-form .actions { grid-column: 1 !important; }
+}

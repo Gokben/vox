@@ -4,4 +4,4 @@ deployment:
     - export DEPLOYPATH=$HOME/public_html/vox/
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/cp -R assets $DEPLOYPATH
-    - /bin/cp .htaccess admin.php branches.php user-edit.php index.php item-new.php item-edit.php item-delete.php login.php logout.php profile.php patient-layout.php patients.php patient-form.php patient-delete.php $DEPLOYPATH
+    - /bin/cp .htaccess admin.php branches.php employees.php employee-status.php employee-patient-link.php social-securities.php user-edit.php index.php item-new.php item-edit.php item-delete.php login.php logout.php profile.php patient-layout.php patients.php patient-form.php patient-delete.php $DEPLOYPATH
