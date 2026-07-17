@@ -9,10 +9,12 @@ function ensure_employee_active_schema(): void
     $pdo = db();
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     if ($driver === 'sqlite') {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS employees(id INTEGER PRIMARY KEY AUTOINCREMENT,full_name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,start_date DATE NOT NULL,end_date DATE NULL,job_title TEXT NOT NULL,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
         $columns = array_column($pdo->query('PRAGMA table_info(employees)')->fetchAll(), 'name');
         if (!in_array('active', $columns, true)) $pdo->exec('ALTER TABLE employees ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
-    } elseif (!$pdo->query("SHOW COLUMNS FROM employees LIKE 'active'")->fetch()) {
-        $pdo->exec('ALTER TABLE employees ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1');
+    } else {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS employees(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,full_name VARCHAR(190) NOT NULL,email VARCHAR(190) NOT NULL UNIQUE,start_date DATE NOT NULL,end_date DATE NULL,job_title VARCHAR(190) NOT NULL,created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        if (!$pdo->query("SHOW COLUMNS FROM employees LIKE 'active'")->fetch()) $pdo->exec('ALTER TABLE employees ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1');
     }
 }
 
@@ -20,7 +22,7 @@ function ensure_employee_active_schema(): void
  * Mevcut hasta tablosundaki personel sütunlarını Çalışanlar tablosundaki
  * Ad Soyad kayıtlarıyla eşleştirir. Eski hasta verileri değiştirilmez.
  */
-function patient_staff_names(): array
+function patient_staff_names(bool $includeInactive = false): array
 {
     ensure_employee_active_schema();
     $names = [
@@ -31,16 +33,17 @@ function patient_staff_names(): array
         'staff_gunes' => 'Güneş',
         'staff_erva' => 'Erva',
         'staff_merve' => 'Merve',
+        'staff_seyma' => 'Şeyma',
     ];
 
     try {
         $employees = db()->query('SELECT full_name,active FROM employees ORDER BY id')->fetchAll();
         foreach ($employees as $employee) {
             $fullName = trim((string)$employee['full_name']);
-            $normalized = mb_strtolower($fullName, 'UTF-8');
-            $column = $normalized === 'cansu' ? 'staff_cansu' : (($normalized === 'büşra' || $normalized === 'busra') ? 'staff_busra' : ((($normalized === 'belma baysan' || str_starts_with($normalized, 'belma '))) ? 'staff_belma' : (str_starts_with($normalized, 'yeliz') ? 'staff_yeliz' : (str_starts_with($normalized, 'gunes') ? 'staff_gunes' : (str_starts_with($normalized, 'erva') ? 'staff_erva' : (str_starts_with($normalized, 'merve') ? 'staff_merve' : null))))));
+            $normalized = strtr(mb_strtolower($fullName, 'UTF-8'), ['ç'=>'c','ğ'=>'g','ı'=>'i','ö'=>'o','ş'=>'s','ü'=>'u']);
+            $column = $normalized === 'cansu' ? 'staff_cansu' : ($normalized === 'busra' ? 'staff_busra' : (($normalized === 'belma baysan' || str_starts_with($normalized, 'belma ')) ? 'staff_belma' : (str_starts_with($normalized, 'yeliz') ? 'staff_yeliz' : (str_starts_with($normalized, 'gunes') ? 'staff_gunes' : (str_starts_with($normalized, 'erva') ? 'staff_erva' : (str_starts_with($normalized, 'merve') ? 'staff_merve' : (str_starts_with($normalized, 'seyma') ? 'staff_seyma' : null)))))));
             if ($column === null) continue;
-            if (!empty($employee['active'])) $names[$column] = $fullName;
+            if (!empty($employee['active']) || $includeInactive) $names[$column] = $fullName;
             else unset($names[$column]);
         }
     } catch (Throwable $e) {
@@ -63,12 +66,14 @@ function ensure_patient_staff_yeliz_schema(): void
         if (!in_array('staff_gunes', $columns, true)) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_gunes INTEGER NOT NULL DEFAULT 0');
         if (!in_array('staff_erva', $columns, true)) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_erva INTEGER NOT NULL DEFAULT 0');
         if (!in_array('staff_merve', $columns, true)) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_merve INTEGER NOT NULL DEFAULT 0');
+        if (!in_array('staff_seyma', $columns, true)) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_seyma INTEGER NOT NULL DEFAULT 0');
     } elseif (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'staff_yeliz'")->fetch()) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN staff_yeliz TINYINT(1) NOT NULL DEFAULT 0');
     }
     if ($driver !== 'sqlite' && !$pdo->query("SHOW COLUMNS FROM patients LIKE 'staff_gunes'")->fetch()) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_gunes TINYINT(1) NOT NULL DEFAULT 0');
     if ($driver !== 'sqlite' && !$pdo->query("SHOW COLUMNS FROM patients LIKE 'staff_erva'")->fetch()) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_erva TINYINT(1) NOT NULL DEFAULT 0');
     if ($driver !== 'sqlite' && !$pdo->query("SHOW COLUMNS FROM patients LIKE 'staff_merve'")->fetch()) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_merve TINYINT(1) NOT NULL DEFAULT 0');
+    if ($driver !== 'sqlite' && !$pdo->query("SHOW COLUMNS FROM patients LIKE 'staff_seyma'")->fetch()) $pdo->exec('ALTER TABLE patients ADD COLUMN staff_seyma TINYINT(1) NOT NULL DEFAULT 0');
 }
 
 function patient_staff_list(array $patient, array $staffNames): string
@@ -97,9 +102,9 @@ function start_patient_staff_ui_link(array $staffNames, array $selectedStaff = [
    if(label&&!names[input.name]) label.remove();
    else if(label) label.lastChild.textContent=' '+names[input.name];
  });
- const staffRow=document.querySelector('.check-row input[name="staff_cansu"]')?.closest('.check-row');
+ const staffRow=Array.from(document.querySelectorAll('.check-row')).find(row=>row.querySelector('input[name^="staff_"]'));
  if(staffRow){
-   ['staff_yeliz','staff_gunes','staff_erva','staff_merve'].forEach(column=>{
+   ['staff_yeliz','staff_gunes','staff_erva','staff_merve','staff_seyma'].forEach(column=>{
      if(!names[column]||staffRow.querySelector(`input[name="${column}"]`))return;
      const label=document.createElement('label');
      label.innerHTML=`<input type="checkbox" name="${column}" value="1"> `;
@@ -109,7 +114,7 @@ function start_patient_staff_ui_link(array $staffNames, array $selectedStaff = [
      staffRow.append(label);
    });
  }
- const oldNames={Cansu:'staff_cansu','Büşra':'staff_busra','Belma Baysan':'staff_belma',Yeliz:'staff_yeliz',Güneş:'staff_gunes',Erva:'staff_erva',Merve:'staff_merve'};
+ const oldNames={Cansu:'staff_cansu','Büşra':'staff_busra','Belma Baysan':'staff_belma',Yeliz:'staff_yeliz',Güneş:'staff_gunes',Erva:'staff_erva',Merve:'staff_merve','Şeyma':'staff_seyma'};
  document.querySelectorAll('.patient-table tbody tr').forEach(row=>{
    const cell=row.cells[14];
    if(!cell)return;

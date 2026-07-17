@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+if (!function_exists('format_date_tr')) {
+    function format_date_tr(?string $value, bool $withTime = false): string
+    {
+        $value = trim((string)$value);
+        if ($value === '') return '';
+        try { return (new DateTime($value))->format($withTime ? 'd.m.Y H:i' : 'd.m.Y'); }
+        catch (Throwable $e) { return $value; }
+    }
+}
+
 function patient_header(string $title, string $active = 'patients'): void
 {
     $userId = (int)($_SESSION['user']['id'] ?? 0);

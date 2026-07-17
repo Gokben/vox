@@ -5,12 +5,13 @@ if (function_exists('ensure_branch_schema')) ensure_branch_schema();
 require __DIR__ . '/patient-layout.php';
 require __DIR__ . '/employee-patient-link.php';
 ensure_patient_staff_yeliz_schema();
-$staffNames = patient_staff_names();
+$staffNames = patient_staff_names(true);
 $staffOrders = [
     'staff_yeliz' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_yeliz,0)=1')->fetchAll(PDO::FETCH_COLUMN),
     'staff_gunes' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_gunes,0)=1')->fetchAll(PDO::FETCH_COLUMN),
     'staff_erva' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_erva,0)=1')->fetchAll(PDO::FETCH_COLUMN),
     'staff_merve' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_merve,0)=1')->fetchAll(PDO::FETCH_COLUMN),
+    'staff_seyma' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_seyma,0)=1')->fetchAll(PDO::FETCH_COLUMN),
 ];
 start_patient_staff_ui_link($staffNames, [], $staffOrders);
 

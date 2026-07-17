@@ -17,6 +17,7 @@ $patient['staff_yeliz'] = (int)($patient['staff_yeliz'] ?? 0);
 $patient['staff_gunes'] = (int)($patient['staff_gunes'] ?? 0);
 $patient['staff_erva'] = (int)($patient['staff_erva'] ?? 0);
 $patient['staff_merve'] = (int)($patient['staff_merve'] ?? 0);
+$patient['staff_seyma'] = (int)($patient['staff_seyma'] ?? 0);
 $branches=db()->query('SELECT id,name FROM branches WHERE active=1 ORDER BY name')->fetchAll();
 $socialSecurityOptions=social_security_definitions();
 if ($id) {
@@ -32,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     $patient['staff_gunes']=isset($_POST['staff_gunes'])?1:0;
     $patient['staff_erva']=isset($_POST['staff_erva'])?1:0;
     $patient['staff_merve']=isset($_POST['staff_merve'])?1:0;
+    $patient['staff_seyma']=isset($_POST['staff_seyma'])?1:0;
     if ($patient['full_name']==='') $error='Ad soyad alanı zorunludur.';
     else {
         $values=[]; foreach(array_merge($fields,['approval','considering','rejected','staff_cansu','staff_busra','staff_belma']) as $field) $values[$field]=$patient[$field];
@@ -39,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $values['staff_gunes']=$patient['staff_gunes'];
         $values['staff_erva']=$patient['staff_erva'];
         $values['staff_merve']=$patient['staff_merve'];
+        $values['staff_seyma']=$patient['staff_seyma'];
         if ($id) {
             $set=implode(',',array_map(fn($field)=>$field.'=?',array_keys($values)));
             $stmt=db()->prepare("UPDATE patients SET $set,updated_at=CURRENT_TIMESTAMP WHERE id=?"); $stmt->execute([...array_values($values),$id]);
@@ -49,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         redirect('patients.php');
     }
 }
-start_patient_staff_ui_link($staffNames, ['staff_yeliz'=>!empty($patient['staff_yeliz']),'staff_gunes'=>!empty($patient['staff_gunes']),'staff_erva'=>!empty($patient['staff_erva']),'staff_merve'=>!empty($patient['staff_merve'])]);
+start_patient_staff_ui_link($staffNames, ['staff_yeliz'=>!empty($patient['staff_yeliz']),'staff_gunes'=>!empty($patient['staff_gunes']),'staff_erva'=>!empty($patient['staff_erva']),'staff_merve'=>!empty($patient['staff_merve']),'staff_seyma'=>!empty($patient['staff_seyma'])]);
 patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 ?>
 <style>
@@ -79,7 +82,7 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="icon-form-row"><label class="icon-form-label">Açıklama</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="notes"><?=e($patient['notes'])?></textarea></div></div>
 <h3 class="form-section-title">Sonuç ve İlgili Personel</h3>
 <div class="icon-form-row"><span class="icon-form-label">Sonuç</span><div class="check-row"><label><input type="checkbox" name="approval" value="1" <?=$patient['approval']?'checked':''?>> Onay</label><label><input type="checkbox" name="considering" value="1" <?=$patient['considering']?'checked':''?>> Düşünecek</label><label><input type="checkbox" name="rejected" value="1" <?=$patient['rejected']?'checked':''?>> Red</label></div></div>
-<div class="icon-form-row"><span class="icon-form-label">İlgili Personel</span><div class="check-row"><label><input type="checkbox" name="staff_cansu" value="1" <?=$patient['staff_cansu']?'checked':''?>> Cansu</label><label><input type="checkbox" name="staff_busra" value="1" <?=$patient['staff_busra']?'checked':''?>> Büşra</label><label><input type="checkbox" name="staff_belma" value="1" <?=$patient['staff_belma']?'checked':''?>> Belma Baysan</label></div></div>
+<div class="icon-form-row"><span class="icon-form-label">İlgili Personel</span><div class="check-row"><?php foreach($staffNames as $field=>$staffName):?><label><input type="checkbox" name="<?=e($field)?>" value="1" <?=!empty($patient[$field])?'checked':''?>> <?=e($staffName)?></label><?php endforeach?></div></div>
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=url('patients.php')?>">İptal</a></div></form></section></main>
 <script>
 (()=>{const input=document.querySelector('input[name="social_security"]');if(!input)return;const select=document.createElement('select');select.name='social_security';select.innerHTML='<option value="">Seçiniz</option>'+<?=json_encode(array_map(fn($item)=>['name'=>$item['name']],$socialSecurityOptions),JSON_UNESCAPED_UNICODE)?>.map(item=>'<option value="'+item.name.replace(/"/g,'&quot;')+'">'+item.name+'</option>').join('');select.value=input.value;input.replaceWith(select)})();
