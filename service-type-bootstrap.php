@@ -50,6 +50,38 @@ function ensure_patient_service_type_schema(): void
             : 'ALTER TABLE patients ADD COLUMN service_type_id INT UNSIGNED NULL AFTER service_type');
     }
 
+    // vox2026.xlsx içindeki "HİZMET YERİ ŞUBE" sütununu, aynı dosyadan
+    // aktarılmış 198-297 sıra numaralı 100 hasta kaydına bir kez uygular.
+    $migrationKey = '20260724_patient_service_locations_2026_v1';
+    $migration = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+    $migration->execute([$migrationKey]);
+    if (!$migration->fetchColumn()) {
+        $definitionIds = [];
+        foreach ($pdo->query("SELECT id,name FROM service_type_definitions WHERE name IN ('Şube','Ev Hizmeti','Hastane')") as $definition) {
+            $definitionIds[$definition['name']] = (int)$definition['id'];
+        }
+        if (isset($definitionIds['Şube'], $definitionIds['Ev Hizmeti'], $definitionIds['Hastane'])) {
+            $update = $pdo->prepare(
+                "UPDATE patients SET " .
+                "service_type=CASE " .
+                "WHEN import_order IN (250,284,285) THEN 'Ev Hizmeti' " .
+                "WHEN import_order=291 THEN 'Hastane' " .
+                "ELSE 'Şube' END, " .
+                "service_type_id=CASE " .
+                "WHEN import_order IN (250,284,285) THEN ? " .
+                "WHEN import_order=291 THEN ? " .
+                "ELSE ? END " .
+                "WHERE import_order BETWEEN 198 AND 297"
+            );
+            $update->execute([
+                $definitionIds['Ev Hizmeti'],
+                $definitionIds['Hastane'],
+                $definitionIds['Şube'],
+            ]);
+            $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$migrationKey]);
+        }
+    }
+
     // Eski metin kayıtlarını mevcut tanımlara bağlar. Yalnızca ilişkisi boş kayıtlarda çalışır.
     $pdo->exec(
         'UPDATE patients SET service_type_id = (' .
