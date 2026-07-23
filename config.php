@@ -5,6 +5,7 @@ const APP_NAME = 'Vox';
 $configuredBasePath = getenv('APP_BASE_PATH');
 $host = $_SERVER['HTTP_HOST'] ?? '';
 $isLocalHost = str_starts_with($host, '127.0.0.1') || str_starts_with($host, 'localhost');
+$isLocalEnvironment = getenv('APP_ENV') === 'local' || $isLocalHost;
 define('BASE_PATH', $configuredBasePath !== false ? $configuredBasePath : ($isLocalHost ? '' : '/vox'));
 
 $privateConfig = __DIR__ . '/config.local.php';
@@ -15,7 +16,7 @@ defined('DB_USER') || define('DB_USER', getenv('DB_USER') ?: 'vox_user');
 defined('DB_PASS') || define('DB_PASS', getenv('DB_PASS') ?: '');
 
 ini_set('session.use_strict_mode', '1');
-if (getenv('APP_ENV') === 'local') {
+if ($isLocalEnvironment) {
     if (!is_dir(__DIR__ . '/storage')) mkdir(__DIR__ . '/storage', 0775, true);
     session_save_path(__DIR__ . '/storage');
 }
@@ -26,7 +27,8 @@ function db(): PDO
 {
     static $pdo;
     if (!$pdo) {
-        if (getenv('APP_ENV') === 'local') {
+        global $isLocalEnvironment;
+        if ($isLocalEnvironment) {
             $pdo = new PDO('sqlite:' . __DIR__ . '/storage/vox.sqlite');
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);

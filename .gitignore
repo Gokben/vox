@@ -44,6 +44,8 @@ next-env.d.ts
 # Vox runtime data
 /storage/*
 !/storage/.gitkeep
+/.runlogs/
+/backups/
 /assets/uploads/profiles/*
 !/assets/uploads/profiles/.gitkeep
 /.openai/

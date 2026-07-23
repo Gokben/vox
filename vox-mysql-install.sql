@@ -47,7 +47,6 @@ CREATE TABLE patients (
  address TEXT NULL,
  social_security VARCHAR(100) NULL,
  report_info VARCHAR(150) NULL,
- service_location VARCHAR(150) NULL,
  service_type VARCHAR(150) NULL,
  source_primary VARCHAR(150) NULL,
  source_marketing VARCHAR(150) NULL,

@@ -116,7 +116,8 @@ function start_patient_staff_ui_link(array $staffNames, array $selectedStaff = [
  }
  const oldNames={Cansu:'staff_cansu','Büşra':'staff_busra','Belma Baysan':'staff_belma',Yeliz:'staff_yeliz',Güneş:'staff_gunes',Erva:'staff_erva',Merve:'staff_merve','Şeyma':'staff_seyma'};
  document.querySelectorAll('.patient-table tbody tr').forEach(row=>{
-   const cell=row.cells[14];
+   // Hasta listesine Kaynak sütunu eklendiği için İlgili hücresi 15. kolondadır.
+   const cell=row.cells[15];
    if(!cell)return;
    cell.textContent=cell.textContent.split(',').map(value=>{
      const current=value.trim(),column=oldNames[current];
