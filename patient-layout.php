@@ -81,7 +81,7 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   reportSubmenu.className = 'report-submenu';
   const resultMenuLink = document.createElement('a');
   resultMenuLink.href = <?= json_encode(url('patient-results.php')) ?>;
-  resultMenuLink.textContent = 'Sonuç';
+  resultMenuLink.textContent = 'Hasta Görüşmeleri Sonuç Raporu';
   if (location.pathname.endsWith('/patient-results.php')) {
     resultMenuLink.classList.add('active');
     reportMenuLink.classList.add('active');

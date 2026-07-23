@@ -84,7 +84,7 @@ function patient_result_url(string $targetResult, int $targetPage = 1): string
     ]));
 }
 
-patient_header('Hasta Sonuçları', 'results');
+patient_header('Hasta Görüşmeleri Sonuç Raporu', 'results');
 $tabs = [
     'all' => 'Tümü',
     'approved' => 'Onay',
@@ -102,7 +102,7 @@ $to = min($offset + $perPage, $total);
 <main class="results-page">
   <section class="results-card">
     <header class="results-head">
-      <div><h1>Hasta Sonuçları</h1><p>Hastaları kayıt sonuçlarına göre ayrı ayrı görüntüleyin.</p></div>
+      <div><h1>Hasta Görüşmeleri Sonuç Raporu</h1><p>Hastaları kayıt sonuçlarına göre ayrı ayrı görüntüleyin.</p></div>
       <form class="results-search" method="get">
         <input type="hidden" name="result" value="<?=e($result)?>">
         <input name="q" value="<?=e($q)?>" placeholder="Hasta ara" autocomplete="off">
