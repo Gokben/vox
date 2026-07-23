@@ -69,6 +69,14 @@ function patient_export_column(int $index): string
     return $name;
 }
 
+function patient_export_excel_date(string $value): ?int
+{
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', trim($value), new DateTimeZone('UTC'));
+    if (!$date || $date->format('Y-m-d') !== trim($value)) return null;
+    $epoch = new DateTimeImmutable('1899-12-30', new DateTimeZone('UTC'));
+    return (int)$epoch->diff($date)->format('%r%a');
+}
+
 $exportRows = [[
     'No', 'Tarih', 'Ad Soyad', 'T.C. Kimlik No', 'Telefon 1', 'Telefon 2',
     'Doğum Tarihi', 'Adres', 'Sosyal Güvence', 'Rapor', 'Hizmet Yeri',
@@ -118,9 +126,13 @@ foreach ($exportRows as $rowIndex => $values) {
     $cells = '';
     foreach ($values as $columnIndex => $value) {
         $reference = patient_export_column($columnIndex + 1) . $excelRow;
-        $style = $rowIndex === 0 ? ' s="1"' : '';
-        $cells .= '<c r="' . $reference . '" t="inlineStr"' . $style . '><is><t xml:space="preserve">' .
-            patient_export_xml((string)$value) . '</t></is></c>';
+        if ($rowIndex > 0 && in_array($columnIndex, [1, 6], true) && ($excelDate = patient_export_excel_date((string)$value)) !== null) {
+            $cells .= '<c r="' . $reference . '" s="2"><v>' . $excelDate . '</v></c>';
+        } else {
+            $style = $rowIndex === 0 ? ' s="1"' : '';
+            $cells .= '<c r="' . $reference . '" t="inlineStr"' . $style . '><is><t xml:space="preserve">' .
+                patient_export_xml((string)$value) . '</t></is></c>';
+        }
     }
     $sheetRows .= '<row r="' . $excelRow . '">' . $cells . '</row>';
 }
@@ -151,7 +163,7 @@ $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"
 $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
 $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Hasta Kayıtları ' . $year . '" sheetId="1" r:id="rId1"/></sheets></workbook>');
 $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
-$zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF16883D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+$zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd.mm.yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF16883D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
 $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
 $zip->close();
 
