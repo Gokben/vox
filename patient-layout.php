@@ -79,7 +79,14 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   reportGroup.className = 'report-menu-group';
   const reportSubmenu = document.createElement('div');
   reportSubmenu.className = 'report-submenu';
-  reportSubmenu.append(followUpMenuLink, salesMenuLink);
+  const resultMenuLink = document.createElement('a');
+  resultMenuLink.href = <?= json_encode(url('patient-results.php')) ?>;
+  resultMenuLink.textContent = 'Sonuç';
+  if (location.pathname.endsWith('/patient-results.php')) {
+    resultMenuLink.classList.add('active');
+    reportMenuLink.classList.add('active');
+  }
+  reportSubmenu.append(followUpMenuLink, salesMenuLink, resultMenuLink);
   reportMenuLink.setAttribute('aria-haspopup', 'true');
   reportMenuLink.setAttribute('aria-expanded', 'false');
   reportMenuLink.addEventListener('click', event => {
