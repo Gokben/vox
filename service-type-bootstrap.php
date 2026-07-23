@@ -10,9 +10,23 @@ function service_type_definitions(): array
         $pdo->exec($driver === 'sqlite'
             ? 'CREATE TABLE IF NOT EXISTS service_type_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(190) NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0)'
             : 'CREATE TABLE IF NOT EXISTS service_type_definitions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(190) NOT NULL UNIQUE, active TINYINT(1) NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-        // Tanımlar yalnızca yönetici tarafından oluşturulur. Burada varsayılan
-        // kayıt eklenmez; böylece silinen bir hizmet yeri sayfa yenilendiğinde
-        // kendiliğinden geri gelmez.
+
+        $pdo->exec($driver === 'sqlite'
+            ? 'CREATE TABLE IF NOT EXISTS app_migrations (migration_key VARCHAR(190) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)'
+            : 'CREATE TABLE IF NOT EXISTS app_migrations (migration_key VARCHAR(190) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $migrationKey = '20260724_service_types_v1';
+        $migration = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+        $migration->execute([$migrationKey]);
+        if (!$migration->fetchColumn()) {
+            $insert = $pdo->prepare($driver === 'sqlite'
+                ? 'INSERT OR IGNORE INTO service_type_definitions(name,active,sort_order) VALUES(?,?,?)'
+                : 'INSERT IGNORE INTO service_type_definitions(name,active,sort_order) VALUES(?,?,?)');
+            foreach (['Belediye', 'Ev Hizmeti', 'Hastane', 'Şube', 'Şehir Dışı'] as $order => $name) {
+                $insert->execute([$name, 1, $order + 1]);
+            }
+            $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$migrationKey]);
+        }
+
         $initialized = true;
     }
     return $pdo->query('SELECT * FROM service_type_definitions ORDER BY sort_order, name')->fetchAll();
