@@ -24,9 +24,11 @@ function ensure_patient_report_schema(): void
         }
     } else {
         if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'report_status'")->fetch()) {
-            $pdo->exec("ALTER TABLE patients ADD COLUMN report_status ENUM('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel reçete getirdi','Özel reçete getirecek') NULL AFTER report_info");
+            $pdo->exec("ALTER TABLE patients ADD COLUMN report_status VARCHAR(190) NULL AFTER report_info");
         } else {
-            $pdo->exec("ALTER TABLE patients MODIFY COLUMN report_status ENUM('Var','Yok','Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel Reçete','Özel reçete getirdi','Özel reçete getirecek') NULL");
+            // Canlı veritabanında eski veya beklenmeyen değerler bulunabilir. ENUM'a
+            // doğrudan geçiş MySQL strict modunda "Data truncated" hatası üretir.
+            $pdo->exec("ALTER TABLE patients MODIFY COLUMN report_status VARCHAR(190) NULL");
         }
     }
 
@@ -63,6 +65,9 @@ function ensure_patient_report_schema(): void
         $pdo->exec("UPDATE patients SET report_status = 'Rapor getirdi' WHERE report_status = 'Var'");
         $pdo->exec("UPDATE patients SET report_status = 'Rapor gerekmedi' WHERE report_status = 'Yok'");
         $pdo->exec("UPDATE patients SET report_status = 'Özel reçete getirdi' WHERE report_status = 'Özel Reçete'");
+        $pdo->exec("UPDATE patients SET report_status = NULL
+            WHERE report_status IS NOT NULL
+              AND report_status NOT IN ('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel reçete getirdi','Özel reçete getirecek')");
         $pdo->exec("ALTER TABLE patients MODIFY COLUMN report_status ENUM('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel reçete getirdi','Özel reçete getirecek') NULL");
     } elseif ($legacyColumn === 'report_status_legacy') {
         try { $pdo->exec('ALTER TABLE patients DROP COLUMN report_status_legacy'); }
