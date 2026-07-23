@@ -4,20 +4,28 @@ require __DIR__ . '/patient-report-schema.php';
 require __DIR__ . '/service-type-bootstrap.php';
 require __DIR__ . '/source-bootstrap.php';
 require_login();
-if (function_exists('ensure_branch_schema')) ensure_branch_schema();
-ensure_patient_service_type_schema();
-ensure_patient_source_schema();
+$extendedSchemaReady = true;
+try {
+    if (function_exists('ensure_branch_schema')) ensure_branch_schema();
+    ensure_patient_service_type_schema();
+    ensure_patient_source_schema();
+} catch (Throwable $exception) {
+    $extendedSchemaReady = false;
+    error_log('patients.php extended schema: ' . $exception->getMessage());
+}
 require __DIR__ . '/patient-layout.php';
 require __DIR__ . '/employee-patient-link.php';
-ensure_patient_staff_yeliz_schema();
-$staffNames = patient_staff_names(true);
-$staffOrders = [
-    'staff_yeliz' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_yeliz,0)=1')->fetchAll(PDO::FETCH_COLUMN),
-    'staff_gunes' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_gunes,0)=1')->fetchAll(PDO::FETCH_COLUMN),
-    'staff_erva' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_erva,0)=1')->fetchAll(PDO::FETCH_COLUMN),
-    'staff_merve' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_merve,0)=1')->fetchAll(PDO::FETCH_COLUMN),
-    'staff_seyma' => db()->query('SELECT import_order FROM patients WHERE COALESCE(staff_seyma,0)=1')->fetchAll(PDO::FETCH_COLUMN),
-];
+$staffNames = ['staff_cansu'=>'Cansu','staff_busra'=>'Büşra','staff_belma'=>'Belma Baysan'];
+$staffOrders = [];
+try {
+    ensure_patient_staff_yeliz_schema();
+    $staffNames = patient_staff_names(true);
+    foreach (['staff_yeliz','staff_gunes','staff_erva','staff_merve','staff_seyma'] as $staffColumn) {
+        $staffOrders[$staffColumn] = db()->query("SELECT import_order FROM patients WHERE COALESCE({$staffColumn},0)=1")->fetchAll(PDO::FETCH_COLUMN);
+    }
+} catch (Throwable $exception) {
+    error_log('patients.php staff schema: ' . $exception->getMessage());
+}
 start_patient_staff_ui_link($staffNames, [], $staffOrders);
 
 $q = trim($_GET['q'] ?? '');
@@ -43,8 +51,22 @@ $total = (int)$countStmt->fetchColumn();
 $totalPages = max(1, (int)ceil($total / $perPage));
 $page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;
-$sql = 'SELECT patients.*,branches.name AS branch_name,service_type_definitions.name AS service_type_name,source_definitions.name AS source_name FROM patients LEFT JOIN branches ON branches.id=patients.branch_id LEFT JOIN service_type_definitions ON service_type_definitions.id=patients.service_type_id LEFT JOIN source_definitions ON source_definitions.id=patients.source_id' . $whereSql . ' ORDER BY import_order,patients.id LIMIT ' . $perPage . ' OFFSET ' . $offset;
-$stmt = db()->prepare($sql); $stmt->execute($args); $rows = $stmt->fetchAll();
+$sql = $extendedSchemaReady
+    ? 'SELECT patients.*,branches.name AS branch_name,service_type_definitions.name AS service_type_name,source_definitions.name AS source_name FROM patients LEFT JOIN branches ON branches.id=patients.branch_id LEFT JOIN service_type_definitions ON service_type_definitions.id=patients.service_type_id LEFT JOIN source_definitions ON source_definitions.id=patients.source_id'
+    : 'SELECT patients.*,NULL AS branch_name,patients.service_type AS service_type_name,NULL AS source_name FROM patients';
+$sql .= $whereSql . ' ORDER BY import_order,patients.id LIMIT ' . $perPage . ' OFFSET ' . $offset;
+try {
+    $stmt = db()->prepare($sql);
+    $stmt->execute($args);
+    $rows = $stmt->fetchAll();
+} catch (Throwable $exception) {
+    error_log('patients.php extended query: ' . $exception->getMessage());
+    $fallbackSql = 'SELECT patients.*,NULL AS branch_name,patients.service_type AS service_type_name,NULL AS source_name FROM patients'
+        . $whereSql . ' ORDER BY import_order,patients.id LIMIT ' . $perPage . ' OFFSET ' . $offset;
+    $stmt = db()->prepare($fallbackSql);
+    $stmt->execute($args);
+    $rows = $stmt->fetchAll();
+}
 foreach ($rows as &$row) {
     if (in_array(mb_strtolower(str_replace(['İ','I'], ['i','i'], trim((string)$row['social_security'])), 'UTF-8'), ['emek','emekli'], true)) $row['social_security'] = 'Emekli';
     if (in_array(mb_strtolower(str_replace(['İ','I'], ['i','ı'], trim((string)$row['social_security'])), 'UTF-8'), ['yeşil kartlı','yeşilkart','yeşil kart'], true)) $row['social_security'] = 'Yeşil Kart';
