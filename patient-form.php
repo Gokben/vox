@@ -5,14 +5,41 @@ require __DIR__ . '/social-security-bootstrap.php';
 require __DIR__ . '/service-type-bootstrap.php';
 require __DIR__ . '/source-bootstrap.php';
 require_login();
-if (function_exists('ensure_branch_schema')) ensure_branch_schema();
-ensure_patient_report_schema();
-ensure_patient_service_type_schema();
-ensure_patient_source_schema();
+$formSetupErrors = [];
+try {
+    if (function_exists('ensure_branch_schema')) ensure_branch_schema();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'branch';
+    error_log('patient-form.php branch schema: ' . $exception->getMessage());
+}
+try {
+    ensure_patient_report_schema();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'report';
+    error_log('patient-form.php report schema: ' . $exception->getMessage());
+}
+try {
+    ensure_patient_service_type_schema();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'service';
+    error_log('patient-form.php service schema: ' . $exception->getMessage());
+}
+try {
+    ensure_patient_source_schema();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'source';
+    error_log('patient-form.php source schema: ' . $exception->getMessage());
+}
 require __DIR__ . '/patient-layout.php';
 require __DIR__ . '/employee-patient-link.php';
-ensure_patient_staff_yeliz_schema();
-$staffNames = patient_staff_names();
+$staffNames = ['staff_cansu'=>'Cansu','staff_busra'=>'Büşra','staff_belma'=>'Belma Baysan'];
+try {
+    ensure_patient_staff_yeliz_schema();
+    $staffNames = patient_staff_names();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'staff';
+    error_log('patient-form.php staff schema: ' . $exception->getMessage());
+}
 
 $id = (int)($_GET['id'] ?? 0);
 $fields = ['branch_id','record_date','full_name','national_id','phone_primary','phone_secondary','birth_date','address','social_security','report_status','service_type','service_type_id','source_id','source_detail','anamnesis','notes'];
@@ -29,11 +56,35 @@ $patient['staff_gunes'] = (int)($patient['staff_gunes'] ?? 0);
 $patient['staff_erva'] = (int)($patient['staff_erva'] ?? 0);
 $patient['staff_merve'] = (int)($patient['staff_merve'] ?? 0);
 $patient['staff_seyma'] = (int)($patient['staff_seyma'] ?? 0);
-$branches=db()->query('SELECT id,name FROM branches WHERE active=1 ORDER BY name')->fetchAll();
-$socialSecurityOptions=social_security_definitions();
-$serviceTypeDefinitions=service_type_definitions();
+$branches = [];
+try {
+    $branches=db()->query('SELECT id,name FROM branches WHERE active=1 ORDER BY name')->fetchAll();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'branch-options';
+    error_log('patient-form.php branch options: ' . $exception->getMessage());
+}
+$socialSecurityOptions = [];
+try {
+    $socialSecurityOptions=social_security_definitions();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'social-security';
+    error_log('patient-form.php social security options: ' . $exception->getMessage());
+}
+$serviceTypeDefinitions = [];
+try {
+    $serviceTypeDefinitions=service_type_definitions();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'service-options';
+    error_log('patient-form.php service options: ' . $exception->getMessage());
+}
 $serviceTypeOptions=array_filter($serviceTypeDefinitions, static fn(array $row): bool => (int)$row['active'] === 1);
-$sourceDefinitions=source_definitions();
+$sourceDefinitions = [];
+try {
+    $sourceDefinitions=source_definitions();
+} catch (Throwable $exception) {
+    $formSetupErrors[] = 'source-options';
+    error_log('patient-form.php source options: ' . $exception->getMessage());
+}
 if ($id) {
     $stmt=db()->prepare('SELECT * FROM patients WHERE id=?'); $stmt->execute([$id]); $found=$stmt->fetch();
     if (!$found) { http_response_code(404); exit('Hasta kaydı bulunamadı.'); }
