@@ -44,5 +44,20 @@ function ensure_patient_source_schema(): void
             ? 'ALTER TABLE patients ADD COLUMN source_id INTEGER NULL'
             : 'ALTER TABLE patients ADD COLUMN source_id INT UNSIGNED NULL AFTER source_primary');
     }
+    if (!in_array('source_unit_id', $columns, true)) {
+        $pdo->exec($driver === 'sqlite'
+            ? 'ALTER TABLE patients ADD COLUMN source_unit_id INTEGER NULL'
+            : 'ALTER TABLE patients ADD COLUMN source_unit_id INT UNSIGNED NULL AFTER source_id');
+    }
+    if (!in_array('source_company_id', $columns, true)) {
+        $pdo->exec($driver === 'sqlite'
+            ? 'ALTER TABLE patients ADD COLUMN source_company_id INTEGER NULL'
+            : 'ALTER TABLE patients ADD COLUMN source_company_id INT UNSIGNED NULL AFTER source_unit_id');
+    }
+    if (!in_array('service_location', $columns, true)) {
+        $pdo->exec($driver === 'sqlite'
+            ? 'ALTER TABLE patients ADD COLUMN service_location TEXT NULL'
+            : 'ALTER TABLE patients ADD COLUMN service_location VARCHAR(150) NULL AFTER service_type_id');
+    }
     $initialized = true;
 }

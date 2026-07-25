@@ -67,10 +67,15 @@ document.addEventListener('click', event => {
 });
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
+const technicalServiceMenuLink = document.createElement('a');
+technicalServiceMenuLink.href = <?= json_encode(url('technical-service.php')) ?>;
+technicalServiceMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Teknik Servis';
+stockGroup.after(technicalServiceMenuLink);
+if (location.pathname.endsWith('/technical-service.php')) technicalServiceMenuLink.classList.add('active');
 const cashMenuLink = document.createElement('a');
 cashMenuLink.href = <?= json_encode(url('cash.php')) ?>;
 cashMenuLink.innerHTML = '<span><i class="icon-base ti tabler-briefcase-filled"></i></span> Kasa';
-stockGroup.after(cashMenuLink);
+technicalServiceMenuLink.after(cashMenuLink);
 if (location.pathname.endsWith('/cash.php')) cashMenuLink.classList.add('active');
 const currentAccountsMenuLink = document.createElement('a');
 currentAccountsMenuLink.href = <?= json_encode(url('current-accounts.php')) ?>;
@@ -119,26 +124,46 @@ brandsMenuLink.textContent = 'Markalar';
 const cashCategoriesMenuLink = document.createElement('a');
 cashCategoriesMenuLink.href = <?= json_encode(url('cash-categories.php')) ?>;
 cashCategoriesMenuLink.textContent = 'Kasa Kategorileri';
-if (location.pathname.endsWith('/brands.php') || location.pathname.endsWith('/cash-categories.php')) {
+const serviceNamesMenuLink = document.createElement('a');
+serviceNamesMenuLink.href = <?= json_encode(url('service-names.php')) ?>;
+serviceNamesMenuLink.textContent = 'Hizmet Adı';
+const serviceTypesMenuLink = document.createElement('a');
+serviceTypesMenuLink.href = <?= json_encode(url('service-types.php')) ?>;
+serviceTypesMenuLink.textContent = 'Hizmet Yerleri';
+if (location.pathname.endsWith('/brands.php') || location.pathname.endsWith('/cash-categories.php') || location.pathname.endsWith('/service-types.php')) {
   setupMenuLink.classList.add('active');
   if (location.pathname.endsWith('/cash-categories.php')) cashCategoriesMenuLink.classList.add('active');
+  if (location.pathname.endsWith('/service-types.php')) serviceTypesMenuLink.classList.add('active');
 }
-setupSubmenu.append(brandsMenuLink, cashCategoriesMenuLink);
+if (location.pathname.endsWith('/service-names.php')) { setupMenuLink.classList.add('active'); serviceNamesMenuLink.classList.add('active'); }
+setupSubmenu.append(brandsMenuLink, cashCategoriesMenuLink, serviceNamesMenuLink, serviceTypesMenuLink);
 setupMenuLink.setAttribute('aria-haspopup', 'true');
 setupMenuLink.setAttribute('aria-expanded', 'false');
 setupMenuLink.addEventListener('click', event => {
   event.preventDefault();
   const isOpen = setupGroup.classList.toggle('open');
   setupMenuLink.setAttribute('aria-expanded', String(isOpen));
+  sessionStorage.setItem('vox.setupMenuOpen', isOpen ? '1' : '0');
+});
+setupSubmenu.addEventListener('click', event => {
+  if (event.target.closest('a')) sessionStorage.setItem('vox.setupMenuOpen', '1');
 });
 document.addEventListener('click', event => {
-  if (!setupGroup.contains(event.target)) {
+  // Kurulum sayfalarında form kartına tıklamak sol alt menüyü kapatmamalıdır.
+  if (!isSetupPage && !setupGroup.contains(event.target)) {
     setupGroup.classList.remove('open');
     setupMenuLink.setAttribute('aria-expanded', 'false');
+    sessionStorage.setItem('vox.setupMenuOpen', '0');
   }
 });
 setupMenuLink.before(setupGroup);
 setupGroup.append(setupMenuLink, setupSubmenu);
+const setupPages = ['brands.php','cash-categories.php','service-names.php','service-types.php'];
+const isSetupPage = setupPages.includes(location.pathname.split('/').pop());
+if (isSetupPage || sessionStorage.getItem('vox.setupMenuOpen') === '1') {
+  setupGroup.classList.add('open');
+  setupMenuLink.setAttribute('aria-expanded', 'true');
+}
 const reportMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Raporlar'));
 const followUpMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Takipler'));
 const salesMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Satışlar'));
@@ -194,8 +219,8 @@ const settingsPages={
   'branches.php':['<?=url('branches.php')?>','Şubeler'],
   'employees.php':['<?=url('employees.php')?>','Çalışanlar'],
   'social-securities.php':['<?=url('social-securities.php')?>','Sosyal Güvence'],
-  'service-types.php':['<?=url('service-types.php')?>','Hizmet Yerleri'],
-  'sources.php':['<?=url('sources.php')?>','Başvuru Kaynağı']
+  'sources.php':['<?=url('sources.php')?>','Başvuru Kaynağı'],
+  'complaints.php':['<?=url('complaints.php')?>','Şikayet / Arıza']
 };
 const currentSettingsPage=location.pathname.split('/').pop()||'index.php';
 if(settingsPages[currentSettingsPage]){
@@ -280,17 +305,20 @@ if(settingsPages[currentSettingsPage]){
 <script>
 (() => {
   document.querySelectorAll('button').forEach(button => {
-    const isSave = button.textContent.trim() === 'Kaydet'
-      || button.getAttribute('title') === 'Kaydet'
-      || button.getAttribute('aria-label') === 'Kaydet';
-    if (!isSave) return;
+    const text = button.textContent.trim();
+    const title = button.getAttribute('title')?.trim() || '';
+    const ariaLabel = button.getAttribute('aria-label')?.trim() || '';
+    const actionLabel = /^(Kaydet|Güncelle|Kaydı Güncelle|Değişiklikleri Kaydet)$/i.test(text) ? text
+      : (/^(Kaydet|Güncelle|Kaydı Güncelle|Değişiklikleri Kaydet)$/i.test(title) ? title
+        : (/^(Kaydet|Güncelle|Kaydı Güncelle|Değişiklikleri Kaydet)$/i.test(ariaLabel) ? ariaLabel : ''));
+    if (!actionLabel) return;
     button.classList.add('vox-save-icon');
-    button.setAttribute('title', 'Kaydet');
-    button.setAttribute('aria-label', 'Kaydet');
-    button.innerHTML = '<i class="ti tabler-device-floppy" aria-hidden="true"></i>';
+    button.setAttribute('title', actionLabel);
+    button.setAttribute('aria-label', actionLabel);
+    button.innerHTML = '<i class="icon-base ti tabler-device-floppy" aria-hidden="true"></i>';
   });
   const style = document.createElement('style');
-  style.textContent = 'body .vox-save-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;min-width:42px!important;padding:0!important;border:0!important;border-radius:7px!important;background:#19a94b!important;color:#fff!important;line-height:1!important;box-sizing:border-box!important}body .vox-save-icon:hover{background:#148d3e!important}body .vox-save-icon>.ti{font-size:18px!important;line-height:1!important}';
+  style.textContent = 'body .vox-save-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;min-width:42px!important;padding:0!important;border:0!important;border-radius:7px!important;background:#19a94b!important;color:#fff!important;line-height:1!important;box-sizing:border-box!important}body .vox-save-icon:hover{background:#148d3e!important}body .vox-save-icon>.ti{display:block!important;flex:0 0 20px!important;width:20px!important;height:20px!important;min-width:20px!important;min-height:20px!important;margin:0!important;padding:0!important;background-color:currentColor!important;font-size:20px!important;line-height:20px!important;-webkit-mask-size:100% 100%!important;mask-size:100% 100%!important}';
   document.head.appendChild(style);
 })();
 </script></body></html>
