@@ -21,6 +21,11 @@ try {
             ? 'ALTER TABLE patients ADD COLUMN patient_rating_comment TEXT NULL'
             : 'ALTER TABLE patients ADD COLUMN patient_rating_comment TEXT NULL');
     }
+    if (!in_array('patient_status', $ratingColumns, true)) {
+        $ratingPdo->exec($ratingPdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+            ? "ALTER TABLE patients ADD COLUMN patient_status TEXT NOT NULL DEFAULT 'active'"
+            : "ALTER TABLE patients ADD COLUMN patient_status VARCHAR(12) NOT NULL DEFAULT 'active'");
+    }
 } catch (Throwable $exception) {
     $patientRatingReady = false;
     error_log('patient-form.php rating schema: ' . $exception->getMessage());
@@ -64,8 +69,9 @@ try {
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
 if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
-$fields = ['branch_id','record_date','full_name','national_id','phone_primary','phone_secondary','birth_date','address','patient_rating','patient_rating_comment','social_security','report_status','service_type','service_type_id','source_id','source_detail','anamnesis','notes'];
+$fields = ['branch_id','record_date','full_name','national_id','phone_primary','phone_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','service_type','service_type_id','source_id','source_detail','anamnesis','notes'];
 $patient = array_fill_keys($fields, '');
+$patient['patient_status'] = 'active';
 $defaultRecordDate = (string)($_GET['date'] ?? '');
 if (preg_match('/^20\d{2}-\d{2}-\d{2}$/', $defaultRecordDate)) $patient['record_date'] = $defaultRecordDate;
 $patient['report_info'] = '';
@@ -121,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         ? mb_substr($patient['patient_rating_comment'], 0, 256, 'UTF-8')
         : substr($patient['patient_rating_comment'], 0, 256);
     $patient['patient_rating'] = max(0, min(5, (int)$patient['patient_rating']));
+    if (!in_array($patient['patient_status'], ['active', 'passive', 'deceased'], true)) $patient['patient_status'] = 'active';
     if (!in_array($patient['report_status'], ['', 'Rapor getirdi', 'Rapor getirecek', 'Rapor gerekmedi', 'Özel reçete getirdi', 'Özel reçete getirecek'], true)) {
         $error = 'Rapor alanı geçerli bir seçenek olmalıdır.';
     }
@@ -182,8 +189,9 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="icon-form-row"><label class="icon-form-label">Telefon 1</label><div class="merged-input"><span class="merged-icon">⌕</span><input name="phone_primary" value="<?=e($patient['phone_primary'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Telefon 2</label><div class="merged-input"><span class="merged-icon">⌕</span><input name="phone_secondary" value="<?=e($patient['phone_secondary'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Adres</label><div class="merged-input"><span class="merged-icon">⌂</span><textarea name="address"><?=e($patient['address'])?></textarea></div></div>
-<div class="icon-form-row"><span class="icon-form-label">Hasta Değerlendirmesi</span><div class="patient-rating" role="radiogroup" aria-label="Hasta değerlendirmesi"><?php for($star=1;$star<=5;$star++):?><input id="patient_rating_<?=$star?>" type="radio" name="patient_rating" value="<?=$star?>" <?=$patient['patient_rating']==$star?'checked':''?>><label class="<?=$patient['patient_rating']>=$star?'is-selected':''?>" for="patient_rating_<?=$star?>" title="<?=$star?> yıldız">★</label><?php endfor?></div></div>
-<div class="icon-form-row"><label class="icon-form-label">Değerlendirme Yorum</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="patient_rating_comment" maxlength="256"><?=e($patient['patient_rating_comment'])?></textarea></div></div>
+<div class="icon-form-row"><span class="icon-form-label">Değerlendirme</span><div class="patient-rating" role="radiogroup" aria-label="Değerlendirme"><?php for($star=1;$star<=5;$star++):?><input id="patient_rating_<?=$star?>" type="radio" name="patient_rating" value="<?=$star?>" <?=$patient['patient_rating']==$star?'checked':''?>><label class="<?=$patient['patient_rating']>=$star?'is-selected':''?>" for="patient_rating_<?=$star?>" title="<?=$star?> yıldız">★</label><?php endfor?></div></div>
+<div class="icon-form-row"><label class="icon-form-label">Yorum</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="patient_rating_comment" maxlength="256"><?=e($patient['patient_rating_comment'])?></textarea></div></div>
+<div class="icon-form-row"><span class="icon-form-label">Hasta</span><div class="check-row"><label><input type="radio" name="patient_status" value="active" <?=$patient['patient_status']==='active'?'checked':''?>> Aktif</label><label><input type="radio" name="patient_status" value="passive" <?=$patient['patient_status']==='passive'?'checked':''?>> Pasif</label><label><input type="radio" name="patient_status" value="deceased" <?=$patient['patient_status']==='deceased'?'checked':''?>> Vefat</label></div></div>
 <h3 class="form-section-title">Hizmet Bilgileri</h3>
 <div class="icon-form-row"><label class="icon-form-label">Sosyal Güvence</label><div class="merged-input"><span class="merged-icon">◇</span><input name="social_security" value="<?=e($patient['social_security'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Rapor Bilgisi</label><div class="merged-input"><span class="merged-icon">▧</span><input name="report_info" value="<?=e($patient['report_info'])?>"></div></div>
