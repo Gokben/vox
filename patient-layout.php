@@ -41,7 +41,7 @@ function patient_footer(): void
     ?>
 <script>
 const stockMenuLink = document.createElement('a');
-stockMenuLink.href = '#';
+stockMenuLink.href = <?= json_encode(url('stocks.php')) ?>;
 stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
 document.querySelector('.patient-nav a[href*="admin.php"]')?.before(stockMenuLink);
 const stockGroup = document.createElement('div');
@@ -49,16 +49,15 @@ stockGroup.className = 'report-menu-group';
 const stockSubmenu = document.createElement('div');
 stockSubmenu.className = 'report-submenu';
 const stockEntryLink = document.createElement('a');
-stockEntryLink.href = <?= json_encode(url('item-new.php')) ?>;
+stockEntryLink.href = <?= json_encode(url('stock-entry.php')) ?>;
 stockEntryLink.textContent = 'Stok Giriş';
+const stockCardLink = document.createElement('a');
+stockCardLink.href = <?= json_encode(url('stock-card.php')) ?>;
+stockCardLink.textContent = 'Stok Kartı';
 stockSubmenu.append(stockEntryLink);
 stockMenuLink.setAttribute('aria-haspopup', 'true');
 stockMenuLink.setAttribute('aria-expanded', 'false');
-stockMenuLink.addEventListener('click', event => {
-  event.preventDefault();
-  const isOpen = stockGroup.classList.toggle('open');
-  stockMenuLink.setAttribute('aria-expanded', String(isOpen));
-});
+stockMenuLink.addEventListener('click', () => {});
 document.addEventListener('click', event => {
   if (!stockGroup.contains(event.target)) {
     stockGroup.classList.remove('open');
@@ -67,6 +66,8 @@ document.addEventListener('click', event => {
 });
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
+if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php')) { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
+if (location.pathname.endsWith('/stock-entry.php')) stockEntryLink.classList.add('active');
 const technicalServiceMenuLink = document.createElement('a');
 technicalServiceMenuLink.href = <?= json_encode(url('technical-service.php')) ?>;
 technicalServiceMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Teknik Servis';
