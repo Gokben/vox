@@ -2,11 +2,12 @@
 declare(strict_types=1);
 require __DIR__ . '/config.php';
 require_admin();
+ensure_role_schema();
 if (function_exists('ensure_branch_schema')) ensure_branch_schema();
 require __DIR__ . '/patient-layout.php';
 $message='';$error='';
 if($_SERVER['REQUEST_METHOD']==='POST'){
- verify_csrf();$name=trim((string)($_POST['name']??''));$email=mb_strtolower(trim((string)($_POST['email']??'')));$password=(string)($_POST['password']??'');$confirm=(string)($_POST['password_confirm']??'');$role=in_array($_POST['role']??'', ['Admin','User'],true)?$_POST['role']:'User';
+ verify_csrf();$name=trim((string)($_POST['name']??''));$email=mb_strtolower(trim((string)($_POST['email']??'')));$password=(string)($_POST['password']??'');$confirm=(string)($_POST['password_confirm']??'');$role=array_key_exists($_POST['role']??'', roles())?$_POST['role']:ROLE_SECRETARY;
  if($name==='')$error='Ad soyad alanı zorunludur.';elseif(!filter_var($email,FILTER_VALIDATE_EMAIL))$error='Geçerli bir e-posta adresi girin.';elseif(strlen($password)<6)$error='Şifre en az 6 karakter olmalıdır.';elseif($password!==$confirm)$error='Şifre ve şifre tekrarı aynı olmalıdır.';else{$check=db()->prepare('SELECT id FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1');$check->execute([$email]);if($check->fetch())$error='Bu e-posta adresi zaten kullanılıyor. Aynı e-posta ile ikinci personel oluşturulamaz.';else try{$insert=db()->prepare('INSERT INTO users(name,email,password_hash,role,active) VALUES(?,?,?,?,1)');$insert->execute([$name,$email,password_hash($password,PASSWORD_DEFAULT),$role]);$message='Personel başarıyla eklendi.';}catch(PDOException $e){$error='Personel kaydedilemedi. E-posta adresini kontrol edin.';}}
 }
 $personnel=db()->query('SELECT id,name,email,role,active,created_at FROM users ORDER BY id DESC')->fetchAll();
@@ -19,10 +20,10 @@ patient_header('Ayarlar - Kullanıcı Yönetimi','settings');
  <form method="post" class="personnel-form"><input type="hidden" name="csrf" value="<?=csrf()?>">
   <label><span>Ad Soyad</span><input name="name" value="<?=e($_POST['name']??'')?>" required></label><label><span>E-posta</span><input type="email" name="email" value="<?=e($_POST['email']??'')?>" required></label>
   <label><span>Şifre</span><input type="password" name="password" minlength="6" required></label><label><span>Şifre Tekrar</span><input type="password" name="password_confirm" minlength="6" required></label>
-  <label><span>Rol</span><select name="role"><option>User</option><option>Admin</option></select></label><div class="personnel-actions"><button>Kullanıcı Ekle</button></div>
- </form></section>
+  <label><span>Rol</span><select name="role"><?php foreach(roles() as $roleKey=>$roleName):?><option value="<?=e($roleKey)?>" <?=($_POST['role']??ROLE_SECRETARY)===$roleKey?'selected':''?>><?=e($roleName)?></option><?php endforeach?></select></label><div class="personnel-actions"><button>Kullanıcı Ekle</button></div>
+ </form><script>document.querySelector('.personnel-form select[name="role"]').innerHTML='<option value="company_manager">Firma Yöneticisi</option><option value="audiometrist">Odyometrist</option><option value="secretary" selected>Sekreter</option><option value="accounting">Muhasebe</option>';</script></section>
  <section class="vuexy-form-card"><header class="form-card-title"><h2>Kullanıcı Listesi</h2><p><?=count($personnel)?> kayıt</p></header><div class="table-responsive"><table class="personnel-table"><thead><tr><th>Ad Soyad</th><th>E-posta</th><th>Rol</th><th>Durum</th><th>Kayıt Tarihi</th><th>İşlemler</th></tr></thead><tbody>
- <?php foreach($personnel as $person):?><tr><td><?=e($person['name'])?></td><td><?=e($person['email'])?></td><td><span class="role-pill"><?=e($person['role'])?></span></td><td><span class="status-pill <?=$person['active']?'active':'passive'?>"><?=$person['active']?'Aktif':'Pasif'?></span></td><td><?=format_date_tr($person['created_at'],true)?></td><td><?php if((int)$person['id']===(int)$_SESSION['user']['id']):?><a class="edit-personnel" href="<?=url('profile.php')?>">Profilim</a><?php elseif($person['role']==='User'):?><a class="edit-personnel" href="<?=url('user-edit.php?id='.(int)$person['id'])?>">Düzenle / Şifre</a><?php else:?><span>Yönetici</span><?php endif?></td></tr><?php endforeach?>
+ <?php foreach($personnel as $person):?><tr><td><?=e($person['name'])?></td><td><?=e($person['email'])?></td><td><span class="role-pill"><?=e(role_label($person['role']))?></span></td><td><span class="status-pill <?=$person['active']?'active':'passive'?>"><?=$person['active']?'Aktif':'Pasif'?></span></td><td><?=format_date_tr($person['created_at'],true)?></td><td><?php if((int)$person['id']===(int)$_SESSION['user']['id']):?><a class="edit-personnel" href="<?=url('profile.php')?>">Profilim</a><?php elseif(normalize_role($person['role'])!==ROLE_COMPANY_MANAGER):?><a class="edit-personnel" href="<?=url('user-edit.php?id='.(int)$person['id'])?>">Düzenle / Şifre</a><?php else:?><span>Firma Yöneticisi</span><?php endif?></td></tr><?php endforeach?>
  </tbody></table></div></section>
 </main>
 <style>

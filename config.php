@@ -57,8 +57,17 @@ function csrf(): string { return $_SESSION['csrf'] ??= bin2hex(random_bytes(32))
 function verify_csrf(): void {
     if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) { http_response_code(419); exit('Oturum doğrulanamadı.'); }
 }
-function require_login(): void { if (empty($_SESSION['user'])) redirect('login.php'); }
-function is_admin(): bool { return ($_SESSION['user']['role'] ?? '') === 'Admin'; }
+const ROLE_COMPANY_MANAGER = 'company_manager';
+const ROLE_AUDIOMETRIST = 'audiometrist';
+const ROLE_SECRETARY = 'secretary';
+const ROLE_ACCOUNTING = 'accounting';
+function roles(): array { return [ROLE_COMPANY_MANAGER => 'Firma Yöneticisi', ROLE_AUDIOMETRIST => 'Odyometrist', ROLE_SECRETARY => 'Sekreter', ROLE_ACCOUNTING => 'Muhasebe']; }
+function normalize_role(string $role): string { return match ($role) { 'Admin' => ROLE_COMPANY_MANAGER, 'User' => ROLE_SECRETARY, default => array_key_exists($role, roles()) ? $role : ROLE_SECRETARY }; }
+function role_label(?string $role): string { return roles()[normalize_role((string)$role)] ?? 'Sekreter'; }
+function current_role(): string { $role = normalize_role((string)($_SESSION['user']['role'] ?? ROLE_SECRETARY)); if (!empty($_SESSION['user'])) $_SESSION['user']['role'] = $role; return $role; }
+function require_login(): void { if (empty($_SESSION['user'])) redirect('login.php'); current_role(); }
+function is_admin(): bool { return current_role() === ROLE_COMPANY_MANAGER; }
+function ensure_role_schema(): void { static $done = false; if ($done) return; $done = true; $pdo = db(); $pdo->exec("UPDATE users SET role = 'company_manager' WHERE role = 'Admin'"); $pdo->exec("UPDATE users SET role = 'secretary' WHERE role = 'User' OR role IS NULL OR role = ''"); if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $pdo->exec("ALTER TABLE users MODIFY role ENUM('company_manager','audiometrist','secretary','accounting') NOT NULL DEFAULT 'secretary'"); }
 function ensure_branch_schema(): void {
  static $done=false;if($done)return;$done=true;$pdo=db();$driver=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
  if($driver==='sqlite'){
