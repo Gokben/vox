@@ -32,7 +32,7 @@ function patient_header(string $title, string $active = 'patients'): void
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=e($title)?> | <?=APP_NAME?></title><link rel="icon" type="image/png" href="<?=url('assets/favicon.png?v=20260713')?>">
 <link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260725-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260725-6')?>"><script src="<?=url('assets/theme.js?v=20260725-33')?>" defer></script>
-</head><body><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><span class="language">TR</span><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kayıtları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><span><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span><i class="icon-base ti tabler-settings"></i></span> Ayarlar</a><?php endif?></nav></header>
+</head><body><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><span class="language">TR</span><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kartları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><span><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span><i class="icon-base ti tabler-settings"></i></span> Ayarlar</a><?php endif?></nav></header>
 <?php
 }
 
@@ -44,11 +44,67 @@ const stockMenuLink = document.createElement('a');
 stockMenuLink.href = '#';
 stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
 document.querySelector('.patient-nav a[href*="admin.php"]')?.before(stockMenuLink);
+const stockGroup = document.createElement('div');
+stockGroup.className = 'report-menu-group';
+const stockSubmenu = document.createElement('div');
+stockSubmenu.className = 'report-submenu';
+const stockEntryLink = document.createElement('a');
+stockEntryLink.href = <?= json_encode(url('item-new.php')) ?>;
+stockEntryLink.textContent = 'Stok Giriş';
+stockSubmenu.append(stockEntryLink);
+stockMenuLink.setAttribute('aria-haspopup', 'true');
+stockMenuLink.setAttribute('aria-expanded', 'false');
+stockMenuLink.addEventListener('click', event => {
+  event.preventDefault();
+  const isOpen = stockGroup.classList.toggle('open');
+  stockMenuLink.setAttribute('aria-expanded', String(isOpen));
+});
+document.addEventListener('click', event => {
+  if (!stockGroup.contains(event.target)) {
+    stockGroup.classList.remove('open');
+    stockMenuLink.setAttribute('aria-expanded', 'false');
+  }
+});
+stockMenuLink.before(stockGroup);
+stockGroup.append(stockMenuLink, stockSubmenu);
 const cashMenuLink = document.createElement('a');
 cashMenuLink.href = <?= json_encode(url('cash.php')) ?>;
 cashMenuLink.innerHTML = '<span><i class="icon-base ti tabler-briefcase-filled"></i></span> Kasa';
-stockMenuLink.after(cashMenuLink);
+stockGroup.after(cashMenuLink);
 if (location.pathname.endsWith('/cash.php')) cashMenuLink.classList.add('active');
+const currentAccountsMenuLink = document.createElement('a');
+currentAccountsMenuLink.href = <?= json_encode(url('current-accounts.php')) ?>;
+currentAccountsMenuLink.innerHTML = '<span><i class="icon-base ti tabler-address-book"></i></span> Cari Kartlar';
+cashMenuLink.after(currentAccountsMenuLink);
+if (location.pathname.endsWith('/current-accounts.php')) currentAccountsMenuLink.classList.add('active');
+const unitsMenuLink = document.createElement('a');
+unitsMenuLink.href = <?= json_encode(url('units.php')) ?>;
+unitsMenuLink.innerHTML = '<span><i class="icon-base ti tabler-building"></i></span> Üniteler';
+currentAccountsMenuLink.after(unitsMenuLink);
+if (location.pathname.endsWith('/units.php')) unitsMenuLink.classList.add('active');
+const unitsGroup = document.createElement('div');
+unitsGroup.className = 'report-menu-group';
+const unitsSubmenu = document.createElement('div');
+unitsSubmenu.className = 'report-submenu';
+const companiesMenuLink = document.createElement('a');
+companiesMenuLink.href = <?= json_encode(url('companies.php')) ?>;
+companiesMenuLink.innerHTML = '<span><i class="icon-base ti tabler-building-community"></i></span> Kurumlar & Firmalar';
+unitsSubmenu.append(companiesMenuLink);
+unitsMenuLink.setAttribute('aria-haspopup', 'true');
+unitsMenuLink.setAttribute('aria-expanded', 'false');
+unitsMenuLink.addEventListener('click', event => { event.preventDefault(); const open = unitsGroup.classList.toggle('open'); unitsMenuLink.setAttribute('aria-expanded', String(open)); });
+document.addEventListener('click', event => { if (!unitsGroup.contains(event.target)) { unitsGroup.classList.remove('open'); unitsMenuLink.setAttribute('aria-expanded', 'false'); } });
+unitsMenuLink.before(unitsGroup);
+unitsGroup.append(unitsMenuLink, unitsSubmenu);
+if (location.pathname.endsWith('/companies.php')) { companiesMenuLink.classList.add('active'); }
+const standaloneUnitsMenuLink = unitsMenuLink.cloneNode(true);
+standaloneUnitsMenuLink.href = <?= json_encode(url('units.php')) ?>;
+standaloneUnitsMenuLink.removeAttribute('aria-haspopup');
+standaloneUnitsMenuLink.removeAttribute('aria-expanded');
+unitsGroup.replaceWith(standaloneUnitsMenuLink);
+standaloneUnitsMenuLink.after(companiesMenuLink);
+if (location.pathname.endsWith('/units.php')) standaloneUnitsMenuLink.classList.add('active');
+if (location.pathname.endsWith('/companies.php')) standaloneUnitsMenuLink.classList.remove('active');
 const setupMenuLink = document.createElement('a');
 setupMenuLink.href = '#';
 setupMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Kurulum';
@@ -218,6 +274,23 @@ if(settingsPages[currentSettingsPage]){
 
   const style = document.createElement('style');
   style.textContent = 'body .vox-icon-action.vox-icon-edit,body .vox-icon-action.vox-icon-delete{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:40px!important;height:42px!important;min-width:40px!important;max-width:40px!important;min-height:42px!important;padding:0!important;border:0!important;border-radius:7px!important;color:#fff!important;line-height:1!important;vertical-align:middle!important;box-sizing:border-box!important;box-shadow:none!important}body .vox-icon-action.vox-icon-edit{background:#19a94b!important}body .vox-icon-action.vox-icon-delete{margin-left:8px!important;background:#e04f55!important}body .vox-icon-action.vox-icon-edit:hover{background:#148d3e!important}body .vox-icon-action.vox-icon-delete:hover{background:#c83f46!important}body .vox-icon-action>.ti{width:18px!important;height:18px!important;font-size:18px!important;flex:0 0 18px!important}';
+  document.head.appendChild(style);
+})();
+</script>
+<script>
+(() => {
+  document.querySelectorAll('button').forEach(button => {
+    const isSave = button.textContent.trim() === 'Kaydet'
+      || button.getAttribute('title') === 'Kaydet'
+      || button.getAttribute('aria-label') === 'Kaydet';
+    if (!isSave) return;
+    button.classList.add('vox-save-icon');
+    button.setAttribute('title', 'Kaydet');
+    button.setAttribute('aria-label', 'Kaydet');
+    button.innerHTML = '<i class="ti tabler-device-floppy" aria-hidden="true"></i>';
+  });
+  const style = document.createElement('style');
+  style.textContent = 'body .vox-save-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;min-width:42px!important;padding:0!important;border:0!important;border-radius:7px!important;background:#19a94b!important;color:#fff!important;line-height:1!important;box-sizing:border-box!important}body .vox-save-icon:hover{background:#148d3e!important}body .vox-save-icon>.ti{font-size:18px!important;line-height:1!important}';
   document.head.appendChild(style);
 })();
 </script></body></html>

@@ -79,7 +79,7 @@ try {
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
 if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
-$fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','service_type','service_type_id','source_id','source_detail','anamnesis','notes'];
+$fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','service_type','service_type_id','source_id','source_unit_id','source_detail','anamnesis','notes'];
 $patient = array_fill_keys($fields, '');
 $patient['patient_status'] = 'active';
 $defaultRecordDate = (string)($_GET['date'] ?? '');
@@ -117,8 +117,10 @@ try {
 }
 $serviceTypeOptions=array_filter($serviceTypeDefinitions, static fn(array $row): bool => (int)$row['active'] === 1);
 $sourceDefinitions = [];
+$sourceUnits = [];
 try {
     $sourceDefinitions=source_definitions();
+    $sourceUnits=db()->query('SELECT id,name,last_name,code FROM units ORDER BY name,last_name')->fetchAll();
 } catch (Throwable $exception) {
     $formSetupErrors[] = 'source-options';
     error_log('patient-form.php source options: ' . $exception->getMessage());
@@ -212,6 +214,7 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="icon-form-row"><label class="icon-form-label">Hizmet Yeri</label><div class="merged-input"><span class="merged-icon">◎</span><select name="service_type_id"><option value="">Seçiniz</option><?php foreach($serviceTypeDefinitions as $serviceType):$isCurrent=(int)$patient['service_type_id']===(int)$serviceType['id'];if(!(int)$serviceType['active']&&!$isCurrent)continue;?><option value="<?=(int)$serviceType['id']?>" <?=$isCurrent?'selected':''?>><?=e($serviceType['name'])?><?=!(int)$serviceType['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
 <h3 class="form-section-title">Başvuru ve Açıklamalar</h3>
 <div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach($sourceDefinitions as $source):$isCurrent=(int)$patient['source_id']===(int)$source['id'];if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ünite seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e(trim($unit['name'].' '.($unit['last_name']??'').' · '.$unit['code']))?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><input name="source_detail" value="<?=e($patient['source_detail'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Anamnez</label><div class="merged-input"><span class="merged-icon">✚</span><textarea name="anamnesis"><?=e($patient['anamnesis'])?></textarea></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Açıklama</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="notes"><?=e($patient['notes'])?></textarea></div></div>
@@ -220,6 +223,22 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="icon-form-row"><span class="icon-form-label">İlgili Personel</span><div class="check-row"><?php foreach($staffNames as $field=>$staffName):?><label><input type="checkbox" name="<?=e($field)?>" value="1" <?=!empty($patient[$field])?'checked':''?>> <?=e($staffName)?></label><?php endforeach?></div></div>
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url($returnTo))?>">İptal</a></div></form></section></main>
 <script>
+(()=>{
+  const icons={
+    branch_id:'tabler-building',record_date:'tabler-calendar',full_name:'tabler-user',national_id:'tabler-id-badge',
+    birth_date:'tabler-cake',phone_primary:'tabler-phone',phone_secondary:'tabler-phone',address:'tabler-map-pin',
+    patient_rating_comment:'tabler-message',social_security:'tabler-shield-check',report_info:'tabler-file-description',
+    report_status:'tabler-file-check',service_location:'tabler-building',service_type_id:'tabler-building-community',
+    source_id:'tabler-speakerphone',source_unit_id:'tabler-building',source_detail:'tabler-list-details',
+    anamnesis:'tabler-notes',notes:'tabler-note'
+  };
+  Object.entries(icons).forEach(([name,icon])=>{
+    const field=document.querySelector(`[name="${name}"]`);
+    const holder=field?.closest('.merged-input');
+    const iconSlot=holder?.querySelector('.merged-icon');
+    if(iconSlot) iconSlot.innerHTML=`<i class="icon-base ti ${icon}" aria-hidden="true"></i>`;
+  });
+})();
 (()=>{const input=document.querySelector('input[name="social_security"]');if(!input)return;const select=document.createElement('select');select.name='social_security';select.innerHTML='<option value="">Seçiniz</option>'+<?=json_encode(array_map(fn($item)=>['name'=>$item['name']],$socialSecurityOptions),JSON_UNESCAPED_UNICODE)?>.map(item=>'<option value="'+item.name.replace(/"/g,'&quot;')+'">'+item.name+'</option>').join('');select.value=input.value;input.replaceWith(select)})();
 (()=>{
   const stars=[...document.querySelectorAll('.patient-rating input')];
@@ -259,5 +278,6 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 })();
 (()=>{const phone=document.getElementById('phone_primary'),toggle=document.getElementById('proximity-toggle'),row=document.getElementById('proximity-row'),relation=document.getElementById('proximity_relation');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
 (()=>{const phone=document.getElementById('phone_secondary'),toggle=document.getElementById('proximity-secondary-toggle'),row=document.getElementById('proximity-secondary-row'),relation=document.getElementById('proximity_relation_secondary');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
+(()=>{const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-unit-row'),units=document.querySelector('select[name="source_unit_id"]');if(!source||!row||!units)return;const refresh=()=>{const label=source.options[source.selectedIndex]?.textContent||'';const show=/kaynak\s*ünite/i.test(label);row.hidden=!show;if(!show)units.value='';};source.addEventListener('change',refresh);refresh()})();
 </script>
 <?php patient_footer();

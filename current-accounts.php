@@ -1,0 +1,65 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/config.php';
+require_login();
+require __DIR__ . '/patient-layout.php';
+
+$pdo = db();
+if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+    $pdo->exec('CREATE TABLE IF NOT EXISTS current_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, title TEXT NOT NULL, tax_office TEXT, tax_number TEXT, account_type TEXT NOT NULL, currency TEXT NOT NULL DEFAULT "TRY", phone TEXT, email TEXT, contact_person TEXT, billing_address TEXT, shipping_address TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+} else {
+    $pdo->exec('CREATE TABLE IF NOT EXISTS current_accounts (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, title VARCHAR(190) NOT NULL, tax_office VARCHAR(150) NULL, tax_number VARCHAR(32) NULL, account_type ENUM("customer","supplier","both") NOT NULL, currency VARCHAR(3) NOT NULL DEFAULT "TRY", phone VARCHAR(50) NULL, email VARCHAR(190) NULL, contact_person VARCHAR(150) NULL, billing_address TEXT NULL, shipping_address TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+}
+$message = '';
+$error = '';
+$editId = (int)($_GET['edit'] ?? 0);
+$editingAccount = null;
+if ($editId > 0) {
+    $statement = $pdo->prepare('SELECT * FROM current_accounts WHERE id=?');
+    $statement->execute([$editId]);
+    $editingAccount = $statement->fetch() ?: null;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $action = (string)($_POST['action'] ?? 'save');
+    if ($action === 'delete') {
+        $pdo->prepare('DELETE FROM current_accounts WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+        header('Location: ' . url('current-accounts.php?deleted=1'));
+        exit;
+    }
+    $data = [
+        'code' => trim((string)($_POST['code'] ?? '')), 'title' => trim((string)($_POST['title'] ?? '')),
+        'tax_office' => trim((string)($_POST['tax_office'] ?? '')), 'tax_number' => trim((string)($_POST['tax_number'] ?? '')),
+        'account_type' => (string)($_POST['account_type'] ?? ''), 'currency' => (string)($_POST['currency'] ?? 'TRY'),
+        'phone' => trim((string)($_POST['phone'] ?? '')), 'email' => trim((string)($_POST['email'] ?? '')),
+        'contact_person' => trim((string)($_POST['contact_person'] ?? '')), 'billing_address' => trim((string)($_POST['billing_address'] ?? '')),
+        'shipping_address' => trim((string)($_POST['shipping_address'] ?? '')),
+    ];
+    if ($action === 'update') {
+        if ($data['code'] === '' || $data['title'] === '' || !in_array($data['account_type'], ['customer','supplier','both'], true)) {
+            header('Location: ' . url('current-accounts.php?edit=' . (int)($_POST['id'] ?? 0)));
+            exit;
+        }
+        $data[] = (int)($_POST['id'] ?? 0);
+        $pdo->prepare('UPDATE current_accounts SET code=?,title=?,tax_office=?,tax_number=?,account_type=?,currency=?,phone=?,email=?,contact_person=?,billing_address=?,shipping_address=? WHERE id=?')->execute(array_values($data));
+        header('Location: ' . url('current-accounts.php?updated=1'));
+        exit;
+    }
+    try {
+        if ($data['code'] === '' || $data['title'] === '' || !in_array($data['account_type'], ['customer','supplier','both'], true)) throw new RuntimeException('Cari kodu, cari unvanı ve cari tipi zorunludur.');
+        if (!in_array($data['currency'], ['TRY','USD','EUR'], true)) throw new RuntimeException('Geçerli bir para birimi seçin.');
+        $pdo->prepare('INSERT INTO current_accounts(code,title,tax_office,tax_number,account_type,currency,phone,email,contact_person,billing_address,shipping_address) VALUES(?,?,?,?,?,?,?,?,?,?,?)')->execute(array_values($data));
+        $message = 'Cari kart kaydedildi.';
+    } catch (PDOException $exception) { $error = 'Bu cari kodu zaten kullanılıyor.'; }
+      catch (RuntimeException $exception) { $error = $exception->getMessage(); }
+}
+$accounts = $pdo->query('SELECT * FROM current_accounts ORDER BY title')->fetchAll();
+if (isset($_GET['updated'])) $message = 'Cari kart güncellendi.';
+if (isset($_GET['deleted'])) $message = 'Cari kart silindi.';
+patient_header('Cari Kartlar', 'cash');
+?>
+<main class="patient-container account-page"><div class="account-head"><h1>Cari Kartlar</h1><p>Müşteri ve tedarikçi bilgilerini yönetin.</p></div>
+<?php if ($message): ?><div class="notice success"><?=e($message)?></div><?php endif ?><?php if ($error): ?><div class="notice error"><?=e($error)?></div><?php endif ?>
+<section class="account-card"><header class="list-head"><h2>Cari Kart Listesi</h2><details class="new-account-card" <?=$editingAccount ? 'open' : ''?>><summary><?=$editingAccount ? 'Cari Kartı Düzenle' : 'Yeni Cari Kart'?> <i class="ti tabler-plus"></i></summary><form class="account-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="<?=$editingAccount ? 'update' : 'save'?>"><?php if ($editingAccount): ?><input type="hidden" name="id" value="<?=(int)$editingAccount['id']?>"><?php endif ?><section><h2>Temel ve Kimlik Bilgileri</h2><div class="grid"><label>Cari Kodu<input name="code" maxlength="50" required placeholder="Örn. CR-0001" value="<?=e($editingAccount['code'] ?? '')?>"></label><label>Cari Unvanı / Adı<input name="title" maxlength="190" required value="<?=e($editingAccount['title'] ?? '')?>"></label><label>Vergi Dairesi<input name="tax_office" maxlength="150" value="<?=e($editingAccount['tax_office'] ?? '')?>"></label><label>Vergi No / T.C. Kimlik No<input name="tax_number" maxlength="32" value="<?=e($editingAccount['tax_number'] ?? '')?>"></label><label>Cari Tipi<select name="account_type" required><option value="customer" <?=($editingAccount['account_type'] ?? 'customer') === 'customer' ? 'selected' : ''?>>Müşteri</option><option value="supplier" <?=($editingAccount['account_type'] ?? '') === 'supplier' ? 'selected' : ''?>>Tedarikçi</option><option value="both" <?=($editingAccount['account_type'] ?? '') === 'both' ? 'selected' : ''?>>Her İkisi</option></select></label></div></section><section><h2>İletişim ve Adres Bilgileri</h2><div class="grid"><label>Telefon<input name="phone" maxlength="50" value="<?=e($editingAccount['phone'] ?? '')?>"></label><label>E-posta<input type="email" name="email" maxlength="190" value="<?=e($editingAccount['email'] ?? '')?>"></label><label>Yetkili Kişi<input name="contact_person" maxlength="150" value="<?=e($editingAccount['contact_person'] ?? '')?>"></label><label>Fatura Adresi<textarea name="billing_address"><?=e($editingAccount['billing_address'] ?? '')?></textarea></label><label>Sevk Adresi<textarea name="shipping_address"><?=e($editingAccount['shipping_address'] ?? '')?></textarea></label></div></section><button class="save" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy"></i></button></form></details></header><div class="table-wrap"><table><thead><tr><th>KOD</th><th>UNVAN</th><th>TİP</th><th>TELEFON</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach ($accounts as $account): ?><tr><td><?=e($account['code'])?></td><td><?=e($account['title'])?></td><td><?=e(['customer'=>'Müşteri','supplier'=>'Tedarikçi','both'=>'Her İkisi'][$account['account_type']] ?? '')?></td><td><?=e($account['phone'])?></td><td class="account-actions"><a class="edit" href="<?=url('current-accounts.php?edit=' . (int)$account['id'])?>" title="Düzenle" aria-label="Düzenle"><i class="ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu cari kart silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$account['id']?>"><button class="delete" title="Sil" aria-label="Sil"><i class="ti tabler-trash"></i></button></form></td></tr><?php endforeach ?><?php if (!$accounts): ?><tr><td colspan="5" class="empty">Henüz cari kart bulunmuyor.</td></tr><?php endif ?></tbody></table></div></section></main>
+<style>.account-page{max-width:1180px!important;margin:auto;padding:96px 32px 48px!important}.account-head{margin-bottom:22px}.account-head h1,.account-card h2{margin:0 0 6px}.account-head p{margin:0;color:var(--muted)}.account-card{margin-bottom:24px;padding:24px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 3px 12px #1e283c0f}.list-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.new-account-card summary{display:flex;align-items:center;gap:8px;height:43px;padding:0 16px;border-radius:7px;background:#19a94b;color:#fff;font-weight:700;cursor:pointer;list-style:none}.new-account-card summary::-webkit-details-marker{display:none}.new-account-card[open]{position:fixed;z-index:100;top:64px;right:0;bottom:0;left:260px;overflow:auto;padding:36px max(32px,calc((100vw - 1360px)/2));border:0;border-radius:0;background:#f7f7fb}.new-account-card[open] summary{max-width:1036px;height:auto;margin:0 auto 20px;padding:0;background:transparent;color:inherit;font-size:30px}.new-account-card[open] summary i{font-size:18px;color:#19a94b}.account-form{max-width:1036px;margin:0 auto;padding:24px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 3px 12px #1e283c0f}.account-form section+section{margin-top:26px;padding-top:24px;border-top:1px solid var(--line)}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 20px}.grid label{display:flex;flex-direction:column;gap:7px}.grid input,.grid select,.grid textarea{width:100%;min-height:43px;padding:10px 12px;border:1px solid #d2d2dc;border-radius:7px;background:transparent;color:inherit;font:inherit}.grid textarea{height:86px;resize:vertical}.save{display:inline-flex;align-items:center;justify-content:center;width:43px;margin-top:24px;height:43px;padding:0;border:0;border-radius:7px;background:#19a94b;color:#fff;font-weight:700}.notice{margin-bottom:18px;padding:13px 16px;border-radius:8px}.success{background:#daf5e3;color:#0d7130}.error{background:#ffe3e3;color:#a21d1d}.table-wrap{overflow:auto}.table-wrap table{width:100%;border-collapse:collapse}.table-wrap th,.table-wrap td{padding:14px;border-bottom:1px solid var(--line);text-align:left}.table-wrap th{font-size:12px}.account-actions{display:flex;gap:8px}.account-actions .edit,.account-actions .delete{display:inline-flex;align-items:center;justify-content:center;width:40px;height:42px;border:0;border-radius:7px;color:#fff}.account-actions .edit{background:#19a94b}.account-actions .delete{background:#e04f55}.empty{text-align:center;color:var(--muted)}[data-theme=dark] .account-card,[data-theme=dark] .new-account-card[open], [data-theme=dark] .account-form{background:#2f3349;border-color:#454a63}[data-theme=dark] .new-account-card[open]{background:#24273a}[data-theme=dark] .grid input,[data-theme=dark] .grid select,[data-theme=dark] .grid textarea{border-color:#5a607b;color:#fff}@media(max-width:700px){.account-page{padding:92px 14px 30px!important}.grid{grid-template-columns:1fr}.list-head{align-items:flex-start;flex-direction:column}.new-account-card[open]{top:64px;left:0;padding:28px 14px}.new-account-card[open] summary{font-size:25px}}</style>
+<?php patient_footer(); ?>
