@@ -206,3 +206,149 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mergeProfileSecurity);
   else mergeProfileSecurity();
 })();
+
+// Vuexy-style sidebar: the control is inserted here so all shared PHP pages get it.
+(() => {
+  function initSidebar() {
+    const sidebar = document.querySelector('.patient-nav');
+    const topbar = document.querySelector('.patient-topbar');
+    if (!sidebar || !topbar || sidebar.dataset.sidebarReady) return;
+    sidebar.dataset.sidebarReady = 'true';
+
+    const icons = {
+      'Ana Sayfa': '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+      'Hasta': '<circle cx="12" cy="8" r="3"/><path d="M5 21c.5-4 2.8-6 7-6s6.5 2 7 6M18 8h4m-2-2v4"/>',
+      'Takvim': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+      'Kanban': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8v8M16 8v5"/>',
+      'Takip': '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M8 12l3 3 5-6"/>',
+      'Satış': '<path d="M3 3h2l2.4 11.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 7H7"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>',
+      'Rapor': '<path d="M5 3h10l4 4v14H5zM15 3v5h5M8 17v-4M12 17V9M16 17v-2"/>',
+      'Stok': '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9zM4 7.5 12 12l8-4.5M12 12v9"/>',
+      'Ayar': '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.2 2.2-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-3.2v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2.2-2.2.1-.1A1.7 1.7 0 0 0 6.6 15a1.7 1.7 0 0 0-1.5-1H5v-3.2h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.2-2.2.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h3.2v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.2 2.2-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2V14h-.2a1.7 1.7 0 0 0-1.5 1z"/>',
+      'Kurulum': '<path d="m14 6-4 4 4 4M3 12h11M14 18l4-4-4-4M21 3v4M19 5h4"/>'
+    };
+    sidebar.querySelectorAll('a').forEach(link => {
+      const label = (link.textContent || '').trim();
+      const key = Object.keys(icons).find(name => label.startsWith(name));
+      const holder = link.querySelector(':scope > span');
+      if (!key || !holder) return;
+      holder.setAttribute('aria-hidden', 'true');
+      holder.innerHTML = `<svg class="menu-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[key]}</svg>`;
+    });
+
+    if (!document.getElementById('vuexy-tabler-icons')) {
+      const iconStyles = document.createElement('link');
+      iconStyles.id = 'vuexy-tabler-icons';
+      iconStyles.rel = 'stylesheet';
+      iconStyles.href = new URL('assets/vuexy-tabler-icons.css?v=2', location.href).href;
+      document.head.appendChild(iconStyles);
+    }
+    if (!document.getElementById('vuexy-layout-fixes')) {
+      const layoutStyles = document.createElement('link');
+      layoutStyles.id = 'vuexy-layout-fixes';
+      layoutStyles.rel = 'stylesheet';
+      layoutStyles.href = new URL('assets/vuexy-layout-fixes.css?v=16', location.href).href;
+      document.head.appendChild(layoutStyles);
+    }
+    const vuexyIcons = {
+      'Ana Sayfa': 'tabler-smart-home', 'Hasta': 'tabler-layout-sidebar', 'Takvim': 'tabler-calendar',
+      'Kanban': 'tabler-layout-kanban', 'Takip': 'tabler-refresh', 'Satış': 'tabler-shopping-cart', 'Rapor': 'tabler-file-report', 'Stok': 'tabler-package',
+      'Ayar': 'tabler-settings', 'Kurulum': 'tabler-tools'
+    };
+    sidebar.querySelectorAll('a').forEach(link => {
+      const label = (link.textContent || '').trim();
+      const key = Object.keys(vuexyIcons).find(name => label.startsWith(name));
+      const holder = link.querySelector(':scope > span');
+      if (key && holder) holder.innerHTML = `<i class="ti ${vuexyIcons[key]}"></i>`;
+    });
+    sidebar.querySelectorAll('.report-submenu a > span').forEach(icon => icon.remove());
+    const taskLink = sidebar.querySelector('a[href*="kanban.php"]');
+    if (taskLink && taskLink.lastChild?.nodeType === Node.TEXT_NODE) taskLink.lastChild.textContent = ' Görev Takip';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'plain-tool menu-toggle';
+    button.setAttribute('aria-label', 'Menüyü aç veya kapat');
+    button.setAttribute('aria-expanded', 'true');
+    button.textContent = '';
+    topbar.insertBefore(button, topbar.firstChild);
+
+    const mobile = () => window.matchMedia('(max-width: 900px)').matches;
+    const saved = localStorage.getItem('vox-sidebar-collapsed') === 'true';
+    function closeSubmenus() {
+      sidebar.querySelectorAll('.report-menu-group.open').forEach(group => {
+        group.classList.remove('open');
+        group.querySelector(':scope > a')?.setAttribute('aria-expanded', 'false');
+      });
+    }
+    document.body.classList.add('layout-navbar-fixed', 'layout-compact', 'layout-menu-fixed');
+    if (!mobile() && saved) {
+      document.body.classList.add('menu-collapsed', 'layout-menu-collapsed');
+      closeSubmenus();
+    }
+
+    function syncLayoutClasses() {
+      const collapsed = document.body.classList.contains('menu-collapsed');
+      document.body.classList.toggle('layout-menu-collapsed', collapsed);
+      document.body.classList.toggle('layout-menu-expanded', !collapsed);
+    }
+    syncLayoutClasses();
+    sidebar.addEventListener('click', event => {
+      const groupLink = event.target.closest('.report-menu-group > a');
+      if (!mobile() && groupLink && document.body.classList.contains('menu-collapsed')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        document.body.classList.remove('menu-collapsed');
+        localStorage.setItem('vox-sidebar-collapsed', 'false');
+        closeSubmenus();
+        syncLayoutClasses();
+        update();
+      }
+    }, true);
+
+    function update() {
+      const open = mobile() ? document.body.classList.contains('menu-open') : !document.body.classList.contains('menu-collapsed');
+      button.setAttribute('aria-expanded', String(open));
+      button.setAttribute('aria-label', open ? 'Menüyü gizle' : 'Menüyü göster');
+      button.textContent = mobile() ? '☰' : '';
+    }
+    button.addEventListener('click', () => {
+      if (mobile()) document.body.classList.toggle('menu-open');
+      else {
+        document.body.classList.toggle('menu-collapsed');
+        if (document.body.classList.contains('menu-collapsed')) closeSubmenus();
+        localStorage.setItem('vox-sidebar-collapsed', String(document.body.classList.contains('menu-collapsed')));
+      }
+      syncLayoutClasses();
+      update();
+    });
+    document.addEventListener('click', event => {
+      if (mobile() && document.body.classList.contains('menu-open') && !sidebar.contains(event.target) && !button.contains(event.target)) {
+        document.body.classList.remove('menu-open');
+        update();
+      }
+    });
+    const brand = document.querySelector('.patient-brand');
+    brand?.addEventListener('click', event => {
+      if (!mobile() && document.body.classList.contains('menu-collapsed')) {
+        event.preventDefault();
+        document.body.classList.remove('menu-collapsed');
+        localStorage.setItem('vox-sidebar-collapsed', 'false');
+        syncLayoutClasses();
+        update();
+      }
+    });
+    window.addEventListener('resize', () => {
+      document.body.classList.remove('menu-open');
+      if (!mobile() && localStorage.getItem('vox-sidebar-collapsed') === 'true') {
+        document.body.classList.add('menu-collapsed');
+        closeSubmenus();
+      }
+      syncLayoutClasses();
+      update();
+    });
+    update();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSidebar);
+  else initSidebar();
+})();

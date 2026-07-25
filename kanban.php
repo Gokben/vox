@@ -106,14 +106,14 @@ foreach (db()->query('SELECT * FROM kanban_tasks WHERE is_active=1 ORDER BY CASE
     if (isset($tasksByColumn[$task['status']])) $tasksByColumn[$task['status']][] = $task;
 }
 
-patient_header('Kanban', 'kanban');
+patient_header('Görev Takip', 'kanban');
 ?>
 <link rel="stylesheet" href="<?=url('assets/kanban.css?v=20260719-1')?>">
 <link rel="stylesheet" href="<?=url('assets/kanban-colors.css?v=20260719-1')?>">
 <link rel="stylesheet" href="<?=url('assets/kanban-vuexy.css?v=20260719-1')?>">
 <main class="kanban-page">
   <div class="kanban-page-head">
-    <div><h1>Kanban</h1><p>Görevlerinizi sürükleyerek süreçte ilerletin.</p></div>
+    <div><h1>Görev Takip</h1><p>Görevlerinizi sürükleyerek süreçte ilerletin.</p></div>
     <button class="button kanban-new-button" type="button" id="kanban-open-new">+ Yeni görev</button>
   </div>
   <section class="kanban-board" aria-label="Görev panosu">

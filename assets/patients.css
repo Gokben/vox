@@ -1,4 +1,76 @@
 :root{--accent:#20a447;--accent-dark:#168238;--accent-light:#66c936;--bg:#f7f7fb;--card:#fff;--text:#343348;--muted:#717083;--line:#e4e3eb;--shadow:0 4px 14px rgba(34,35,58,.09)}
+
+/* Vuexy-style vertical application shell — existing VOX colours are intentionally retained. */
+@media (min-width: 901px){
+  body{padding-left:260px!important}
+  body .patient-header{box-shadow:none!important;background:transparent!important}
+  body .patient-topbar{position:fixed!important;z-index:30!important;top:0!important;left:260px!important;right:0!important;height:64px!important;padding:0 28px!important;background:var(--card)!important;border-bottom:1px solid var(--line)!important;box-shadow:0 2px 8px rgba(30,31,48,.06)!important}
+  body .header-tools{margin-left:auto!important}
+  body .patient-brand{position:fixed!important;z-index:31!important;top:0!important;left:0!important;width:260px!important;height:64px!important;margin:0!important;padding:0 24px!important;background-color:var(--card)!important;background-position:24px center!important;border-bottom:1px solid var(--line)!important}
+  body .patient-nav{position:fixed!important;z-index:25!important;top:64px!important;bottom:0!important;left:0!important;width:260px!important;height:auto!important;padding:18px 13px 28px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:3px!important;overflow-y:auto!important;background:var(--card)!important;border-right:1px solid var(--line)!important}
+  body .patient-nav a,body .report-menu-group>a{width:100%!important;min-height:42px!important;padding:10px 13px!important;font-size:14px!important;border-radius:7px!important}
+  .patient-nav a span{width:18px;text-align:center;opacity:.8}
+  .patient-nav .report-menu-group{width:100%}
+  .patient-nav .report-submenu{position:static;min-width:0;margin:2px 0 4px;padding:3px 0 3px 14px;box-shadow:none;border:0;background:transparent}
+  .patient-nav .report-submenu a{font-size:13px!important;min-height:34px;padding:8px 12px!important}
+  body .patient-container{min-height:100vh!important;padding:96px 32px 38px!important}
+  .page-head{max-width:1600px;margin-left:auto;margin-right:auto}
+  body .dashboard,body .employee-page{padding-top:96px!important}
+}
+@media (min-width: 1400px){.patient-container{padding-left:42px;padding-right:42px}}
+
+/* Collapsible sidebar.  It remains a vertical drawer on phones as well. */
+body.menu-collapsed{padding-left:76px!important}
+body.menu-collapsed .patient-topbar{left:76px!important}
+body.menu-collapsed .patient-brand{width:76px!important;padding:0!important;background-position:center!important}
+body.menu-collapsed .patient-nav{width:76px!important;padding-left:10px!important;padding-right:10px!important}
+body.menu-collapsed .patient-nav a{justify-content:center!important;padding-left:8px!important;padding-right:8px!important;font-size:0!important}
+body.menu-collapsed .patient-nav a span{width:auto!important;font-size:16px!important}
+body.menu-collapsed .patient-nav .report-submenu{display:none!important}
+
+@media (max-width: 900px){
+  body{padding-left:0!important}
+  body .patient-header{height:64px!important}
+  body .patient-topbar{position:fixed!important;z-index:30!important;top:0!important;left:0!important;right:0!important;height:64px!important;padding:0 14px!important;background:var(--card)!important;border-bottom:1px solid var(--line)!important;box-shadow:0 2px 8px rgba(30,31,48,.06)!important}
+  body .patient-brand{width:102px!important;height:42px!important;background-position:left center!important;flex:0 0 102px!important}
+  body .header-tools{margin-left:auto!important;gap:13px!important}
+  body .patient-nav{position:fixed!important;z-index:25!important;top:64px!important;bottom:0!important;left:0!important;width:260px!important;height:auto!important;padding:18px 13px 28px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:3px!important;overflow-y:auto!important;transform:translateX(-100%);transition:transform .22s ease;background:var(--card)!important;border-right:1px solid var(--line)!important;box-shadow:8px 0 20px rgba(30,31,48,.12)!important}
+  body.menu-open .patient-nav{transform:translateX(0)}
+  body .patient-nav a,body .report-menu-group>a{width:100%!important;min-height:42px!important;padding:10px 13px!important;font-size:14px!important;border-radius:7px!important}
+  body .patient-nav .report-menu-group{width:100%}
+  body .patient-nav .report-submenu{position:static!important;min-width:0!important;margin:2px 0 4px!important;padding:3px 0 3px 14px!important;box-shadow:none!important;border:0!important;background:transparent!important}
+  body .patient-container{padding:92px 14px 30px!important}
+  body .dashboard,body .employee-page{padding-top:92px!important}
+  body.menu-collapsed .patient-topbar{left:0!important}
+  body.menu-collapsed .patient-brand{width:102px!important;padding:0!important;background-position:left center!important}
+  body.menu-collapsed .patient-nav{width:260px!important;padding:18px 13px 28px!important}
+  body.menu-collapsed .patient-nav a{justify-content:flex-start!important;padding:10px 13px!important;font-size:14px!important}
+  body.menu-collapsed .patient-nav a span{width:18px!important;font-size:16px!important}
+}
+.menu-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:34px!important;height:34px!important;min-height:34px!important;margin-right:8px!important;padding:0!important;font-size:20px!important}
+
+/* Menu geometry adapted from the supplied Vuexy vertical-menu template. */
+body .patient-nav{padding:14px 0 24px!important;gap:0!important}
+body .patient-nav::before{content:'MENÜ';display:block;padding:6px 24px 10px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.4px}
+body .patient-nav>a,body .patient-nav>.report-menu-group>a,body .patient-nav>.report-menu-group{margin:3px 0!important}
+body .patient-nav>a,body .patient-nav>.report-menu-group>a{min-height:38px!important;margin-left:12px!important;margin-right:12px!important;padding:8px 12px!important;border-radius:6px!important;font-size:15px!important;line-height:1.467!important}
+body .patient-nav>a span,body .patient-nav>.report-menu-group>a span{width:22px!important;margin-right:4px;text-align:center;font-size:17px!important}
+body .patient-nav .menu-svg{display:block;width:18px;height:18px}
+body .patient-nav>.report-menu-group>a{margin-left:12px!important;margin-right:12px!important}
+body .patient-nav .report-submenu{margin:3px 12px 3px 26px!important;padding:0!important}
+body .patient-nav .report-submenu a{min-height:34px!important;padding:8px 12px!important;border-radius:6px!important;font-size:14px!important;line-height:1.467!important}
+body.menu-collapsed .patient-nav::before{position:relative;width:22px;height:1px;margin:8px auto 12px;padding:0;font-size:0;background:var(--line)}
+body.menu-collapsed .patient-nav>a,body.menu-collapsed .patient-nav>.report-menu-group>a{margin-left:12px!important;margin-right:12px!important}
+body.menu-collapsed .patient-nav>a span,body.menu-collapsed .patient-nav>.report-menu-group>a span{margin-right:0!important}
+body.menu-collapsed .patient-nav>.report-menu-group>a{justify-content:center!important;padding-left:8px!important;padding-right:8px!important;font-size:0!important}
+body.menu-collapsed .patient-nav>.report-menu-group>a span{width:auto!important;font-size:16px!important}
+@media(max-width:900px){
+  body .patient-nav{padding-top:14px!important}
+  body .patient-nav::before{padding-left:24px!important}
+  body.menu-collapsed .patient-nav::before{width:auto!important;height:auto!important;margin:0!important;padding:6px 24px 10px!important;font-size:11px!important;background:transparent!important}
+  body.menu-collapsed .patient-nav>.report-menu-group>a{justify-content:flex-start!important;padding:10px 13px!important;font-size:14px!important}
+  body.menu-collapsed .patient-nav>.report-menu-group>a span{width:22px!important;font-size:17px!important}
+}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,sans-serif}body{background:var(--bg);color:var(--text);font-size:14px}.patient-header{position:relative;z-index:20;background:var(--card);box-shadow:0 1px 7px rgba(30,31,48,.12)}
 .patient-topbar{height:57px;display:flex;align-items:center;justify-content:space-between;padding:0 31px;border-bottom:1px solid var(--line)}.patient-brand{display:flex;align-items:center;gap:14px;color:#635bff;text-decoration:none;font-size:20px}.patient-brand img{width:40px;height:40px;border-radius:50%;object-fit:cover}.header-tools{display:flex;align-items:center;gap:19px}.plain-tool{min-width:auto;padding:5px;border:0;background:transparent!important;color:var(--text)!important;font-size:18px;box-shadow:none!important}.language{font-size:13px}.account{position:relative}.account-button{display:flex;align-items:center;gap:9px;border:0;background:transparent!important;color:var(--text)!important;padding:4px;box-shadow:none!important}.avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#82d400,#079548);color:#fff;font-weight:700;border:2px solid #7668ff}.account-name{text-align:left;font-weight:700}.account-name small{display:block;margin-top:2px;color:var(--muted);font-size:10px}.account-menu{display:none;position:absolute;right:0;top:47px;width:180px;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}.account-menu.open{display:block}.account-menu a{display:block;padding:10px;border-radius:6px;color:var(--text);text-decoration:none}.account-menu a:hover{background:var(--bg)}.account-menu .logout{color:#d94141}
 .patient-nav{height:56px;display:flex;align-items:center;gap:7px;padding:0 31px;overflow:auto}.patient-nav a{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:11px 15px;border-radius:7px;color:#5c5b6d;text-decoration:none;font-size:16px}.patient-nav a.active,.patient-nav a:hover{background:linear-gradient(135deg,var(--accent-light),var(--accent));color:#fff;box-shadow:0 4px 10px rgba(32,164,71,.22)}

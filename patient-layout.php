@@ -31,8 +31,8 @@ function patient_header(string $title, string $active = 'patients'): void
     ?>
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=e($title)?> | <?=APP_NAME?></title><link rel="icon" type="image/png" href="<?=url('assets/favicon.png?v=20260713')?>">
-<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260713-13')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260716-5')?>"><script src="<?=url('assets/theme.js?v=20260717-1')?>" defer></script>
-</head><body><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><span class="language">TR</span><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span>⌂</span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span>▣</span> Hasta Kayıtları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span>＋</span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span>▦</span> Kanban</a><a href="#"><span>⇄</span> Takipler</a><a href="#"><span>▥</span> Satışlar</a><a href="#"><span>▤</span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span>⚙</span> Ayarlar</a><?php endif?></nav></header>
+<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260725-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260716-5')?>"><script src="<?=url('assets/theme.js?v=20260725-21')?>" defer></script>
+</head><body><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><span class="language">TR</span><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kayıtları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><span><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span><i class="icon-base ti tabler-settings"></i></span> Ayarlar</a><?php endif?></nav></header>
 <?php
 }
 
@@ -42,11 +42,11 @@ function patient_footer(): void
 <script>
 const stockMenuLink = document.createElement('a');
 stockMenuLink.href = '#';
-stockMenuLink.innerHTML = '<span>▤</span> Stoklar';
+stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
 document.querySelector('.patient-nav a[href*="admin.php"]')?.before(stockMenuLink);
 const setupMenuLink = document.createElement('a');
 setupMenuLink.href = '#';
-setupMenuLink.innerHTML = '<span>⚙</span> Kurulum';
+setupMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Kurulum';
 document.querySelector('.patient-nav a[href*="admin.php"]')?.after(setupMenuLink);
 const setupGroup = document.createElement('div');
 setupGroup.className = 'report-menu-group';
@@ -109,6 +109,8 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
 const calendarMenuLink = [...document.querySelectorAll('.patient-nav a')].find(link => link.getAttribute('href')?.includes('patient-form.php'));
 if (calendarMenuLink) {
   calendarMenuLink.href = <?= json_encode(url('calendar.php')) ?>;
+  const calendarIcon = calendarMenuLink.querySelector(':scope > span');
+  if (calendarIcon) calendarIcon.innerHTML = '<i class="icon-base ti tabler-calendar"></i>';
   if (calendarMenuLink.lastChild?.nodeType === Node.TEXT_NODE) calendarMenuLink.lastChild.textContent = ' Takvim';
   if (location.pathname.endsWith('/calendar.php')) calendarMenuLink.classList.add('active');
 }

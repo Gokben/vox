@@ -1,0 +1,129 @@
+/* Shared content offsets for pages rendered inside the fixed Vuexy-style shell. */
+@media (min-width:901px){
+  body .patient-container.datatable-page,
+  body .patient-container.patient-form-page,
+  body .patient-container.personnel-page,
+  body .patient-container.branch-page,
+  body .patient-container.employee-page{padding-top:96px!important}
+  body .patient-container.patient-form-page{max-width:1160px!important;padding-left:32px!important;padding-right:32px!important}
+  body .calendar-page,
+  body .kanban-page,
+  body .results-page{padding-top:96px!important}
+  body .calendar-page{padding-left:32px!important;padding-right:32px!important}
+  body .kanban-page{padding-left:32px!important;padding-right:32px!important}
+  body .results-page{max-width:none!important;padding-left:32px!important;padding-right:32px!important}
+}
+@media (max-width:900px){
+  body .patient-container.datatable-page,
+  body .patient-container.patient-form-page,
+  body .patient-container.personnel-page,
+  body .patient-container.branch-page,
+  body .patient-container.employee-page{padding-top:92px!important}
+  body .patient-container.patient-form-page{padding-left:14px!important;padding-right:14px!important}
+  body .calendar-page,
+  body .kanban-page,
+  body .results-page{padding-top:92px!important}
+  body .calendar-page,
+  body .kanban-page,
+  body .results-page{padding-left:14px!important;padding-right:14px!important}
+}
+
+/* Vuexy vertical-menu hierarchy, while retaining the application's colour palette. */
+body .patient-nav{padding-top:10px!important}
+body .patient-nav::before{padding:10px 24px 8px!important;font-size:11px!important;font-weight:700!important;letter-spacing:.4px!important}
+body .patient-nav>a,body .patient-nav>.report-menu-group>a{position:relative;min-height:40px!important;margin:2px 12px!important;padding:9px 38px 9px 12px!important;border-radius:6px!important;font-size:15px!important;font-weight:400!important}
+body .patient-nav>a span,body .patient-nav>.report-menu-group>a span{width:20px!important;margin-right:8px!important;font-size:18px!important}
+body .patient-nav>.report-menu-group>a::after{position:absolute;right:13px;top:50%;width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;content:'';transform:translateY(-65%) rotate(-45deg);transition:transform .2s ease}
+body .patient-nav>.report-menu-group.open>a::after{transform:translateY(-35%) rotate(45deg)}
+body .patient-nav .report-submenu{display:none!important;position:static!important;margin:0 12px!important;padding:2px 0 4px 38px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+body .patient-nav .report-menu-group.open .report-submenu{display:grid!important;gap:1px!important}
+body .patient-nav .report-submenu a{min-height:36px!important;padding:9px 10px!important;border-radius:6px!important;font-size:14px!important}
+body.menu-collapsed .patient-nav>.report-menu-group>a::after{display:none}
+@media(max-width:900px){body .patient-nav .report-submenu{padding-left:38px!important}}
+body .menu-toggle,body .menu-toggle:hover{width:28px!important;height:28px!important;min-height:28px!important;margin-right:16px!important;padding:0!important;border:1px solid var(--line)!important;border-radius:50%!important;background:var(--card)!important;color:var(--text)!important;font-size:24px!important;font-weight:400!important;line-height:22px!important;box-shadow:none!important}
+body .patient-nav::before{display:none!important}
+body .patient-brand{background-size:72px auto!important}
+body .patient-nav>a,body .patient-nav>.report-menu-group>a{font-weight:700!important}
+body .patient-nav .report-submenu a{font-weight:700!important}
+body .patient-nav .ti{font-weight:700!important;transform:scale(1.12);transform-origin:center}
+
+/* Phone-specific spacing and touch targets. */
+@media(max-width:600px){
+  body .patient-topbar{padding:0 10px!important}
+  body .patient-brand{width:76px!important;flex-basis:76px!important;background-size:64px auto!important}
+  body .header-tools{gap:8px!important}
+  body .plain-tool{min-width:32px!important;min-height:32px!important}
+  body .menu-toggle,body .menu-toggle:hover{margin-right:8px!important}
+  body .page-head{flex-direction:column!important;align-items:stretch!important;margin-bottom:20px!important}
+  body .page-actions{width:100%!important}
+  body .page-actions .button{flex:1 1 auto!important}
+  body .monthly-chart-card header{align-items:flex-start!important;gap:12px!important}
+  body .chart-year-form{width:100%;justify-content:space-between}
+  body .results-search button{min-width:76px}
+  body .vuexy-dt-title{padding-left:16px!important;padding-right:16px!important}
+}
+
+/* Vuexy index.html desktop menu toggle: the control lives on the sidebar brand row. */
+@media(min-width:901px){
+  body .patient-topbar .menu-toggle,body .patient-topbar .menu-toggle:hover{
+    position:absolute!important;top:19px!important;left:-49px!important;z-index:40!important;display:block!important;width:20px!important;height:20px!important;min-height:20px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background-color:var(--text)!important;color:transparent!important;font-size:0!important;line-height:0!important;box-shadow:none!important;
+    -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Cpath d='M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0'/%3E%3Cpath d='M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0'/%3E%3C/g%3E%3C/svg%3E")!important;
+    mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Cpath d='M11 12a1 1 0 1 0 2 0a1 1 0 1 0-2 0'/%3E%3Cpath d='M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0'/%3E%3C/g%3E%3C/svg%3E")!important;
+    -webkit-mask-repeat:no-repeat!important;mask-repeat:no-repeat!important;-webkit-mask-size:100% 100%!important;mask-size:100% 100%!important;
+  }
+  body.menu-collapsed .patient-topbar .menu-toggle,body.menu-collapsed .patient-topbar .menu-toggle:hover{
+    left:-29px!important;
+    -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0'/%3E%3C/svg%3E")!important;
+    mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0'/%3E%3C/svg%3E")!important;
+  }
+}
+
+/* An expanded submenu must collapse to a divider, never to clipped text. */
+@media(min-width:901px){
+  body.menu-collapsed .patient-nav .report-submenu,body.layout-menu-collapsed .patient-nav .report-submenu{display:none!important}
+  body.menu-collapsed .patient-nav .report-menu-group.open,body.layout-menu-collapsed .patient-nav .report-menu-group.open{position:relative!important;margin-bottom:18px!important}
+  body.menu-collapsed .patient-nav .report-menu-group.open::after,body.layout-menu-collapsed .patient-nav .report-menu-group.open::after{position:absolute;right:16px;bottom:-9px;left:16px;height:1px;background:var(--line);content:''}
+  body.menu-collapsed .patient-nav:hover .report-menu-group.open::after,body.layout-menu-collapsed .patient-nav:hover .report-menu-group.open::after{display:none}
+}
+
+/* Vuexy submenu rows: indented labels with the small outlined-circle marker. */
+body .patient-nav .report-submenu{padding:2px 0 4px 12px!important}
+body .patient-nav .report-submenu a{position:relative;min-height:40px!important;padding:10px 10px 10px 32px!important;border-radius:6px!important;background:transparent!important;color:var(--text)!important;font-size:15px!important;font-weight:400!important;line-height:1.35!important}
+body .patient-nav .report-submenu a::before{position:absolute;top:50%;left:10px;width:8px;height:8px;border:1.5px solid currentColor;border-radius:50%;content:'';opacity:.9;transform:translateY(-50%)}
+body .patient-nav .report-submenu a:hover{background:transparent!important;color:var(--text)!important;box-shadow:none!important}
+body .patient-nav .report-submenu a.active{font-weight:500!important}
+body .patient-nav .report-submenu a{display:flex!important;justify-content:flex-start!important;width:100%!important;margin:0!important;text-align:left!important}
+
+/* Vuexy-like brand strip: full identity when expanded, mark-only when collapsed. */
+@media(min-width:901px){
+  body .patient-brand{height:64px!important;background-repeat:no-repeat!important;background-size:105px auto!important;background-position:20px center!important}
+  body.menu-collapsed .patient-brand,body.layout-menu-collapsed .patient-brand{background-image:none!important;background-size:0!important}
+  body.menu-collapsed .patient-brand::before,body.layout-menu-collapsed .patient-brand::before{position:absolute;top:14px;left:20px;width:36px;height:36px;background:url('vox-logo-02.png?v=20260713-9') -43px -3px/118px 43px no-repeat;content:''}
+  body.menu-collapsed .patient-topbar .menu-toggle,body.menu-collapsed .patient-topbar .menu-toggle:hover,body.layout-menu-collapsed .patient-topbar .menu-toggle,body.layout-menu-collapsed .patient-topbar .menu-toggle:hover{display:none!important}
+  body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{background-image:url('vox-logo-02.png?v=20260713-9')!important;background-size:105px auto!important;background-position:20px center!important}
+  body.menu-collapsed:has(.patient-nav:hover) .patient-brand::before,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand::before{display:none}
+}
+
+/* Vuexy fixed/collapsed/hover-expanded sidebar behaviour. */
+@media(min-width:901px){
+  body .patient-nav{width:260px!important;transition:width .3s ease,box-shadow .3s ease!important}
+  body .patient-brand{width:260px!important;transition:width .3s ease!important}
+  body.menu-collapsed .patient-nav,body.layout-menu-collapsed .patient-nav{width:76px!important;overflow-x:hidden!important;box-shadow:0 0 6px rgba(47,43,61,.10)!important}
+  body.menu-collapsed .patient-brand,body.layout-menu-collapsed .patient-brand{width:76px!important}
+  body.menu-collapsed .patient-nav:hover,body.layout-menu-collapsed .patient-nav:hover{width:260px!important;overflow-x:visible!important;box-shadow:7px 0 18px rgba(47,43,61,.14)!important}
+  body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{width:260px!important;box-shadow:7px 0 18px rgba(47,43,61,.10)!important}
+  body.menu-collapsed .patient-nav:hover>a,body.menu-collapsed .patient-nav:hover>.report-menu-group>a,body.layout-menu-collapsed .patient-nav:hover>a,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a{justify-content:flex-start!important;padding-left:12px!important;padding-right:38px!important;font-size:15px!important}
+  body.menu-collapsed .patient-nav:hover>a span,body.menu-collapsed .patient-nav:hover>.report-menu-group>a span,body.layout-menu-collapsed .patient-nav:hover>a span,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a span{width:20px!important;margin-right:8px!important;font-size:18px!important}
+  body.menu-collapsed .patient-nav:hover>.report-menu-group>a::after,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a::after{display:block!important}
+  body.menu-collapsed .patient-nav:hover .report-submenu,body.layout-menu-collapsed .patient-nav:hover .report-submenu{display:none!important}
+  body.menu-collapsed .patient-nav:hover .report-menu-group.open .report-submenu,body.layout-menu-collapsed .patient-nav:hover .report-menu-group.open .report-submenu{display:grid!important}
+  body .patient-nav>a,body .patient-nav>.report-menu-group>a{font-weight:400!important}
+  body .patient-nav .report-submenu a{font-weight:400!important}
+  body .patient-nav>a.active{font-weight:500!important}
+}
+
+/* Keep collapsed navigation clean even while the pointer is inside the sidebar. */
+@media(min-width:901px){
+  body.menu-collapsed .patient-nav .report-submenu,body.menu-collapsed .patient-nav:hover .report-submenu,
+  body.layout-menu-collapsed .patient-nav .report-submenu,body.layout-menu-collapsed .patient-nav:hover .report-submenu{display:none!important}
+}
