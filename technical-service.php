@@ -6,9 +6,15 @@ require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+$pdo->exec($sqlite
+    ? 'CREATE TABLE IF NOT EXISTS patient_services (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER NOT NULL, service_date TEXT NOT NULL, service_status TEXT NOT NULL, performed_action TEXT, action_date TEXT, opened_by TEXT, branch_name TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+    : 'CREATE TABLE IF NOT EXISTS patient_services (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, patient_id INT UNSIGNED NOT NULL, service_date DATE NOT NULL, service_status VARCHAR(80) NOT NULL, performed_action TEXT NULL, action_date DATE NULL, opened_by VARCHAR(190) NULL, branch_name VARCHAR(190) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 try {
     $columns = $sqlite ? array_column($pdo->query('PRAGMA table_info(patient_services)')->fetchAll(), 'name') : array_column($pdo->query('SHOW COLUMNS FROM patient_services')->fetchAll(), 'Field');
-    if (!in_array('repair_details', $columns, true)) $pdo->exec('ALTER TABLE patient_services ADD COLUMN repair_details TEXT NULL');
+    foreach (['service_name VARCHAR(150) NULL', 'repair_details TEXT NULL'] as $definition) {
+        $column = explode(' ', $definition, 2)[0];
+        if (!in_array($column, $columns, true)) $pdo->exec('ALTER TABLE patient_services ADD COLUMN ' . $definition);
+    }
 } catch (Throwable $exception) { error_log('technical-service schema: ' . $exception->getMessage()); }
 if (isset($_GET['external_patient'])) {
     $externalName = trim((string)($_GET['external_name'] ?? '')) ?: 'Kayıtsız Hasta';
