@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/config.php';
 require_login();
+require __DIR__ . '/cash-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
@@ -85,6 +86,7 @@ if ((int)$pdo->query('SELECT COUNT(*) FROM cash_categories')->fetchColumn() === 
     $insertCategory = $pdo->prepare('INSERT INTO cash_categories(name,active) VALUES(?,1)');
     foreach (['Maaş', 'Fatura', 'Satış', 'Kira'] as $categoryName) $insertCategory->execute([$categoryName]);
 }
+ensure_cash_schema($pdo);
 
 function cash_money(float $value): string
 {
@@ -106,7 +108,7 @@ function cash_balance_until(PDO $pdo, string $date): float
 $message = '';
 $error = '';
 $activeTab = (string)($_GET['tab'] ?? 'transactions');
-if (!in_array($activeTab, ['transactions', 'categories', 'closing'], true)) $activeTab = 'transactions';
+if (!in_array($activeTab, ['transactions', 'closing'], true)) $activeTab = 'transactions';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -191,7 +193,7 @@ $income = (float)$totals['income'];
 $expense = (float)$totals['expense'];
 $netBalance = $openingBalance + $income - $expense;
 
-$categories = $pdo->query('SELECT * FROM cash_categories ORDER BY active DESC,name')->fetchAll();
+$categories = $pdo->query('SELECT c.*,p.name parent_name FROM cash_categories c LEFT JOIN cash_categories p ON p.id=c.parent_id ORDER BY active DESC,COALESCE(c.parent_id,c.id),c.parent_id IS NOT NULL,c.name')->fetchAll();
 $activeCategories = array_values(array_filter($categories, static fn(array $category): bool => (bool)$category['active']));
 $transactions = $pdo->query('SELECT t.*,c.name category_name FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500')->fetchAll();
 $closings = $pdo->query('SELECT * FROM cash_closings ORDER BY closing_date DESC,id DESC LIMIT 365')->fetchAll();
@@ -212,7 +214,6 @@ patient_header('Kasa', 'cash');
 
   <nav class="cash-tabs">
     <a class="<?=$activeTab === 'transactions' ? 'active' : ''?>" href="<?=url('cash.php?tab=transactions')?>">Gelir / Gider</a>
-    <a class="<?=$activeTab === 'categories' ? 'active' : ''?>" href="<?=url('cash.php?tab=categories')?>">Kategoriler</a>
     <a class="<?=$activeTab === 'closing' ? 'active' : ''?>" href="<?=url('cash.php?tab=closing')?>">Günlük Kapanış</a>
   </nav>
 
@@ -226,7 +227,7 @@ patient_header('Kasa', 'cash');
         <label>Açıklama<input name="description" maxlength="255" value="<?=e($_POST['description'] ?? '')?>" required></label>
         <label>Tutar<input type="number" name="amount" min="0.01" step="0.01" value="<?=e($_POST['amount'] ?? '')?>" required></label>
         <label>Ödeme Türü<select name="payment_type" required><option value="cash">Nakit</option><option value="credit_card">Kredi Kartı</option></select></label>
-        <label>Kategori<select name="category_id"><option value="">Kategorisiz</option><?php foreach ($activeCategories as $category): ?><option value="<?=(int)$category['id']?>"><?=e($category['name'])?></option><?php endforeach ?></select></label>
+        <label>Kategori<select name="category_id"><option value="">Kategorisiz</option><?php foreach ($activeCategories as $category): ?><option value="<?=(int)$category['id']?>"><?=e(($category['parent_name'] ? $category['parent_name'] . ' / ' : '') . $category['name'])?></option><?php endforeach ?></select></label>
         <div class="cash-actions"><button>Kaydet</button></div>
       </form>
     </details>

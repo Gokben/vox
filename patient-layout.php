@@ -60,7 +60,14 @@ setupSubmenu.className = 'report-submenu';
 const brandsMenuLink = document.createElement('a');
 brandsMenuLink.href = <?= json_encode(url('brands.php')) ?>;
 brandsMenuLink.textContent = 'Markalar';
-setupSubmenu.append(brandsMenuLink);
+const cashCategoriesMenuLink = document.createElement('a');
+cashCategoriesMenuLink.href = <?= json_encode(url('cash-categories.php')) ?>;
+cashCategoriesMenuLink.textContent = 'Kasa Kategorileri';
+if (location.pathname.endsWith('/brands.php') || location.pathname.endsWith('/cash-categories.php')) {
+  setupMenuLink.classList.add('active');
+  if (location.pathname.endsWith('/cash-categories.php')) cashCategoriesMenuLink.classList.add('active');
+}
+setupSubmenu.append(brandsMenuLink, cashCategoriesMenuLink);
 setupMenuLink.setAttribute('aria-haspopup', 'true');
 setupMenuLink.setAttribute('aria-expanded', 'false');
 setupMenuLink.addEventListener('click', event => {
