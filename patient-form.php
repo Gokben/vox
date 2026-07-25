@@ -5,6 +5,26 @@ require __DIR__ . '/social-security-bootstrap.php';
 require __DIR__ . '/service-type-bootstrap.php';
 require __DIR__ . '/source-bootstrap.php';
 require_login();
+$patientRatingReady = true;
+try {
+    $ratingPdo = db();
+    $ratingColumns = $ratingPdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+        ? array_column($ratingPdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name')
+        : $ratingPdo->query("SHOW COLUMNS FROM patients LIKE 'patient_rating'")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('patient_rating', $ratingColumns, true)) {
+        $ratingPdo->exec($ratingPdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+            ? 'ALTER TABLE patients ADD COLUMN patient_rating INTEGER NOT NULL DEFAULT 0'
+            : 'ALTER TABLE patients ADD COLUMN patient_rating TINYINT UNSIGNED NOT NULL DEFAULT 0');
+    }
+    if (!in_array('patient_rating_comment', $ratingColumns, true)) {
+        $ratingPdo->exec($ratingPdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+            ? 'ALTER TABLE patients ADD COLUMN patient_rating_comment TEXT NULL'
+            : 'ALTER TABLE patients ADD COLUMN patient_rating_comment TEXT NULL');
+    }
+} catch (Throwable $exception) {
+    $patientRatingReady = false;
+    error_log('patient-form.php rating schema: ' . $exception->getMessage());
+}
 $formSetupErrors = [];
 try {
     if (function_exists('ensure_branch_schema')) ensure_branch_schema();
@@ -44,7 +64,7 @@ try {
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
 if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
-$fields = ['branch_id','record_date','full_name','national_id','phone_primary','phone_secondary','birth_date','address','social_security','report_status','service_type','service_type_id','source_id','source_detail','anamnesis','notes'];
+$fields = ['branch_id','record_date','full_name','national_id','phone_primary','phone_secondary','birth_date','address','patient_rating','patient_rating_comment','social_security','report_status','service_type','service_type_id','source_id','source_detail','anamnesis','notes'];
 $patient = array_fill_keys($fields, '');
 $defaultRecordDate = (string)($_GET['date'] ?? '');
 if (preg_match('/^20\d{2}-\d{2}-\d{2}$/', $defaultRecordDate)) $patient['record_date'] = $defaultRecordDate;
@@ -97,6 +117,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     foreach($fields as $field) {
         $patient[$field]=trim((string)($_POST[$field]??''));
     }
+    $patient['patient_rating_comment'] = function_exists('mb_substr')
+        ? mb_substr($patient['patient_rating_comment'], 0, 256, 'UTF-8')
+        : substr($patient['patient_rating_comment'], 0, 256);
+    $patient['patient_rating'] = max(0, min(5, (int)$patient['patient_rating']));
     if (!in_array($patient['report_status'], ['', 'Rapor getirdi', 'Rapor getirecek', 'Rapor gerekmedi', 'Özel reçete getirdi', 'Özel reçete getirecek'], true)) {
         $error = 'Rapor alanı geçerli bir seçenek olmalıdır.';
     }
@@ -145,6 +169,9 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 .patient-form-page{padding-top:28px!important}.vuexy-form-card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1);overflow:hidden}.vuexy-form-header{display:flex;align-items:center;justify-content:space-between;min-height:70px;padding:0 24px;border-bottom:1px solid var(--line)}.vuexy-form-header h2{margin:0;font-size:20px;font-weight:500}.vuexy-icon-form{padding:10px 24px 24px}.form-section-title{margin:16px 0 8px;padding-bottom:10px;border-bottom:1px solid var(--line);font-size:14px;color:#20a447}.icon-form-row{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:start;gap:0 0;margin:14px 0}.icon-form-label{padding:11px 15px 0 0;color:var(--text);font-size:14px}.required-mark{color:#e44747}.merged-input{display:flex;align-items:stretch;min-height:40px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);overflow:hidden;transition:border-color .18s,box-shadow .18s}.merged-input:focus-within{border-color:#20a447;box-shadow:0 0 0 3px rgba(32,164,71,.12)}.merged-icon{display:grid;place-items:center;flex:0 0 46px;color:#686574;font-size:18px}.merged-input input,.merged-input select,.merged-input textarea{width:100%!important;height:38px!important;min-height:38px!important;margin:0!important;padding:8px 12px 8px 0!important;border:0!important;border-radius:0!important;outline:0!important;background:transparent!important;color:var(--text)!important;font:inherit!important;box-shadow:none!important}.merged-input textarea{height:76px!important;resize:vertical!important;padding-top:10px!important}.check-row{display:flex;flex-wrap:wrap;gap:10px 24px;padding:8px 0}.check-row label{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;color:var(--text);font-weight:400!important}.check-row input{width:17px!important;height:17px!important;margin:0!important;accent-color:#20a447}.vuexy-form-actions{display:flex;align-items:center;gap:12px;margin:22px 0 0 150px;padding-left:0}.vuexy-form-actions .button{min-width:100px}.cancel-link{color:var(--muted);text-decoration:none}.form-alert{margin:18px 24px 0;padding:12px 14px;border-radius:6px;background:#fde8e8;color:#a62c2c}[data-theme=dark] .merged-input{background:#30334d;border-color:#565a78}[data-theme=dark] .merged-icon,[data-theme=dark] .icon-form-label{color:#fff}@media(max-width:720px){.vuexy-icon-form{padding:10px 16px 22px}.icon-form-row{grid-template-columns:1fr;gap:7px}.icon-form-label{padding:0}.vuexy-form-actions{margin-left:0}.vuexy-form-header{padding:0 16px}}
 .patient-container.patient-form-page{width:100%!important;max-width:1100px!important;margin-left:auto!important;margin-right:auto!important;padding:28px 20px 48px!important}.patient-form-page .vuexy-form-card{width:100%!important}.icon-form-row:has(input[name="service_location"]),.icon-form-row:has(input[name="report_info"]),.icon-form-row:has(input[name="source_marketing"]){display:none!important}
 </style>
+<style>
+.patient-rating{display:flex;align-items:center;gap:5px;min-height:40px}.patient-rating input{position:absolute;opacity:0;pointer-events:none}.patient-rating label{font-size:29px;line-height:1;color:#d7d6de;cursor:pointer;transition:color .15s,transform .15s}.patient-rating label.is-selected,.patient-rating label:hover{color:#f3a64a}.patient-rating label:hover{transform:scale(1.08)}.patient-rating:focus-within{outline:2px solid rgba(32,164,71,.35);outline-offset:5px;border-radius:5px}.merged-input textarea[name="patient_rating_comment"]{height:38px!important;min-height:38px!important;padding-top:8px!important;resize:none!important}
+</style>
 <main class="patient-container patient-form-page"><section class="vuexy-form-card"><header class="vuexy-form-header"><h2><?=$id?'Hasta Düzenle':'Yeni Hasta Kaydı'?></h2><a class="cancel-link" href="<?=e(url($returnTo))?>">Listeye dön</a></header><?php if($error):?><div class="form-alert"><?=e($error)?></div><?php endif?><form class="vuexy-icon-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="return" value="<?=e($returnTo)?>">
 <h3 class="form-section-title">Temel Bilgiler</h3>
 <div class="icon-form-row"><label class="icon-form-label">Şube <span class="required-mark">*</span></label><div class="merged-input"><span class="merged-icon">⌂</span><select name="branch_id" required><option value="">Şube seçin</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=(int)$patient['branch_id']===(int)$branch['id']?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select></div></div>
@@ -155,6 +182,8 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="icon-form-row"><label class="icon-form-label">Telefon 1</label><div class="merged-input"><span class="merged-icon">⌕</span><input name="phone_primary" value="<?=e($patient['phone_primary'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Telefon 2</label><div class="merged-input"><span class="merged-icon">⌕</span><input name="phone_secondary" value="<?=e($patient['phone_secondary'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Adres</label><div class="merged-input"><span class="merged-icon">⌂</span><textarea name="address"><?=e($patient['address'])?></textarea></div></div>
+<div class="icon-form-row"><span class="icon-form-label">Hasta Değerlendirmesi</span><div class="patient-rating" role="radiogroup" aria-label="Hasta değerlendirmesi"><?php for($star=1;$star<=5;$star++):?><input id="patient_rating_<?=$star?>" type="radio" name="patient_rating" value="<?=$star?>" <?=$patient['patient_rating']==$star?'checked':''?>><label class="<?=$patient['patient_rating']>=$star?'is-selected':''?>" for="patient_rating_<?=$star?>" title="<?=$star?> yıldız">★</label><?php endfor?></div></div>
+<div class="icon-form-row"><label class="icon-form-label">Değerlendirme Yorum</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="patient_rating_comment" maxlength="256"><?=e($patient['patient_rating_comment'])?></textarea></div></div>
 <h3 class="form-section-title">Hizmet Bilgileri</h3>
 <div class="icon-form-row"><label class="icon-form-label">Sosyal Güvence</label><div class="merged-input"><span class="merged-icon">◇</span><input name="social_security" value="<?=e($patient['social_security'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Rapor Bilgisi</label><div class="merged-input"><span class="merged-icon">▧</span><input name="report_info" value="<?=e($patient['report_info'])?>"></div></div>
@@ -172,5 +201,6 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'new');
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url($returnTo))?>">İptal</a></div></form></section></main>
 <script>
 (()=>{const input=document.querySelector('input[name="social_security"]');if(!input)return;const select=document.createElement('select');select.name='social_security';select.innerHTML='<option value="">Seçiniz</option>'+<?=json_encode(array_map(fn($item)=>['name'=>$item['name']],$socialSecurityOptions),JSON_UNESCAPED_UNICODE)?>.map(item=>'<option value="'+item.name.replace(/"/g,'&quot;')+'">'+item.name+'</option>').join('');select.value=input.value;input.replaceWith(select)})();
+(()=>{const stars=[...document.querySelectorAll('.patient-rating input')];if(!stars.length)return;const paint=value=>document.querySelectorAll('.patient-rating label').forEach((star,index)=>star.classList.toggle('is-selected',index<value));stars.forEach(star=>star.addEventListener('change',()=>paint(Number(star.value))));})();
 </script>
 <?php patient_footer();
