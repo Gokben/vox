@@ -25,6 +25,60 @@
   window.voxFormatDate=trDate;
 })();
 
+(() => {
+  function initActionIcons() {
+    if (!document.querySelector('link[href*="iconify-icons.css"]')) {
+      const iconStyles = document.createElement('link');
+      iconStyles.rel = 'stylesheet';
+      iconStyles.href = 'assets/vendor/fonts/iconify-icons.css?v=10.11.1';
+      document.head.appendChild(iconStyles);
+    }
+
+    document.querySelectorAll('button,a').forEach(element => {
+      const label = element.textContent.trim();
+      const isSave = label === 'Kaydet';
+      const isCancel = label === 'İptal';
+      const isListBack = label === 'Listeye dön';
+      const isDeactivate = label === 'Pasifleştir';
+      const isProfile = label === 'Profilim';
+      const isAccountSettings = label === 'Ayarlar' && element.matches('.account-menu a');
+      const isLogout = label === 'Çıkış yap' && element.matches('.account-menu a');
+      if (!isSave && !isCancel && !isListBack && !isDeactivate && !isProfile && !isAccountSettings && !isLogout) return;
+
+      const actionClass = isSave ? 'vox-save-action'
+        : isCancel ? 'vox-cancel-action'
+        : isListBack ? 'vox-list-action'
+        : isDeactivate ? 'vox-deactivate-action'
+        : isProfile ? 'vox-profile-action'
+        : isAccountSettings ? 'vox-settings-action'
+        : 'vox-logout-action';
+      element.classList.add('vox-action-icon', actionClass);
+      element.setAttribute('title', label);
+      if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', label);
+      element.innerHTML = isSave
+        ? '<i class="ti tabler-device-floppy" aria-hidden="true"></i>'
+        : (isCancel
+          ? '<i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i>'
+          : (isListBack
+            ? '<i class="ti tabler-home-hand" aria-hidden="true"></i>'
+            : (isDeactivate
+              ? '<i class="ti tabler-home-x" aria-hidden="true"></i>'
+              : (isProfile
+                ? '<i class="ti tabler-user-check" aria-hidden="true"></i>'
+                : (isAccountSettings
+                  ? '<i class="ti tabler-settings" aria-hidden="true"></i>'
+                  : '<i class="ti tabler-logout" aria-hidden="true"></i>')))));
+    });
+
+    const style = document.createElement('style');
+    style.textContent = 'body .account-menu.open{display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important}body .vox-action-icon.vox-save-action,body .vox-action-icon.vox-cancel-action,body .vox-action-icon.vox-list-action,body .vox-action-icon.vox-deactivate-action,body .vox-action-icon.vox-profile-action,body .vox-action-icon.vox-settings-action,body .vox-action-icon.vox-logout-action{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:40px!important;height:42px!important;min-width:40px!important;max-width:40px!important;min-height:42px!important;padding:0!important;border:0!important;border-radius:7px!important;color:#fff!important;line-height:1!important;text-decoration:none!important;vertical-align:middle!important;box-sizing:border-box!important}body .vox-action-icon.vox-save-action{background:#19a94b!important}body .vox-action-icon.vox-cancel-action,body .vox-action-icon.vox-deactivate-action,body .vox-action-icon.vox-logout-action{background:#e04f55!important}body .vox-action-icon.vox-list-action{background:#19a94b!important}body .vox-action-icon.vox-profile-action,body .vox-action-icon.vox-settings-action{border:1px solid #e1e2e8!important;background:#fff!important;color:#2f2b3d!important}body .vox-action-icon.vox-save-action:hover{background:#148d3e!important}body .vox-action-icon.vox-cancel-action:hover,body .vox-action-icon.vox-deactivate-action:hover,body .vox-action-icon.vox-logout-action:hover{background:#c83f46!important}body .vox-action-icon.vox-list-action:hover{background:#148d3e!important}body .vox-action-icon.vox-profile-action:hover,body .vox-action-icon.vox-settings-action:hover{background:#f1f1f4!important}body .vox-action-icon>.ti{width:18px!important;height:18px!important;font-size:18px!important;flex:0 0 18px!important}body .vox-action-icon>.fa-solid.fa-arrow-rotate-left{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:18px!important;height:18px!important;font:700 20px/18px Arial,sans-serif!important}body .vox-action-icon>.fa-solid.fa-arrow-rotate-left:before{content:"↶"}';
+    document.head.appendChild(style);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initActionIcons);
+  else initActionIcons();
+})();
+
 // Çalışan listesinde aktif/pasif durumunun yönetimi.
 (() => {
   async function initEmployeeStatus() {

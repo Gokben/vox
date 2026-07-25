@@ -343,3 +343,236 @@
   .employee-page .employee-form { grid-template-columns: 1fr !important; padding: 18px !important; }
   .employee-page .employee-form .actions { grid-column: 1 !important; }
 }
+
+/* Ayar tanımları başlıkları Çalışanlar kart başlıklarıyla aynı görünümdedir. */
+.social-settings .settings-page-header {
+  display: block !important;
+  margin: 0 0 20px !important;
+  padding: 22px 24px !important;
+  background: #fff !important;
+  border: 1px solid #e1e2e8 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 12px rgba(30,40,60,.06) !important;
+}
+.social-settings .settings-page-header span { display: none !important; }
+.social-settings .settings-page-header h1 {
+  margin: 0 !important;
+  color: #2f2b3d !important;
+  font-size: 21px !important;
+  line-height: 1.25 !important;
+}
+[data-theme="dark"] .social-settings .settings-page-header { background: #2f3349 !important; border-color: #454a63 !important; }
+[data-theme="dark"] .social-settings .settings-page-header h1 { color: #fff !important; }
+
+.personnel-form .personnel-check > span:last-child { display: inline-flex; align-items: center; gap: 7px; height: 43px; }
+.personnel-form .personnel-check input[type="checkbox"] { width: auto !important; height: auto !important; padding: 0 !important; accent-color: #19a94b; }
+
+/* Kullanıcı Yönetimi kart ve form stilleri; diğer tanım sayfalarında da kullanılır. */
+.personnel-page { width: 100% !important; max-width: 1180px !important; margin: 0 auto !important; padding: 28px 20px 48px !important; }
+.personnel-page .vuexy-form-card { background: #fff !important; border: 1px solid #e1e2e8 !important; border-radius: 10px !important; margin-bottom: 24px !important; box-shadow: 0 3px 12px rgba(30,40,60,.06) !important; overflow: hidden !important; }
+.personnel-page .form-card-title { display: block !important; padding: 22px 24px !important; border-bottom: 1px solid #e1e2e8 !important; }
+.personnel-page .form-card-title h1,.personnel-page .form-card-title h2 { margin: 0 0 5px !important; color: #2f2b3d !important; font-size: 21px !important; line-height: normal !important; }
+.personnel-page .form-card-title p { margin: 0 !important; color: #7b7b8d !important; }
+.personnel-page .personnel-form { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 18px 24px !important; padding: 24px !important; }
+.personnel-page .personnel-form label { display: flex !important; flex-direction: column !important; gap: 7px !important; color: #2f2b3d !important; font-size: 14px !important; }
+.personnel-page .personnel-form input,.personnel-page .personnel-form select { width: 100% !important; height: 43px !important; padding: 0 12px !important; border: 1px solid #d2d2dc !important; border-radius: 7px !important; background: transparent !important; color: inherit !important; box-sizing: border-box !important; }
+.personnel-page .personnel-form .personnel-check input[type="checkbox"] { width: auto !important; height: auto !important; padding: 0 !important; }
+.personnel-page .personnel-actions { grid-column: 1 / -1 !important; }
+.personnel-page .personnel-actions button,.personnel-page .edit-personnel { display: inline-flex !important; align-items: center !important; justify-content: center !important; background: #19a94b !important; color: #fff !important; border: 0 !important; border-radius: 7px !important; padding: 11px 18px !important; text-decoration: none !important; font-weight: 700 !important; }
+.personnel-page .personnel-table { width: 100% !important; min-width: 850px !important; border-collapse: collapse !important; }
+.personnel-page .personnel-table th,.personnel-page .personnel-table td { padding: 14px 18px !important; border-bottom: 1px solid #e1e2e8 !important; text-align: left !important; white-space: nowrap !important; }
+.personnel-page .status-pill { display: inline-block !important; padding: 5px 9px !important; border-radius: 6px !important; background: #e8f7ed !important; color: #12883c !important; font-weight: 700 !important; font-size: 12px !important; }
+.personnel-page .status-pill.passive { background: #f3f3f5 !important; color: #777 !important; }
+[data-theme="dark"] .personnel-page .vuexy-form-card { background: #2f3349 !important; border-color: #454a63 !important; }
+[data-theme="dark"] .personnel-page .form-card-title { border-color: #454a63 !important; }
+[data-theme="dark"] .personnel-page .form-card-title h1,[data-theme="dark"] .personnel-page .form-card-title h2,[data-theme="dark"] .personnel-page .personnel-form label { color: #fff !important; }
+[data-theme="dark"] .personnel-page .form-card-title p { color: #c4c7d6 !important; }
+[data-theme="dark"] .personnel-page .personnel-form input,[data-theme="dark"] .personnel-page .personnel-form select { border-color: #5a607b !important; color: #fff !important; }
+@media(max-width:720px){.personnel-page { padding: 20px 12px !important; }.personnel-page .personnel-form { grid-template-columns: 1fr !important; }}
+
+/* Şubeler sayfası ile aynı ayar sayfası yerleşimi. */
+body .patient-container.definition-settings,
+body .patient-container.social-settings {
+  max-width: 1180px !important;
+  min-height: auto !important;
+  margin: 0 auto !important;
+  padding: 28px 20px 48px !important;
+}
+body .definition-settings .vuexy-form-card {
+  border-radius: 9px !important;
+  margin-bottom: 22px !important;
+  box-shadow: none !important;
+}
+body .definition-settings .form-card-title {
+  padding: 20px 24px !important;
+  border-bottom-color: var(--line, #ddd) !important;
+}
+body .definition-settings .form-card-title h1,
+body .definition-settings .form-card-title h2 {
+  font-size: 21px !important;
+  line-height: normal !important;
+}
+body .definition-settings .definition-form {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  padding: 24px !important;
+}
+body .definition-settings .definition-form input:not([type=checkbox]) {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 10px !important;
+  border-color: #d4d5dd !important;
+  border-radius: 6px !important;
+}
+body .definition-settings .definition-form .check { align-self: end !important; }
+body .definition-settings .definition-table { min-width: 800px !important; }
+body .definition-settings .definition-table th,
+body .definition-settings .definition-table td {
+  padding: 13px 18px !important;
+  border-bottom-color: var(--line, #ddd) !important;
+}
+body .social-settings .settings-page-header {
+  padding: 20px 24px !important;
+  margin-bottom: 0 !important;
+  border-radius: 9px 9px 0 0 !important;
+  box-shadow: none !important;
+}
+body .social-settings form {
+  margin: 0 0 22px !important;
+  padding: 24px !important;
+  background: var(--card, #fff) !important;
+  border: 1px solid var(--line, #ddd) !important;
+  border-top: 0 !important;
+  border-radius: 0 0 9px 9px !important;
+}
+body .social-settings table {
+  margin-top: 22px !important;
+  background: var(--card, #fff) !important;
+  border: 1px solid var(--line, #ddd) !important;
+  border-radius: 9px !important;
+  overflow: hidden !important;
+}
+body .social-settings th,
+body .social-settings td { padding: 13px 18px !important; border-bottom-color: var(--line, #ddd) !important; }
+@media (max-width: 700px) {
+  body .patient-container.definition-settings,
+  body .patient-container.social-settings { padding: 20px 12px 40px !important; }
+  body .definition-settings .definition-form { grid-template-columns: 1fr !important; }
+}
+
+/* Kullanıcı Yönetimi ile bire bir ölçü eşlemesi. */
+body .patient-container.definition-settings,
+body .patient-container.social-settings {
+  max-width: 1180px !important;
+  margin: 0 auto !important;
+  padding: 28px 20px 48px !important;
+}
+body .definition-settings .vuexy-form-card {
+  border: 1px solid #e1e2e8 !important;
+  border-radius: 10px !important;
+  margin-bottom: 24px !important;
+  box-shadow: 0 3px 12px rgba(30,40,60,.06) !important;
+}
+body .definition-settings .form-card-title {
+  display: block !important;
+  padding: 22px 24px !important;
+  border-bottom: 1px solid #e1e2e8 !important;
+}
+body .definition-settings .form-card-title h1,
+body .definition-settings .form-card-title h2 {
+  margin: 0 0 5px !important;
+  font-size: 21px !important;
+  line-height: normal !important;
+}
+body .definition-settings .form-card-title p { margin: 0 !important; color: #7b7b8d !important; }
+body .definition-settings .definition-form {
+  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  gap: 18px 24px !important;
+  padding: 24px !important;
+}
+body .definition-settings .definition-form .check { grid-column: 1 / -1 !important; align-self: auto !important; }
+body .definition-settings .definition-form > button,
+body .definition-settings .definition-form > .cancel-edit { grid-column: 1 / -1; width: max-content; }
+body .definition-settings .definition-table { min-width: 850px !important; }
+body .definition-settings .definition-table th,
+body .definition-settings .definition-table td { padding: 14px 18px !important; border-bottom: 1px solid #e1e2e8 !important; }
+
+body .social-settings .settings-page-header {
+  padding: 22px 24px !important;
+  margin: 0 !important;
+  border: 1px solid #e1e2e8 !important;
+  border-radius: 10px 10px 0 0 !important;
+  box-shadow: 0 3px 12px rgba(30,40,60,.06) !important;
+}
+body .social-settings form {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  gap: 18px 24px !important;
+  margin: 0 0 24px !important;
+  padding: 24px !important;
+  border: 1px solid #e1e2e8 !important;
+  border-top: 0 !important;
+  border-radius: 0 0 10px 10px !important;
+  box-shadow: 0 3px 12px rgba(30,40,60,.06) !important;
+}
+body .social-settings form label { gap: 7px !important; }
+body .social-settings form label:last-of-type { grid-column: 1 / -1; }
+body .social-settings form button { width: max-content; }
+body .social-settings table {
+  width: 100% !important;
+  min-width: 850px !important;
+  margin-top: 0 !important;
+  border: 1px solid #e1e2e8 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 3px 12px rgba(30,40,60,.06) !important;
+}
+body .social-settings th,
+body .social-settings td { padding: 14px 18px !important; border-bottom: 1px solid #e1e2e8 !important; }
+@media (max-width: 720px) {
+  body .definition-settings .definition-form,
+  body .social-settings form { grid-template-columns: 1fr !important; }
+  body .patient-container.definition-settings,
+  body .patient-container.social-settings { padding: 20px 12px !important; }
+}
+
+body .employee-card .employee-icon-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 42px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  color: #fff !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+}
+body .employee-card td:last-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+body .employee-card td:last-child form {
+  display: inline-flex !important;
+  margin: 0 !important;
+}
+body .employee-card .employee-icon-edit { background: #19a94b !important; }
+body .employee-card .employee-icon-delete,
+body .employee-card .employee-icon-action.vox-icon-delete { margin: 0 !important; background: #e04f55 !important; }
+body .employee-card .employee-icon-action > .ti {
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 18px !important;
+}
+
+body .personnel-page .personnel-table .vox-profile-action {
+  border: 0 !important;
+  background: #e04f55 !important;
+  color: #fff !important;
+}
+body .personnel-page .personnel-table .vox-profile-action:hover {
+  background: #c83f46 !important;
+}

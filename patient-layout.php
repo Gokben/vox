@@ -31,7 +31,7 @@ function patient_header(string $title, string $active = 'patients'): void
     ?>
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=e($title)?> | <?=APP_NAME?></title><link rel="icon" type="image/png" href="<?=url('assets/favicon.png?v=20260713')?>">
-<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260725-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260716-5')?>"><script src="<?=url('assets/theme.js?v=20260725-21')?>" defer></script>
+<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260725-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260725-6')?>"><script src="<?=url('assets/theme.js?v=20260725-33')?>" defer></script>
 </head><body><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><span class="language">TR</span><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kayıtları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><span><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span><i class="icon-base ti tabler-settings"></i></span> Ayarlar</a><?php endif?></nav></header>
 <?php
 }
@@ -44,6 +44,11 @@ const stockMenuLink = document.createElement('a');
 stockMenuLink.href = '#';
 stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
 document.querySelector('.patient-nav a[href*="admin.php"]')?.before(stockMenuLink);
+const cashMenuLink = document.createElement('a');
+cashMenuLink.href = <?= json_encode(url('cash.php')) ?>;
+cashMenuLink.innerHTML = '<span><i class="icon-base ti tabler-briefcase-filled"></i></span> Kasa';
+stockMenuLink.after(cashMenuLink);
+if (location.pathname.endsWith('/cash.php')) cashMenuLink.classList.add('active');
 const setupMenuLink = document.createElement('a');
 setupMenuLink.href = '#';
 setupMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Kurulum';
@@ -151,6 +156,63 @@ if(settingsPages[currentSettingsPage]){
     }
   }
 }
+</script>
+<script>
+(()=>{
+  const setupNewRecordAccordion=card=>{
+    if(card.dataset.newRecordAccordionReady)return;
+    const header=card.querySelector(':scope > header');
+    const form=card.querySelector(':scope > form');
+    const title=header?.querySelector('h1,h2');
+    if(!header||!form||!title||!/^Yeni\b/i.test(title.textContent.trim()))return;
+    card.dataset.newRecordAccordionReady='true';
+    header.classList.add('new-record-toggle');
+    header.setAttribute('role','button');
+    header.setAttribute('tabindex','0');
+    card.classList.add('new-record-collapsed');
+    header.setAttribute('aria-expanded','false');
+    const chevron=document.createElement('span');
+    chevron.className='new-record-chevron';
+    chevron.setAttribute('aria-hidden','true');
+    chevron.textContent='⌄';
+    header.appendChild(chevron);
+    const toggle=()=>{
+      const collapsed=card.classList.toggle('new-record-collapsed');
+      header.setAttribute('aria-expanded',String(!collapsed));
+    };
+    header.addEventListener('click',toggle);
+    header.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}
+    });
+  };
+  document.querySelectorAll('.vuexy-form-card,.branch-card').forEach(setupNewRecordAccordion);
+  const style=document.createElement('style');
+  style.textContent='.new-record-toggle{position:relative;display:block!important;cursor:pointer;user-select:none}.new-record-toggle:focus-visible{outline:2px solid #19a94b;outline-offset:-3px}.new-record-chevron{position:absolute;right:24px;top:50%;font-size:24px;line-height:1;transform:translateY(-50%) rotate(0);transition:transform .2s ease}.new-record-collapsed .new-record-chevron{transform:translateY(-50%) rotate(-90deg)}.new-record-collapsed>:not(header){display:none!important}';
+  document.head.appendChild(style);
+})();
+</script>
+<script>
+(() => {
+  document.querySelectorAll('a,button').forEach(element => {
+    const text = element.textContent.trim();
+    const currentTitle = element.getAttribute('title')?.trim() || '';
+    const isEdit = currentTitle === 'Düzenle' || /^Düzenle(?:\s*\/\s*Şifre)?$/i.test(text);
+    const isDelete = currentTitle === 'Sil' || text === 'Sil';
+    if (!isEdit && !isDelete) return;
+
+    const actionLabel = isEdit ? (text || 'Düzenle') : 'Sil';
+    if (!currentTitle) element.setAttribute('title', actionLabel);
+    if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', actionLabel);
+    element.classList.add('vox-icon-action', isEdit ? 'vox-icon-edit' : 'vox-icon-delete');
+    element.innerHTML = isEdit
+      ? '<i class="ti tabler-edit" aria-hidden="true"></i>'
+      : '<i class="ti tabler-trash" aria-hidden="true"></i>';
+  });
+
+  const style = document.createElement('style');
+  style.textContent = 'body .vox-icon-action.vox-icon-edit,body .vox-icon-action.vox-icon-delete{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:40px!important;height:42px!important;min-width:40px!important;max-width:40px!important;min-height:42px!important;padding:0!important;border:0!important;border-radius:7px!important;color:#fff!important;line-height:1!important;vertical-align:middle!important;box-sizing:border-box!important;box-shadow:none!important}body .vox-icon-action.vox-icon-edit{background:#19a94b!important}body .vox-icon-action.vox-icon-delete{margin-left:8px!important;background:#e04f55!important}body .vox-icon-action.vox-icon-edit:hover{background:#148d3e!important}body .vox-icon-action.vox-icon-delete:hover{background:#c83f46!important}body .vox-icon-action>.ti{width:18px!important;height:18px!important;font-size:18px!important;flex:0 0 18px!important}';
+  document.head.appendChild(style);
+})();
 </script></body></html>
 <?php
 }
