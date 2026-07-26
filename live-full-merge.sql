@@ -650,6 +650,12 @@ SET @sql := IF(@exists=0, 'ALTER TABLE `stock_list_prices` ADD COLUMN `price` DE
 SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_list_prices' AND column_name='created_at');
 SET @sql := IF(@exists=0, 'ALTER TABLE `stock_list_prices` ADD COLUMN `created_at` TEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- A model name may be used by more than one brand. Replace the legacy global unique index.
+SET @old_index := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='models' AND index_name='models_name_unique');
+SET @sql := IF(@old_index>0, 'ALTER TABLE `models` DROP INDEX `models_name_unique`', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @brand_model_index := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='models' AND index_name='models_brand_name_unique');
+SET @sql := IF(@brand_model_index=0, 'ALTER TABLE `models` ADD UNIQUE INDEX `models_brand_name_unique` (`brand_id`, `name`)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 START TRANSACTION;
 
 INSERT INTO `branches` (`id`,`name`,`code`,`phone`,`address`,`active`,`created_at`) VALUES
