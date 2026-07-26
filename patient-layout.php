@@ -52,22 +52,31 @@ const stockEntryLink = document.createElement('a');
 stockEntryLink.href = <?= json_encode(url('stock-entry.php')) ?>;
 stockEntryLink.textContent = 'Stok Giriş';
 const stockCardLink = document.createElement('a');
-stockCardLink.href = <?= json_encode(url('stock-card.php')) ?>;
-stockCardLink.textContent = 'Stok Kartı';
-stockSubmenu.append(stockEntryLink);
+stockCardLink.href = <?= json_encode(url('stocks.php')) ?>;
+stockCardLink.textContent = 'Stok Kartı Listesi';
+const stockPricesLink = document.createElement('a');
+stockPricesLink.href = <?= json_encode(url('stock-prices.php')) ?>;
+stockPricesLink.textContent = 'Liste Fiyatları';
+const priceListsLink = document.createElement('a');
+priceListsLink.href = <?= json_encode(url('price-lists.php')) ?>;
+priceListsLink.textContent = 'Liste Fiyatları';
+stockSubmenu.append(stockEntryLink, stockCardLink, priceListsLink);
 stockMenuLink.setAttribute('aria-haspopup', 'true');
 stockMenuLink.setAttribute('aria-expanded', 'false');
 stockMenuLink.addEventListener('click', () => {});
 document.addEventListener('click', event => {
-  if (!stockGroup.contains(event.target)) {
+  const keepStockMenuOpen = location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php');
+  if (!stockGroup.contains(event.target) && !keepStockMenuOpen) {
     stockGroup.classList.remove('open');
     stockMenuLink.setAttribute('aria-expanded', 'false');
   }
 });
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
-if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php')) { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
+if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php')) { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
 if (location.pathname.endsWith('/stock-entry.php')) stockEntryLink.classList.add('active');
+if (location.pathname.endsWith('/stocks.php')) stockCardLink.classList.add('active');
+if (location.pathname.endsWith('/price-lists.php')) priceListsLink.classList.add('active');
 const technicalServiceMenuLink = document.createElement('a');
 technicalServiceMenuLink.href = <?= json_encode(url('technical-service.php')) ?>;
 technicalServiceMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Teknik Servis';

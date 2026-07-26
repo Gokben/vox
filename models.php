@@ -15,10 +15,9 @@ function ensure_model_schema(): void
             brand_id INTEGER NOT NULL,
             name VARCHAR(190) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (name),
+            UNIQUE (brand_id, name COLLATE NOCASE),
             FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE RESTRICT
         )');
-        $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS models_name_unique ON models(name COLLATE NOCASE)');
     } else {
         $pdo->exec('CREATE TABLE IF NOT EXISTS brands (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(190) NOT NULL UNIQUE, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
         $pdo->exec('CREATE TABLE IF NOT EXISTS models (
@@ -26,13 +25,9 @@ function ensure_model_schema(): void
             brand_id INT UNSIGNED NOT NULL,
             name VARCHAR(190) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY models_name_unique (name),
+            UNIQUE KEY models_brand_name_unique (brand_id, name),
             CONSTRAINT models_brand_fk FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-        $indexStatement = $pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='models' AND index_name='models_name_unique' LIMIT 1");
-        if (!$indexStatement->fetchColumn()) {
-            $pdo->exec('ALTER TABLE models ADD UNIQUE KEY models_name_unique (name)');
-        }
     }
 }
 

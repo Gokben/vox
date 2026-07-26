@@ -16,10 +16,9 @@ function ensure_brand_and_model_schema(): void
             brand_id INTEGER NOT NULL,
             name VARCHAR(190) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (name),
+            UNIQUE (brand_id, name COLLATE NOCASE),
             FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE RESTRICT
         )');
-        $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS models_name_unique ON models(name COLLATE NOCASE)');
     } else {
         $pdo->exec('CREATE TABLE IF NOT EXISTS brands (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(190) NOT NULL UNIQUE, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
         $pdo->exec('CREATE TABLE IF NOT EXISTS models (
@@ -27,13 +26,9 @@ function ensure_brand_and_model_schema(): void
             brand_id INT UNSIGNED NOT NULL,
             name VARCHAR(190) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY models_name_unique (name),
+            UNIQUE KEY models_brand_name_unique (brand_id, name),
             CONSTRAINT models_brand_fk FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-        $indexStatement = $pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='models' AND index_name='models_name_unique' LIMIT 1");
-        if (!$indexStatement->fetchColumn()) {
-            $pdo->exec('ALTER TABLE models ADD UNIQUE KEY models_name_unique (name)');
-        }
     }
 
     if ((int)$pdo->query('SELECT COUNT(*) FROM brands')->fetchColumn() === 0) {
@@ -42,11 +37,56 @@ function ensure_brand_and_model_schema(): void
             $insert->execute([$name]);
         }
     }
+
+    $hasStockType = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+        ? (bool)array_filter($pdo->query('PRAGMA table_info(brands)')->fetchAll(), static fn($column) => $column['name'] === 'stock_type')
+        : (function() use ($pdo): bool {$query = $pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name="brands" AND column_name="stock_type"');$query->execute();return(bool)$query->fetchColumn();})();
+    if (!$hasStockType) $pdo->exec('ALTER TABLE brands ADD COLUMN stock_type VARCHAR(50) NULL');
+    $hasModelStockType = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+        ? (bool)array_filter($pdo->query('PRAGMA table_info(models)')->fetchAll(), static fn($column) => $column['name'] === 'stock_type')
+        : (function() use ($pdo): bool {$query = $pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name="models" AND column_name="stock_type"');$query->execute();return(bool)$query->fetchColumn();})();
+    if (!$hasModelStockType) $pdo->exec('ALTER TABLE models ADD COLUMN stock_type VARCHAR(50) NULL');
+
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $singleNameUnique = false;
+        foreach ($pdo->query('PRAGMA index_list(models)')->fetchAll() as $index) {
+            if (!(int)$index['unique']) continue;
+            $columns = $pdo->query('PRAGMA index_info(' . $pdo->quote($index['name']) . ')')->fetchAll();
+            if (count($columns) === 1 && ($columns[0]['name'] ?? '') === 'name') $singleNameUnique = true;
+        }
+        if ($singleNameUnique) {
+            $pdo->beginTransaction();
+            try {
+                $pdo->exec('ALTER TABLE models RENAME TO models_legacy_unique_name');
+                $pdo->exec('CREATE TABLE models (id INTEGER PRIMARY KEY AUTOINCREMENT, brand_id INTEGER NOT NULL, name VARCHAR(190) NOT NULL, stock_type VARCHAR(50) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE (brand_id, name COLLATE NOCASE), FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE RESTRICT)');
+                $pdo->exec('INSERT INTO models(id,brand_id,name,stock_type,created_at) SELECT id,brand_id,name,stock_type,created_at FROM models_legacy_unique_name');
+                $pdo->exec('DROP TABLE models_legacy_unique_name');
+                $pdo->commit();
+            } catch (Throwable $exception) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $exception;
+            }
+        }
+    } else {
+        $singleNameIndexes = $pdo->query("SELECT index_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='models' AND non_unique=0 AND index_name<>'PRIMARY' GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index)='name'")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($singleNameIndexes as $indexName) $pdo->exec('ALTER TABLE models DROP INDEX `' . str_replace('`', '``', (string)$indexName) . '`');
+        $hasCompositeUnique = $pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='models' AND index_name='models_brand_name_unique' LIMIT 1")->fetchColumn();
+        if (!$hasCompositeUnique) $pdo->exec('ALTER TABLE models ADD UNIQUE KEY models_brand_name_unique (brand_id,name)');
+    }
 }
 
 ensure_brand_and_model_schema();
 $pdo = db();
+$pdo->prepare('UPDATE brands SET stock_type = ? WHERE stock_type = ?')->execute(['İşitme Cihazı', 'Kulaklık']);
 seed_brand_models_once($pdo);
+$unclassifiedModels = $pdo->query("SELECT models.id, brands.stock_type FROM models INNER JOIN brands ON brands.id=models.brand_id WHERE models.stock_type IS NULL OR models.stock_type='' ")->fetchAll();
+$setModelStockType = $pdo->prepare('UPDATE models SET stock_type=? WHERE id=?');
+foreach ($unclassifiedModels as $unclassifiedModel) {
+    $brandTypes = array_values(array_filter(explode(',', (string)$unclassifiedModel['stock_type'])));
+    if (count($brandTypes) === 1 && in_array($brandTypes[0], ['İşitme Cihazı', 'Pil'], true)) {
+        $setModelStockType->execute([$brandTypes[0], $unclassifiedModel['id']]);
+    }
+}
 $message = '';
 $error = '';
 $editBrandId = (int)($_GET['edit_brand'] ?? $_GET['edit'] ?? 0);
@@ -71,17 +111,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } elseif ($action === 'save') {
             $name = trim((string)($_POST['name'] ?? ''));
+            $stockTypes = [(($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı'];
+            $stockType = implode(',', $stockTypes);
             if ($name === '') {
                 $error = 'Marka adı zorunludur.';
             } else {
                 try {
                     if ($id > 0) {
-                        $pdo->prepare('UPDATE brands SET name=? WHERE id=?')->execute([$name, $id]);
-                        $message = 'Marka güncellendi.';
-                        $editBrandId = $id;
+                        $existing = $pdo->prepare('SELECT id,stock_type FROM brands WHERE name=? AND id<>?');
+                        $existing->execute([$name, $id]);
+                        $existingBrand = $existing->fetch();
+                        if ($existingBrand) {
+                            $types = array_values(array_unique(array_merge(array_filter(explode(',', (string)$existingBrand['stock_type'])), $stockTypes)));
+                            $pdo->prepare('UPDATE brands SET stock_type=? WHERE id=?')->execute([implode(',', $types) ?: null, $existingBrand['id']]);
+                            $message = 'Mevcut markaya stok tipi eklendi.';
+                            $editBrandId = (int)$existingBrand['id'];
+                        } else {
+                            $current = $pdo->prepare('SELECT stock_type FROM brands WHERE id=?');
+                            $current->execute([$id]);
+                            $types = array_values(array_unique(array_merge(array_filter(explode(',', (string)$current->fetchColumn())), $stockTypes)));
+                            $pdo->prepare('UPDATE brands SET name=?, stock_type=? WHERE id=?')->execute([$name, implode(',', $types) ?: null, $id]);
+                            $message = 'Marka güncellendi.';
+                            $editBrandId = $id;
+                        }
                     } else {
-                        $pdo->prepare('INSERT INTO brands(name) VALUES(?)')->execute([$name]);
-                        $message = 'Marka eklendi.';
+                        $existing = $pdo->prepare('SELECT id,stock_type FROM brands WHERE name=?');
+                        $existing->execute([$name]);
+                        $existingBrand = $existing->fetch();
+                        if ($existingBrand) {
+                            $types = array_values(array_unique(array_merge(array_filter(explode(',', (string)$existingBrand['stock_type'])), $stockTypes)));
+                            $pdo->prepare('UPDATE brands SET stock_type=? WHERE id=?')->execute([implode(',', $types) ?: null, $existingBrand['id']]);
+                            $message = 'Mevcut markaya stok tipi eklendi.';
+                        } else {
+                            $pdo->prepare('INSERT INTO brands(name,stock_type) VALUES(?,?)')->execute([$name, $stockType ?: null]);
+                            $message = 'Marka eklendi.';
+                        }
                     }
                 } catch (PDOException $exception) {
                     $error = 'Bu marka zaten kayıtlı.';
@@ -95,22 +159,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'save') {
             $brandId = (int)($_POST['brand_id'] ?? 0);
             $name = trim((string)($_POST['name'] ?? ''));
-            $brandStatement = $pdo->prepare('SELECT 1 FROM brands WHERE id=?');
+            $stockType = (($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı';
+            $brandStatement = $pdo->prepare('SELECT stock_type FROM brands WHERE id=?');
             $brandStatement->execute([$brandId]);
-            if (!$brandStatement->fetchColumn()) {
+            $brandStockTypes = array_filter(explode(',', (string)$brandStatement->fetchColumn()));
+            if (!$brandStockTypes) {
                 $error = 'Lütfen geçerli bir marka seçin.';
                 $editModelId = $id;
             } elseif ($name === '') {
                 $error = 'Model adı zorunludur.';
                 $editModelId = $id;
+            } elseif (!in_array($stockType, ['İşitme Cihazı', 'Pil'], true) || !in_array($stockType, $brandStockTypes, true)) {
+                $error = 'Model için markanın desteklediği geçerli bir stok tipi seçin.';
+                $editModelId = $id;
             } else {
                 try {
                     if ($id > 0) {
-                        $pdo->prepare('UPDATE models SET brand_id=?, name=? WHERE id=?')->execute([$brandId, $name, $id]);
+                        $pdo->prepare('UPDATE models SET brand_id=?, name=?, stock_type=? WHERE id=?')->execute([$brandId, $name, $stockType, $id]);
                         $message = 'Model güncellendi.';
                         $editModelId = $id;
                     } else {
-                        $pdo->prepare('INSERT INTO models(brand_id,name) VALUES(?,?)')->execute([$brandId, $name]);
+                        $pdo->prepare('INSERT INTO models(brand_id,name,stock_type) VALUES(?,?,?)')->execute([$brandId, $name, $stockType]);
                         $message = 'Model eklendi.';
                     }
                 } catch (PDOException $exception) {
@@ -122,18 +191,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$editBrand = ['id' => 0, 'name' => ''];
+$editBrand = ['id' => 0, 'name' => '', 'stock_type' => ''];
 if ($editBrandId > 0) {
-    $statement = $pdo->prepare('SELECT id,name FROM brands WHERE id=?');
+    $statement = $pdo->prepare('SELECT id,name,stock_type FROM brands WHERE id=?');
     $statement->execute([$editBrandId]);
     $editBrand = $statement->fetch() ?: $editBrand;
 } elseif ($error && ($_POST['entity'] ?? '') === 'brand') {
-    $editBrand = ['id' => 0, 'name' => trim((string)($_POST['name'] ?? ''))];
+    $editBrand = ['id' => 0, 'name' => trim((string)($_POST['name'] ?? '')), 'stock_type' => (($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı'];
 }
 
-$editModel = ['id' => 0, 'brand_id' => 0, 'name' => ''];
+$editModel = ['id' => 0, 'brand_id' => 0, 'name' => '', 'stock_type' => ''];
 if ($editModelId > 0) {
-    $statement = $pdo->prepare('SELECT id,brand_id,name FROM models WHERE id=?');
+    $statement = $pdo->prepare('SELECT id,brand_id,name,stock_type FROM models WHERE id=?');
     $statement->execute([$editModelId]);
     $editModel = $statement->fetch() ?: $editModel;
 } elseif ($error && ($_POST['entity'] ?? '') === 'model') {
@@ -141,15 +210,34 @@ if ($editModelId > 0) {
         'id' => 0,
         'brand_id' => (int)($_POST['brand_id'] ?? 0),
         'name' => trim((string)($_POST['name'] ?? '')),
+        'stock_type' => (($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı',
     ];
 }
 
-$brands = $pdo->query('SELECT id,name FROM brands ORDER BY id ASC')->fetchAll();
-$brandOptions = $pdo->query('SELECT id,name FROM brands ORDER BY name')->fetchAll();
+$brands = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY id ASC')->fetchAll();
+$brandOptions = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY name')->fetchAll();
 $firstBrandId = (int)($brandOptions[0]['id'] ?? 0);
-$models = $pdo->query('SELECT models.id,models.brand_id,models.name,brands.name AS brand_name
+$models = $pdo->query('SELECT models.id,models.brand_id,models.name,models.stock_type AS model_stock_type,brands.name AS brand_name,brands.stock_type AS brand_stock_type
     FROM models INNER JOIN brands ON brands.id=models.brand_id
     ORDER BY models.id ASC')->fetchAll();
+$brandGroups = ['İşitme Cihazı Markaları' => [], 'Pil Markaları' => [], 'Diğer Markalar' => []];
+foreach ($brands as $brand) {
+    $types = array_filter(explode(',', (string)$brand['stock_type']));
+    if (in_array('İşitme Cihazı', $types, true)) $brandGroups['İşitme Cihazı Markaları'][] = $brand;
+    if (in_array('Pil', $types, true)) $brandGroups['Pil Markaları'][] = $brand;
+    if (!in_array('İşitme Cihazı', $types, true) && !in_array('Pil', $types, true)) $brandGroups['Diğer Markalar'][] = $brand;
+}
+$modelGroups = ['İşitme Cihazı Modelleri' => [], 'Pil Numaraları' => [], 'Diğer Modeller' => []];
+foreach ($models as $model) {
+    if ($model['model_stock_type'] === 'İşitme Cihazı') $modelGroups['İşitme Cihazı Modelleri'][] = $model;
+    elseif ($model['model_stock_type'] === 'Pil') $modelGroups['Pil Numaraları'][] = $model;
+    else $modelGroups['Diğer Modeller'][] = $model;
+}
+$activeGroup = (($_POST['group'] ?? $_GET['group'] ?? 'hearing') === 'battery') ? 'battery' : 'hearing';
+$visibleBrandGroups = $activeGroup === 'battery' ? ['Pil Markaları' => $brandGroups['Pil Markaları']] : ['İşitme Cihazı Markaları' => $brandGroups['İşitme Cihazı Markaları']];
+$visibleModelGroups = $activeGroup === 'battery' ? ['Pil Numaraları' => $modelGroups['Pil Numaraları']] : ['İşitme Cihazı Modelleri' => $modelGroups['İşitme Cihazı Modelleri']];
+$visibleBrandCount = array_sum(array_map('count', $visibleBrandGroups));
+$visibleModelCount = array_sum(array_map('count', $visibleModelGroups));
 $activeSection = (
     ($_GET['tab'] ?? '') === 'models'
     || $editModelId > 0
@@ -163,6 +251,7 @@ patient_header('Kurulum - Markalar', 'settings');
     <a class="<?=$activeSection === 'brands' ? 'active' : ''?>" href="<?=url('brands.php?tab=brands')?>">Markalar</a>
     <a class="<?=$activeSection === 'models' ? 'active' : ''?>" href="<?=url('brands.php?tab=models')?>">Modeller</a>
   </nav>
+  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeSection=<?=json_encode($activeSection)?>,activeGroup=<?=json_encode($activeGroup)?>,items=[['brands','hearing','İşitme Cihazı Markaları'],['models','hearing','İşitme Cihazı Modelleri'],['brands','battery','Pil Markaları'],['models','battery','Pil Numaraları']];nav.innerHTML='';items.forEach(([tab,group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab='+tab+'&group='+group;link.textContent=label;link.className=activeSection===tab&&activeGroup===group?'active':'';nav.append(link)})})();</script>
   <?php if ($message): ?><p class="manage-message success"><?=e($message)?></p><?php endif; ?>
   <?php if ($error): ?><p class="manage-message error"><?=e($error)?></p><?php endif; ?>
 
@@ -175,6 +264,7 @@ patient_header('Kurulum - Markalar', 'settings');
     <form class="personnel-form manage-form brand-form <?=$editBrand['id'] ? 'is-open' : ''?>" id="brand-form" method="post">
       <input type="hidden" name="csrf" value="<?=csrf()?>">
       <input type="hidden" name="entity" value="brand">
+      <input type="hidden" name="group" value="<?=e($activeGroup)?>">
       <input type="hidden" name="action" value="save">
       <input type="hidden" name="id" value="<?=(int)$editBrand['id']?>">
       <label>Marka adı<input name="name" maxlength="190" required placeholder="Marka adı" value="<?=e($editBrand['name'])?>"></label>
@@ -182,19 +272,22 @@ patient_header('Kurulum - Markalar', 'settings');
     </form>
   </details>
   <section class="vuexy-form-card manage-card list-admin-card">
-    <header class="form-card-title manage-head"><div><h2>Marka Listesi</h2><p><?=count($brands)?> kayıt</p></div></header>
+    <header class="form-card-title manage-head"><div class="list-title-with-count"><h2>Marka Listesi</h2><p><?= $visibleBrandCount ?> kayıt</p></div></header>
     <div class="table-responsive manage-table-wrap">
       <table class="personnel-table manage-table brands-table">
-        <thead><tr><th>ID</th><th>MARKA ADI</th><th>İŞLEMLER</th></tr></thead>
+        <thead><tr><th>ID</th><th>MARKA ADI</th><th>STOK TİPİ</th><th>İŞLEMLER</th></tr></thead>
         <tbody>
-          <?php foreach ($brands as $brand): ?>
-            <tr><td><?=(int)$brand['id']?></td><td><?=e($brand['name'])?></td><td>
-              <a class="row-action edit" href="<?=url('brands.php?tab=brands&amp;edit_brand='.(int)$brand['id'])?>" title="Düzenle" aria-label="<?=e($brand['name'])?> markasını düzenle"><?=action_icon('edit')?></a>
+          <?php foreach ($visibleBrandGroups as $groupTitle => $groupBrands): ?>
+            <?php if (!$groupBrands): ?><tr class="empty-row"><td colspan="4">Henüz kayıt bulunmuyor.</td></tr><?php endif; ?>
+            <?php foreach ($groupBrands as $brand): ?>
+            <tr><td><?=(int)$brand['id']?></td><td><?=e($brand['name'])?></td><td><?=e($brand['stock_type'] ?: '—')?></td><td>
+              <a class="row-action edit" href="<?=url('brands.php?tab=brands&amp;group='.$activeGroup.'&amp;edit_brand='.(int)$brand['id'])?>" title="Düzenle" aria-label="<?=e($brand['name'])?> markasını düzenle"><?=action_icon('edit')?></a>
               <form method="post" onsubmit="return confirm('Bu marka silinsin mi?')">
                 <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="entity" value="brand"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$brand['id']?>">
                 <button class="row-action delete" title="Sil" aria-label="<?=e($brand['name'])?> markasını sil"><?=action_icon('delete')?></button>
               </form>
             </td></tr>
+            <?php endforeach; ?>
           <?php endforeach; ?>
         </tbody>
       </table>
@@ -205,54 +298,52 @@ patient_header('Kurulum - Markalar', 'settings');
   <div class="brand-tab-panel models-section" id="models" <?=$activeSection !== 'models' ? 'hidden' : ''?>>
   <details class="vuexy-form-card manage-card admin-new-card"<?=((int)$editModel['id'] || ($error && ($_POST['entity'] ?? '') === 'model')) ? ' open' : ''?>>
     <summary class="form-card-title manage-head models-head">
-      <div><h2><?= (int)$editModel['id'] ? 'Modeli Düzenle' : 'Yeni Model' ?></h2><p>Markalara bağlı ürün modellerini yönetin.</p></div>
+      <div><h2><?= (int)$editModel['id'] ? 'Modeli Düzenle' : ($activeGroup === 'battery' ? 'Yeni Pil Numarası' : 'Yeni Model') ?></h2><p><?= $activeGroup === 'battery' ? 'Markalara bağlı pil numaralarını yönetin.' : 'Markalara bağlı ürün modellerini yönetin.' ?></p></div>
       <i class="admin-card-chevron" aria-hidden="true"></i>
     </summary>
     <form class="personnel-form manage-form model-form <?=$editModel['id'] || ($error && ($_POST['entity'] ?? '') === 'model') ? 'is-open' : ''?>" id="model-form" method="post">
       <input type="hidden" name="csrf" value="<?=csrf()?>">
       <input type="hidden" name="entity" value="model">
+      <input type="hidden" name="group" value="<?=e($activeGroup)?>">
       <input type="hidden" name="action" value="save">
       <input type="hidden" name="id" value="<?=(int)$editModel['id']?>">
       <label>Marka
         <select name="brand_id" required>
           <option value="">Marka Ara</option>
           <?php foreach ($brandOptions as $brand): ?>
+            <?php if (!in_array($activeGroup === 'battery' ? 'Pil' : 'İşitme Cihazı', array_filter(explode(',', (string)$brand['stock_type'])), true)) continue; ?>
             <option value="<?=(int)$brand['id']?>" <?=(int)$editModel['brand_id'] === (int)$brand['id'] ? 'selected' : ''?>><?=e($brand['name'])?></option>
           <?php endforeach; ?>
         </select>
       </label>
-      <label>Model Adı<input name="name" maxlength="190" required placeholder="Model Adı" value="<?=e($editModel['name'])?>"></label>
+      <label><?= $activeGroup === 'battery' ? 'Pil Numarası' : 'Model Adı' ?><input name="name" maxlength="190" required placeholder="<?= $activeGroup === 'battery' ? 'Pil Numarası' : 'Model Adı' ?>" value="<?=e($editModel['name'])?>"></label>
       <div class="form-actions"><button type="submit">Kaydet</button><a href="<?=url('brands.php?tab=models')?>">İptal</a></div>
     </form>
   </details>
   <section class="vuexy-form-card manage-card list-admin-card">
     <header class="form-card-title manage-head models-list-head">
-      <div><h2>Model Listesi</h2><p><?=count($models)?> kayıt</p></div>
+      <div class="model-list-title"><h2><?= $activeGroup === 'battery' ? 'Pil Numara Listesi' : 'Model Listesi' ?></h2><p><?= $visibleModelCount ?> kayıt</p></div>
       <label class="model-search">
         <span class="model-search-icon" aria-hidden="true">⌕</span>
         <input type="search" id="model-search" placeholder="Tüm modellerde ara" autocomplete="off" aria-label="Tüm modellerde ara">
       </label>
     </header>
-    <nav class="brand-tabs" aria-label="Model markaları">
-      <?php foreach ($brandOptions as $brand): ?>
-        <?php $isFirstBrand = (int)$brand['id'] === $firstBrandId; ?>
-        <button class="brand-tab <?=$isFirstBrand ? 'active' : ''?>" type="button" data-brand-filter="<?=(int)$brand['id']?>" aria-pressed="<?=$isFirstBrand ? 'true' : 'false'?>"><?=e($brand['name'])?></button>
-      <?php endforeach; ?>
-    </nav>
     <div class="table-responsive manage-table-wrap">
       <table class="personnel-table manage-table models-table">
-        <thead><tr><th>ID</th><th>MARKA</th><th>MODEL ADI</th><th>İŞLEMLER</th></tr></thead>
+        <thead><tr><th>ID</th><th>MARKA</th><th><?= $activeGroup === 'battery' ? 'PİL NO' : 'MODEL ADI' ?></th><th>STOK TİPİ</th><th>İŞLEMLER</th></tr></thead>
         <tbody>
-          <?php foreach ($models as $model): ?>
-            <tr data-model-brand="<?=(int)$model['brand_id']?>" <?=(int)$model['brand_id'] !== $firstBrandId ? 'hidden' : ''?>><td><?=(int)$model['id']?></td><td><?=e($model['brand_name'])?></td><td><?=e($model['name'])?></td><td>
-              <a class="row-action edit" href="<?=url('brands.php?tab=models&amp;edit_model='.(int)$model['id'].'#models')?>" title="Düzenle" aria-label="<?=e($model['name'])?> modelini düzenle"><?=action_icon('edit')?></a>
+          <?php foreach ($visibleModelGroups as $groupTitle => $groupModels): ?>
+            <?php if (!$groupModels): ?><tr class="empty-row"><td colspan="5">Henüz kayıt bulunmuyor.</td></tr><?php endif; ?>
+            <?php foreach ($groupModels as $model): ?>
+            <tr data-model-brand="<?=(int)$model['brand_id']?>"><td><?=(int)$model['id']?></td><td><?=e($model['brand_name'])?></td><td><?=e($model['name'])?></td><td><?=e($model['model_stock_type'] ?: '—')?></td><td>
+              <a class="row-action edit" href="<?=url('brands.php?tab=models&amp;group='.$activeGroup.'&amp;edit_model='.(int)$model['id'].'#models')?>" title="Düzenle" aria-label="<?=e($model['name'])?> modelini düzenle"><?=action_icon('edit')?></a>
               <form method="post" onsubmit="return confirm('Bu model silinsin mi?')">
                 <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="entity" value="model"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$model['id']?>">
                 <button class="row-action delete" title="Sil" aria-label="<?=e($model['name'])?> modelini sil"><?=action_icon('delete')?></button>
               </form>
             </td></tr>
+            <?php endforeach; ?>
           <?php endforeach; ?>
-          <?php if (!$models): ?><tr class="empty-row"><td colspan="4">Henüz model kaydı bulunmuyor.</td></tr><?php endif; ?>
         </tbody>
       </table>
     </div>
@@ -289,6 +380,7 @@ function action_icon(string $type): string
 .brands-page .manage-table .vox-icon-action.vox-icon-delete{margin:0!important}
 .brands-page .manage-table .vox-icon-action{vertical-align:top!important}
 .models-list-head{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,440px)}
+.model-list-title,.list-title-with-count{display:flex;align-items:baseline;gap:10px}.model-list-title h2,.list-title-with-count h2{margin:0}.model-list-title p,.list-title-with-count p{margin:0}
 .models-list-head .model-search{justify-self:end}
 @media(max-width:900px){.patient-container.personnel-page.brands-page{padding:92px 14px 30px!important}}
 @media(max-width:760px){.brands-page .admin-new-card .personnel-form{grid-template-columns:1fr!important}.models-list-head{display:flex}.models-list-head .model-search{width:100%}}
@@ -316,7 +408,7 @@ const applyModelFilter = () => {
   const selectedBrand = document.querySelector('[data-brand-filter].active')?.dataset.brandFilter || '';
   modelRows.forEach(row => {
     const matchesSearch = query !== '' && row.textContent.toLocaleLowerCase('tr-TR').includes(query);
-    row.hidden = query !== '' ? !matchesSearch : row.dataset.modelBrand !== selectedBrand;
+    row.hidden = query !== '' ? !matchesSearch : (selectedBrand !== '' && row.dataset.modelBrand !== selectedBrand);
   });
 };
 brandTabs.forEach(tab => {
@@ -335,4 +427,5 @@ brandTabs.forEach(tab => {
 });
 modelSearch?.addEventListener('input', applyModelFilter);
 </script>
+<style>.brand-stock-types{display:flex;flex:1;align-items:center;gap:14px;min-width:260px;margin:0;padding:0;border:0}.brand-stock-types legend{margin:0 10px 0 0;font-size:13px;font-weight:700}.brand-stock-types label{display:inline-flex!important;flex:0 0 auto!important;flex-direction:row!important;align-items:center;gap:6px;min-width:0!important;margin:0;font-size:13px!important}.brand-stock-types input[type=checkbox]{appearance:checkbox!important;-webkit-appearance:checkbox!important;box-sizing:border-box!important;width:18px!important;min-width:18px!important;height:18px!important;min-height:18px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important}</style>
 <?php patient_footer();
