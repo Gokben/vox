@@ -910,113 +910,215 @@ INSERT INTO `brands` (`id`,`name`,`created_at`,`stock_type`) VALUES
 (14,'DB Power','2026-07-26 18:57:05','Pil')
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `created_at`=VALUES(`created_at`), `stock_type`=VALUES(`stock_type`);
 
-INSERT INTO `models` (`id`,`brand_id`,`name`,`stock_type`,`created_at`) VALUES
-(1,1,'KE261','İşitme Cihazı','2026-07-23 20:22:45'),
-(2,1,'KE267','İşitme Cihazı','2026-07-23 20:22:45'),
-(3,1,'KE277','İşitme Cihazı','2026-07-23 20:22:45'),
-(4,1,'KE288','İşitme Cihazı','2026-07-23 20:22:45'),
-(5,1,'KE298','İşitme Cihazı','2026-07-23 20:22:45'),
-(6,1,'KE461','İşitme Cihazı','2026-07-23 20:22:45'),
-(7,1,'KE461 DRWC','İşitme Cihazı','2026-07-23 20:22:45'),
-(8,1,'KE4CIC','İşitme Cihazı','2026-07-23 20:22:45'),
-(9,1,'KE488','İşitme Cihazı','2026-07-23 20:22:45'),
-(10,1,'KE498','İşitme Cihazı','2026-07-23 20:22:45'),
-(11,1,'KE477','İşitme Cihazı','2026-07-23 20:22:45'),
-(12,1,'KE478','İşitme Cihazı','2026-07-23 20:22:45'),
-(13,1,'RU761','İşitme Cihazı','2026-07-23 20:22:45'),
-(14,1,'RU761 DRWC','İşitme Cihazı','2026-07-23 20:22:45'),
-(15,1,'RU760 DRWC','İşitme Cihazı','2026-07-23 20:22:45'),
-(16,1,'RU777 DRWC','İşitme Cihazı','2026-07-23 20:22:45'),
-(17,1,'RU788','İşitme Cihazı','2026-07-23 20:22:45'),
-(18,1,'RU788 DRWC','İşitme Cihazı','2026-07-23 20:22:45'),
-(19,1,'RU960 DRW','İşitme Cihazı','2026-07-23 20:22:45'),
-(20,1,'RU960','İşitme Cihazı','2026-07-23 20:22:45'),
-(21,1,'RU960 DRWC','İşitme Cihazı','2026-07-23 20:22:45'),
-(22,1,'RU988','İşitme Cihazı','2026-07-23 20:22:45'),
-(23,1,'EQ788','İşitme Cihazı','2026-07-23 20:22:45'),
-(24,1,'EQ798','İşitme Cihazı','2026-07-23 20:22:45'),
-(25,1,'EQ799','İşitme Cihazı','2026-07-23 20:22:45'),
-(26,1,'EQ7100','İşitme Cihazı','2026-07-23 20:22:45'),
-(27,1,'EQ7101','İşitme Cihazı','2026-07-23 20:22:45'),
-(28,1,'EQ7102','İşitme Cihazı','2026-07-23 20:22:45'),
-(29,1,'EQ988','İşitme Cihazı','2026-07-23 20:22:45'),
-(30,1,'EQ998','İşitme Cihazı','2026-07-23 20:22:45'),
-(31,2,'RLY276','İşitme Cihazı','2026-07-23 20:30:15'),
-(32,2,'RLY286','İşitme Cihazı','2026-07-23 20:30:15'),
-(33,2,'RLY295','İşitme Cihazı','2026-07-23 20:30:15'),
-(34,2,'RLY463','İşitme Cihazı','2026-07-23 20:30:15'),
-(35,2,'RLY476','İşitme Cihazı','2026-07-23 20:30:15'),
-(36,2,'RLY486','İşitme Cihazı','2026-07-23 20:30:15'),
-(37,2,'RLY495','İşitme Cihazı','2026-07-23 20:30:15'),
-(38,2,'BBU695','İşitme Cihazı','2026-07-23 20:30:15'),
-(39,2,'BBU995','İşitme Cihazı','2026-07-23 20:30:15'),
-(40,2,'IMP1763','İşitme Cihazı','2026-07-23 20:30:15'),
-(41,5,'E-FA-E1','İşitme Cihazı','2026-07-23 20:33:09'),
-(42,5,'E-FP E1','İşitme Cihazı','2026-07-23 20:33:09'),
-(43,5,'MOJO M2 - MBB 3D','İşitme Cihazı','2026-07-23 20:33:09'),
-(44,5,'MOJO M2 - MRB0','İşitme Cihazı','2026-07-23 20:33:09'),
-(45,5,'MOJO M2 - MBB2','İşitme Cihazı','2026-07-23 20:33:09'),
-(46,5,'MOJO M2 - MRB 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(47,5,'MOJO M2 CIC','İşitme Cihazı','2026-07-23 20:33:09'),
-(48,5,'MOJO M3 - MRB0','İşitme Cihazı','2026-07-23 20:33:09'),
-(49,5,'MOJO M3 - MRB 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(50,5,'MOJO M3 - MRR 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(51,5,'MOJO M3 - MBR 3D','İşitme Cihazı','2026-07-23 20:33:09'),
-(52,5,'MOJO M3 M-CIC','İşitme Cihazı','2026-07-23 20:33:09'),
-(53,5,'MOJO M4 - MRB 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(54,5,'MOJO M4 - MRR 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(55,5,'MOJO M4 - MBR 3D','İşitme Cihazı','2026-07-23 20:33:09'),
-(56,5,'MOJO M5 - MRB 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(57,5,'MOJO M5 - MBB 3D','İşitme Cihazı','2026-07-23 20:33:09'),
-(58,5,'MOJO M5 - MRR 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(59,5,'MOJO M6 - MRR 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(60,5,'MOJO M6 - MRB 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(61,5,'MOJO M6 MBB 3D','İşitme Cihazı','2026-07-23 20:33:09'),
-(62,5,'MOJO M7 - MRR 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(63,5,'MOJO M7 - MRB 2D','İşitme Cihazı','2026-07-23 20:33:09'),
-(64,5,'MOJO M7 MBB 3D','İşitme Cihazı','2026-07-23 20:33:09'),
-(67,3,'MOTION 13','İşitme Cihazı','2026-07-23 20:41:02'),
-(68,3,'PURE C&G','İşitme Cihazı','2026-07-23 20:41:03'),
-(69,3,'SILK C&G','İşitme Cihazı','2026-07-23 20:41:03'),
-(70,3,'INTUIS M','İşitme Cihazı','2026-07-23 20:41:03'),
-(71,3,'ACTIVE PRO C&G','İşitme Cihazı','2026-07-23 20:41:03'),
-(72,3,'STYLETTO','İşitme Cihazı','2026-07-23 20:41:03'),
-(73,3,'SILK X','İşitme Cihazı','2026-07-23 20:41:03'),
-(74,3,'SILK 3X','İşitme Cihazı','2026-07-23 20:41:03'),
-(75,3,'SILK 3X - L','İşitme Cihazı','2026-07-23 20:41:03'),
-(76,3,'CROS SILK X','İşitme Cihazı','2026-07-23 20:41:03'),
-(77,3,'PURE 1 AX','İşitme Cihazı','2026-07-23 20:41:03'),
-(78,3,'PURE 3 AX','İşitme Cihazı','2026-07-23 20:41:03'),
-(79,3,'PURE 1 IX','İşitme Cihazı','2026-07-23 20:41:03'),
-(80,9,'BICORE B M 10',NULL,'2026-07-23 20:43:48'),
-(81,9,'BICORE B P 10',NULL,'2026-07-23 20:43:48'),
-(82,10,'SAVANT AL 2400','İşitme Cihazı','2026-07-23 20:45:48'),
-(84,5,'28539','İşitme Cihazı','2026-07-23 21:29:26'),
-(85,5,'534884','İşitme Cihazı','2026-07-23 21:29:26'),
-(86,8,'675','Pil','2026-07-26 09:51:06'),
-(87,8,'312','Pil','2026-07-26 09:51:21'),
-(88,8,'13','Pil','2026-07-26 09:51:36'),
-(89,8,'10','Pil','2026-07-26 09:51:43'),
-(90,13,'675','Pil','2026-07-26 13:03:42'),
-(91,13,'312','Pil','2026-07-26 13:04:09'),
-(92,13,'13','Pil','2026-07-26 13:04:19'),
-(93,13,'10','Pil','2026-07-26 13:04:26'),
-(94,9,'675','Pil','2026-07-26 13:04:43'),
-(95,9,'312','Pil','2026-07-26 13:04:54'),
-(96,9,'13','Pil','2026-07-26 13:05:08'),
-(97,9,'10','Pil','2026-07-26 13:05:14'),
-(98,12,'675','Pil','2026-07-26 13:05:21'),
-(99,12,'312','Pil','2026-07-26 13:05:30'),
-(100,12,'13','Pil','2026-07-26 13:05:36'),
-(101,12,'10','Pil','2026-07-26 13:05:43'),
-(102,14,'675','Pil','2026-07-26 18:57:31'),
-(103,14,'312','Pil','2026-07-26 18:57:41')
-ON DUPLICATE KEY UPDATE `brand_id`=VALUES(`brand_id`), `name`=VALUES(`name`), `stock_type`=VALUES(`stock_type`), `created_at`=VALUES(`created_at`);
-
-INSERT INTO `models` (`id`,`brand_id`,`name`,`stock_type`,`created_at`) VALUES
-(104,14,'13','Pil','2026-07-26 18:57:54'),
-(105,14,'10','Pil','2026-07-26 18:58:05')
-ON DUPLICATE KEY UPDATE `brand_id`=VALUES(`brand_id`), `name`=VALUES(`name`), `stock_type`=VALUES(`stock_type`), `created_at`=VALUES(`created_at`);
+INSERT INTO `models` (`brand_id`,`name`,`stock_type`,`created_at`)
+SELECT b.`id`, v.model_name, v.stock_type, v.created_at
+FROM (
+SELECT 'Beltone' AS brand_name, 'BBU695' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'BBU995' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'IMP1763' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY276' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY286' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY295' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY463' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY476' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY486' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Beltone' AS brand_name, 'RLY495' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:30:15' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, '28539' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 21:29:26' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, '534884' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 21:29:26' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'E-FA-E1' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'E-FP E1' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M2 - MBB 3D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M2 - MBB2' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M2 - MRB 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M2 - MRB0' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M2 CIC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M3 - MBR 3D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M3 - MRB 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M3 - MRB0' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M3 - MRR 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M3 M-CIC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M4 - MBR 3D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M4 - MRB 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M4 - MRR 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M5 - MBB 3D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M5 - MRB 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M5 - MRR 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M6 - MRB 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M6 - MRR 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M6 MBB 3D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M7 - MRB 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M7 - MRR 2D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'Coselgi' AS brand_name, 'MOJO M7 MBB 3D' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:33:09' AS created_at
+UNION ALL
+SELECT 'DB Power' AS brand_name, '10' AS model_name, 'Pil' AS stock_type, '2026-07-26 18:58:05' AS created_at
+UNION ALL
+SELECT 'DB Power' AS brand_name, '13' AS model_name, 'Pil' AS stock_type, '2026-07-26 18:57:54' AS created_at
+UNION ALL
+SELECT 'DB Power' AS brand_name, '312' AS model_name, 'Pil' AS stock_type, '2026-07-26 18:57:41' AS created_at
+UNION ALL
+SELECT 'DB Power' AS brand_name, '675' AS model_name, 'Pil' AS stock_type, '2026-07-26 18:57:31' AS created_at
+UNION ALL
+SELECT 'Duracell' AS brand_name, '10' AS model_name, 'Pil' AS stock_type, '2026-07-26 09:51:43' AS created_at
+UNION ALL
+SELECT 'Duracell' AS brand_name, '13' AS model_name, 'Pil' AS stock_type, '2026-07-26 09:51:36' AS created_at
+UNION ALL
+SELECT 'Duracell' AS brand_name, '312' AS model_name, 'Pil' AS stock_type, '2026-07-26 09:51:21' AS created_at
+UNION ALL
+SELECT 'Duracell' AS brand_name, '675' AS model_name, 'Pil' AS stock_type, '2026-07-26 09:51:06' AS created_at
+UNION ALL
+SELECT 'Nuear' AS brand_name, 'SAVANT AL 2400' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:45:48' AS created_at
+UNION ALL
+SELECT 'Philips' AS brand_name, '10' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:04:26' AS created_at
+UNION ALL
+SELECT 'Philips' AS brand_name, '13' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:04:19' AS created_at
+UNION ALL
+SELECT 'Philips' AS brand_name, '312' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:04:09' AS created_at
+UNION ALL
+SELECT 'Philips' AS brand_name, '675' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:03:42' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ7100' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ7101' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ7102' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ788' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ798' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ799' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ988' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'EQ998' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE261' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE267' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE277' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE288' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE298' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE461' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE461 DRWC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE477' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE478' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE488' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE498' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'KE4CIC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU760 DRWC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU761' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU761 DRWC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU777 DRWC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU788' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU788 DRWC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU960' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU960 DRW' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU960 DRWC' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Resound' AS brand_name, 'RU988' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:22:45' AS created_at
+UNION ALL
+SELECT 'Rexton' AS brand_name, '10' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:05:14' AS created_at
+UNION ALL
+SELECT 'Rexton' AS brand_name, '13' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:05:08' AS created_at
+UNION ALL
+SELECT 'Rexton' AS brand_name, '312' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:04:54' AS created_at
+UNION ALL
+SELECT 'Rexton' AS brand_name, '675' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:04:43' AS created_at
+UNION ALL
+SELECT 'Rexton' AS brand_name, 'BICORE B M 10' AS model_name, '' AS stock_type, '2026-07-23 20:43:48' AS created_at
+UNION ALL
+SELECT 'Rexton' AS brand_name, 'BICORE B P 10' AS model_name, '' AS stock_type, '2026-07-23 20:43:48' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'ACTIVE PRO C&G' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'CROS SILK X' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'INTUIS M' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'MOTION 13' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:02' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'PURE 1 AX' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'PURE 1 IX' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'PURE 3 AX' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'PURE C&G' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'SILK 3X' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'SILK 3X - L' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'SILK C&G' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'SILK X' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Signia' AS brand_name, 'STYLETTO' AS model_name, 'İşitme Cihazı' AS stock_type, '2026-07-23 20:41:03' AS created_at
+UNION ALL
+SELECT 'Varta' AS brand_name, '10' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:05:43' AS created_at
+UNION ALL
+SELECT 'Varta' AS brand_name, '13' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:05:36' AS created_at
+UNION ALL
+SELECT 'Varta' AS brand_name, '312' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:05:30' AS created_at
+UNION ALL
+SELECT 'Varta' AS brand_name, '675' AS model_name, 'Pil' AS stock_type, '2026-07-26 13:05:21' AS created_at
+) v
+INNER JOIN `brands` b ON b.`name`=v.brand_name
+ON DUPLICATE KEY UPDATE `stock_type`=VALUES(`stock_type`), `created_at`=VALUES(`created_at`);
 
 INSERT INTO `stock_cards` (`id`,`stock_code`,`stock_name`,`brand`,`model`,`device_type`,`serial_no`,`uts_lot_no`,`warranty_start`,`warranty_end`,`sgk_status`,`min_stock`,`max_stock`,`purchase_price`,`sale_price`,`vat_rate`,`unit_cost`,`created_at`,`stock_type`,`image_path`,`power_usage`,`product_color`) VALUES
 (1,'KE267','ReSound Key 267 DRW RIE','Resound','KE267','Kanal İçi Alıcı RIC/RIE','54435','45454545','2026-07-26','2026-07-26','',5,10,15000.0,15000.0,20.0,15000.0,'2026-07-25 22:48:52','İşitme Cihazı','assets/uploads/stocks/stock-5dd37f3dc5608e206fe8a461.jpg','Pilli','Bej'),
