@@ -123,7 +123,7 @@ body .vuexy-actions{gap:8px!important}body .vuexy-actions>a,body .vuexy-actions>
  const excelLink=document.createElement('a');excelLink.className='excel-export-button';excelLink.href='<?=url('patients-export.php?year='.$year)?>';excelLink.title='<?=$year?> yılı hasta kayıtlarını Excel’e aktar';excelLink.setAttribute('aria-label',excelLink.title);excelLink.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 12l4 6m0-6-4 6m7-6h2m-2 3h2m-2 3h2"/></svg>';toolbar.insertBefore(excelLink,toolbar.querySelector('.vuexy-search'));
  const menu=picker.querySelector('.column-picker-menu'),options=picker.querySelector('.column-picker-options');
  let visible;try{visible=JSON.parse(localStorage.getItem('vox-patient-columns')||'null')}catch(e){}
- if(!Array.isArray(visible)||visible.length!==columns.length)visible=columns.map(()=>true);
+ if(!Array.isArray(visible)||visible.length!==columns.length||visible.filter(Boolean).length<6)visible=columns.map(()=>true);
  let autoFit=localStorage.getItem('vox-patient-auto-fit')!=='0';
  function applyFit(){table.classList.toggle('auto-fit-columns',autoFit);picker.querySelector('[data-auto-fit]').textContent='↔ Otomatik Genişlet: '+(autoFit?'Açık':'Kapalı');localStorage.setItem('vox-patient-auto-fit',autoFit?'1':'0')}
  function apply(){table.querySelectorAll('tr').forEach(row=>[...row.children].forEach((cell,i)=>cell.style.display=visible[i]?'':'none'));localStorage.setItem('vox-patient-columns',JSON.stringify(visible));options.querySelectorAll('input').forEach((box,i)=>box.checked=visible[i]);applyFit();}
