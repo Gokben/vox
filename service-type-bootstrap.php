@@ -85,7 +85,7 @@ function ensure_patient_service_type_schema(): void
     // Eski metin kayıtlarını mevcut tanımlara bağlar. Yalnızca ilişkisi boş kayıtlarda çalışır.
     $pdo->exec(
         'UPDATE patients SET service_type_id = (' .
-        'SELECT id FROM service_type_definitions WHERE service_type_definitions.name = patients.service_type' .
+        'SELECT id FROM service_type_definitions WHERE service_type_definitions.name COLLATE utf8mb4_unicode_ci = patients.service_type COLLATE utf8mb4_unicode_ci' .
         ') WHERE service_type_id IS NULL AND service_type IS NOT NULL AND service_type <> \'\''
     );
     $initialized = true;
