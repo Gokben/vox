@@ -5,6 +5,28 @@
 SET NAMES utf8mb4;
 START TRANSACTION;
 
+-- Eski canlı şemalarda bulunmayan stok sınıflandırma ve hareket sütunlarını ekler.
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='brands' AND column_name='stock_type');
+SET @sql := IF(@exists=0, 'ALTER TABLE brands ADD COLUMN stock_type VARCHAR(50) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='models' AND column_name='stock_type');
+SET @sql := IF(@exists=0, 'ALTER TABLE models ADD COLUMN stock_type VARCHAR(50) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_cards' AND column_name='stock_type');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_cards ADD COLUMN stock_type VARCHAR(50) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='current_account_id');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN current_account_id INT UNSIGNED NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='invoice_no');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN invoice_no VARCHAR(100) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='serial_numbers');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN serial_numbers TEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='purchase_price');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN purchase_price DECIMAL(12,2) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='sale_price');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN sale_price DECIMAL(12,2) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='vat_rate');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN vat_rate DECIMAL(5,2) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='stock_movements' AND column_name='unit_cost');
+SET @sql := IF(@exists=0, 'ALTER TABLE stock_movements ADD COLUMN unit_cost DECIMAL(12,2) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 INSERT INTO current_accounts
   (code, title, short_name, tax_office, tax_number, account_type, currency, phone, email, contact_person, billing_address, shipping_address)
 VALUES
