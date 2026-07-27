@@ -82,6 +82,18 @@ foreach ($rows as &$row) {
 unset($row);
 foreach ($rows as &$row) $row['report_info'] = (string)($row['report_status'] ?? '');
 unset($row);
+foreach ($rows as &$row) {
+    if (trim((string)($row['source_name'] ?? '')) === '') {
+        foreach (['source_primary', 'source_marketing', 'source_detail'] as $sourceField) {
+            $sourceValue = trim((string)($row[$sourceField] ?? ''));
+            if ($sourceValue !== '') {
+                $row['source_name'] = $sourceValue;
+                break;
+            }
+        }
+    }
+}
+unset($row);
 $from = $total ? $offset + 1 : 0; $to = min($offset + $perPage, $total);
 $patientListReturn = 'patients.php?' . http_build_query([
     'year' => $year,
