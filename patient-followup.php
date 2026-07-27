@@ -154,8 +154,26 @@ if ($editId && trim((string)$form['complaint']) === '') $form['complaint'] = (st
 if ($patientOutcome !== '' && ($form['result_name'] === '' || $form['result_name'] === 'Beklemede')) $form['result_name'] = $patientOutcome;
 if ($editId && trim((string)$form['related_personnel']) === '') $form['related_personnel'] = patient_staff_list($patient, $staffNames);
 if (trim((string)$form['related_personnel']) !== '' && (trim((string)$form['contact_person']) === '' || $form['contact_person'] === 'Vox Yöneticisi')) $form['contact_person'] = $form['related_personnel'];
-$contactPersonOptions = array_values($staffNames);
-if (trim((string)$form['contact_person']) !== '' && !in_array($form['contact_person'], $contactPersonOptions, true)) $contactPersonOptions[] = $form['contact_person'];
+$contactPersonOptions = array_values(array_unique($staffNames));
+$currentContactPerson = trim((string)$form['contact_person']);
+if ($currentContactPerson !== '') {
+    $normalizePerson = static function (string $name): string {
+        $name = mb_strtolower(trim($name), 'UTF-8');
+        return preg_replace('/[^\p{L}\p{N}]+/u', ' ', $name) ?? '';
+    };
+    $normalizedCurrent = $normalizePerson($currentContactPerson);
+    foreach ($contactPersonOptions as $person) {
+        $normalizedPerson = $normalizePerson($person);
+        if ($normalizedCurrent === $normalizedPerson
+            || str_starts_with($normalizedPerson, $normalizedCurrent . ' ')
+            || str_starts_with($normalizedCurrent, $normalizedPerson . ' ')) {
+            $form['contact_person'] = $person;
+            $currentContactPerson = $person;
+            break;
+        }
+    }
+    if (!in_array($currentContactPerson, $contactPersonOptions, true)) $contactPersonOptions[] = $currentContactPerson;
+}
 ?>
 <style>
 .services-page{max-width:1120px;margin:0 auto;padding:96px 20px 48px!important}.services-card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1);overflow:hidden}.services-head{display:flex;align-items:center;justify-content:space-between;min-height:70px;padding:0 24px;border-bottom:1px solid var(--line)}.services-head h2{margin:0;font-size:19px;font-weight:600}.service-form{padding:20px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.service-field{display:flex;flex-direction:column;gap:6px;color:var(--text);font-size:12px}.service-field input,.service-field select,.service-field textarea{box-sizing:border-box;width:100%;min-height:38px;padding:8px 10px;border:1px solid #d5d3de;border-radius:5px;background:var(--card);color:var(--text);font:inherit}.service-field textarea{min-height:58px;resize:vertical}.service-wide{grid-column:1/-1}.service-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;grid-column:1/-1}.satisfaction{grid-column:1/-1;text-align:center}.satisfaction label{font-size:12px;display:block;margin-bottom:5px}.faces{display:flex;justify-content:center;gap:12px}.faces input{position:absolute;opacity:0}.faces label{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid #9da0a9;font-size:23px;cursor:pointer}.faces label:nth-of-type(1){background:#fff09c}.faces label:nth-of-type(2){background:#b5ddbc}.faces label:nth-of-type(3){background:#9fdbf1}.faces label:nth-of-type(4){background:#f5a2a2}.faces input:checked+label{outline:3px solid #7367f0}.action-box{grid-column:1/-1;margin-top:2px;padding:16px;border-radius:7px;background:#fff;box-shadow:0 .15rem .7rem rgba(47,43,61,.1);display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}.action-box h3{grid-column:1/-1;margin:0;font-size:13px}.action-box .button{justify-self:end}.service-form footer{grid-column:1/-1;display:flex;gap:10px}.services-toolbar{display:flex;justify-content:space-between;padding:18px 24px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--muted)}.services-table{width:100%;border-collapse:collapse}.services-table th,.services-table td{padding:14px 18px;border-bottom:1px solid var(--line);text-align:left}.services-table th{font-size:11px;color:var(--muted)}.service-empty{text-align:center;color:var(--muted)}@media(max-width:720px){.services-page{padding:92px 12px 30px!important}.service-form,.action-box{grid-template-columns:1fr}.service-three{grid-template-columns:1fr}.services-table{min-width:850px}.services-card{overflow:auto}}
