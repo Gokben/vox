@@ -168,6 +168,11 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         redirect($returnTo);
     }
 }
+$patientFullNameHtml = e((string)$patient['full_name']);
+if (function_exists('mb_encode_numericentity')) {
+    $patientFullNameHtml = mb_encode_numericentity($patientFullNameHtml, [0x80, 0x10FFFF, 0, 0xFFFFFF], 'UTF-8');
+}
+$patientFullNameJson = json_encode((string)$patient['full_name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 start_patient_staff_ui_link($staffNames, ['staff_yeliz'=>!empty($patient['staff_yeliz']),'staff_gunes'=>!empty($patient['staff_gunes']),'staff_erva'=>!empty($patient['staff_erva']),'staff_merve'=>!empty($patient['staff_merve']),'staff_seyma'=>!empty($patient['staff_seyma'])]);
 patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 ?>
@@ -182,7 +187,7 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 <h3 class="form-section-title">Temel Bilgiler</h3>
 <div class="icon-form-row"><label class="icon-form-label">Şube <span class="required-mark">*</span></label><div class="merged-input"><span class="merged-icon">⌂</span><select name="branch_id" required><option value="">Şube seçin</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=(int)$patient['branch_id']===(int)$branch['id']?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Kayıt Tarihi</label><div class="merged-input"><span class="merged-icon">▣</span><input type="date" name="record_date" value="<?=e($patient['record_date'])?>"></div></div>
-<div class="icon-form-row"><label class="icon-form-label">Ad Soyad <span class="required-mark">*</span></label><div class="merged-input"><span class="merged-icon">♙</span><input name="full_name" lang="tr" style="font-family:Arial,'Segoe UI',sans-serif!important;text-transform:none" value="<?=e($patient['full_name'])?>" required></div></div>
+<div class="icon-form-row"><label class="icon-form-label">Ad Soyad <span class="required-mark">*</span></label><div class="merged-input"><span class="merged-icon">♙</span><input name="full_name" lang="tr" style="font-family:Arial,'Segoe UI',sans-serif!important;font-size:14px!important;line-height:24px!important;padding-top:6px!important;padding-bottom:6px!important;text-transform:none" value="<?=$patientFullNameHtml?>" required></div></div><script>document.querySelector('input[name="full_name"]').value=<?=$patientFullNameJson?>;</script>
 <div class="icon-form-row"><label class="icon-form-label">T.C. Kimlik No</label><div class="merged-input"><span class="merged-icon">▤</span><input name="national_id" maxlength="20" value="<?=e($patient['national_id'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Doğum Tarihi</label><div class="merged-input"><span class="merged-icon">◷</span><input type="date" name="birth_date" value="<?=e($patient['birth_date'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Telefon 1</label><div class="merged-input phone-input"><span class="merged-icon">⌕</span><input id="phone_primary" name="phone_primary" inputmode="tel" maxlength="14" placeholder="0546 638 67 75" value="<?=e($patient['phone_primary'])?>"><button id="proximity-toggle" class="proximity-toggle" type="button" title="Yakınlık derecesini aç/kapat" aria-label="Yakınlık derecesini aç/kapat" aria-controls="proximity-row" aria-expanded="false" <?=trim($patient['phone_primary'])===''?'disabled':''?>><i class="icon-base ti tabler-users"></i></button></div></div>
