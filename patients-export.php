@@ -84,7 +84,7 @@ $exportRows = [[
 ]];
 
 foreach ($rows as $row) {
-    $result = $row['approval'] ? 'Onay' : ($row['considering'] ? 'Düşünecek' : ($row['rejected'] ? 'Red' : ''));
+    $result = $row['approval'] ? 'Onay' : ($row['considering'] ? 'Düşünecek' : ($row['rejected'] ? 'Ret' : ''));
     $staff = implode(', ', array_filter([
         $row['staff_cansu'] ? 'Cansu' : '',
         $row['staff_busra'] ? 'Büşra' : '',

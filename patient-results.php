@@ -70,7 +70,7 @@ function patient_result_label(array $patient): string
 {
     if (!empty($patient['approval'])) return 'Onay';
     if (!empty($patient['considering'])) return 'Düşünecek';
-    if (!empty($patient['rejected'])) return 'Red';
+    if (!empty($patient['rejected'])) return 'Ret';
     return 'Sonuç Yok';
 }
 
@@ -89,7 +89,7 @@ $tabs = [
     'all' => 'Tümü',
     'approved' => 'Onay',
     'considering' => 'Düşünecek',
-    'rejected' => 'Red',
+    'rejected' => 'Ret',
     'none' => 'Sonuç Yok',
 ];
 $from = $total ? $offset + 1 : 0;
@@ -121,7 +121,7 @@ $resultsReturn = 'patient-results.php?' . http_build_query(['result'=>$result,'q
       <table class="results-table">
         <thead><tr><th>No</th><th>Tarih</th><th>Ad Soyad</th><th>T.C. Kimlik No</th><th>Telefon</th><th>Hizmet Yeri</th><th>Sonuç</th><th>Açıklama</th><th>İşlem</th></tr></thead>
         <tbody>
-        <?php foreach ($rows as $patient): $label = patient_result_label($patient); $class = $label==='Onay'?'approved':($label==='Düşünecek'?'considering':($label==='Red'?'rejected':'none')); ?>
+        <?php foreach ($rows as $patient): $label = patient_result_label($patient); $class = $label==='Onay'?'approved':($label==='Düşünecek'?'considering':($label==='Ret'?'rejected':'none')); ?>
           <tr>
             <td><?=e((string)$patient['import_order'])?></td>
             <td><?=e(format_date_tr($patient['record_date']))?></td>

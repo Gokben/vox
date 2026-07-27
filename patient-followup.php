@@ -90,7 +90,7 @@ $patientStatement = $pdo->prepare('SELECT patients.id,patients.full_name,patient
 $patientStatement->execute([$id]);
 $patient = $patientStatement->fetch();
 if (!$patient) { http_response_code(404); exit('Hasta kaydı bulunamadı.'); }
-$patientOutcome = !empty($patient['approval']) ? 'Onay' : (!empty($patient['considering']) ? 'Düşünecek' : (!empty($patient['rejected']) ? 'Red' : ''));
+$patientOutcome = !empty($patient['approval']) ? 'Onay' : (!empty($patient['considering']) ? 'Düşünecek' : (!empty($patient['rejected']) ? 'Ret' : ''));
 $branches = $pdo->query('SELECT id,name FROM branches ORDER BY name')->fetchAll();
 $serviceLocations = array_filter(service_type_definitions(), static fn(array $location): bool => (int)$location['active'] === 1);
 $serviceNames = array_filter(service_name_definitions(), static fn(array $name): bool => (int)$name['active'] === 1);
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $values = [
         'record_no'=>trim((string)($_POST['record_no'] ?? '')),
         'service_date'=>(string)($_POST['record_date'] ?? date('Y-m-d')),
-        'service_status'=>trim((string)($_POST['result_name'] ?? 'Beklemede')),
+        'service_status'=>trim((string)($_POST['result_name'] ?? 'Beklemede')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? 'Beklemede')),
         'performed_action'=>trim((string)($_POST['action_name'] ?? '')),
         'action_date'=>(string)($_POST['action_date'] ?? ''),
         'opened_by'=>(string)($_SESSION['user']['name'] ?? ''),
@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'branch_id'=>(int)($_POST['branch_id'] ?? 0), 'contact_person'=>trim((string)($_POST['contact_person'] ?? '')),
         'appointment_status'=>trim((string)($_POST['appointment_status'] ?? '')), 'complaint'=>trim((string)($_POST['complaint'] ?? '')),
         'observation'=>trim((string)($_POST['observation'] ?? '')), 'service_name'=>trim((string)($_POST['service_name'] ?? '')),
-        'result_name'=>trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
+        'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
         'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>(string)($_POST['repair_details'] ?? ''), 'description'=>trim((string)($_POST['description'] ?? '')),
     ];
     if ($values['record_no'] === '') $values['record_no'] = 'HK' . date('ymdHis');
@@ -149,6 +149,7 @@ $services = $servicesStatement->fetchAll();
 patient_header('Hizmetler', 'patients');
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
 $form = array_merge(['record_no'=>'HK' . date('ymdHis'),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'Beklemede','complaint'=>(string)($patient['anamnesis'] ?? ''),'observation'=>'','service_name'=>$requestedServiceName,'result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
+if ($form['result_name'] === 'Red') $form['result_name'] = 'Ret';
 if ($editId && trim((string)$form['service_location']) === '') $form['service_location'] = (string)($patient['service_location'] ?? '');
 if ($editId && trim((string)$form['complaint']) === '') $form['complaint'] = (string)($patient['anamnesis'] ?? '');
 if ($patientOutcome !== '' && ($form['result_name'] === '' || $form['result_name'] === 'Beklemede')) $form['result_name'] = $patientOutcome;
@@ -214,7 +215,7 @@ if ($currentContactPerson !== '') {
 <label class="service-field service-wide">Şube Seçin<select name="branch_id"><option value="">Seçiniz</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=((string)$patient['branch_name']===(string)$branch['name'])?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select><input type="hidden" name="branch_name" value="<?=e((string)$patient['branch_name'])?>"></label>
 <label class="service-field">İlgilenen Kişi<select name="contact_person"><option value="">Seçiniz</option><?php foreach($contactPersonOptions as $person):?><option value="<?=e($person)?>"><?=e($person)?></option><?php endforeach?></select></label><label class="service-field">Randevu Durumu<select name="appointment_status"><option>Beklemede</option><option>Onaylandı</option><option>Tamamlandı</option><option>İptal</option></select></label>
 <label class="service-field service-wide">Anamnez<textarea name="complaint" placeholder="Anamnez Girin"></textarea></label><label class="service-field service-wide">Gözlem<textarea name="observation" placeholder="Gözlem Girin"></textarea></label>
-<label class="service-field">Hizmet Adı<select name="service_name"><option value="">Seçiniz</option><?php foreach($serviceNames as $serviceName):?><option value="<?=e($serviceName['name'])?>"><?=e($serviceName['name'])?></option><?php endforeach?></select></label><label class="service-field">Sonuç<select name="result_name"><option>Beklemede</option><option>Onay</option><option>Düşünecek</option><option>Red</option><option>Tamamlandı</option><option>İptal</option></select></label>
+<label class="service-field">Hizmet Adı<select name="service_name"><option value="">Seçiniz</option><?php foreach($serviceNames as $serviceName):?><option value="<?=e($serviceName['name'])?>"><?=e($serviceName['name'])?></option><?php endforeach?></select></label><label class="service-field">Sonuç<select name="result_name"><option>Beklemede</option><option>Onay</option><option>Düşünecek</option><option>Ret</option><option>Tamamlandı</option><option>İptal</option></select></label>
 <section class="action-box"><label class="service-field">Aksiyon<select name="action_name"><option value="">Seçiniz</option><?php foreach($serviceActions as $serviceAction):?><option value="<?=e($serviceAction['name'])?>"><?=e($serviceAction['name'])?></option><?php endforeach?></select></label><label class="service-field">Aksiyon Tarihi<input type="date" name="action_date" value="<?=date('Y-m-d')?>"></label></section>
 <div class="satisfaction"><label>Memnuniyet</label><div class="faces"><?php foreach(['🙂','😐','🙁','😡'] as $score=>$face):?><input id="s<?=$score+1?>" type="radio" name="satisfaction" value="<?=$score+1?>" <?=$score===0?'checked':''?>><label for="s<?=$score+1?>"><?=$face?></label><?php endforeach?></div></div>
 <label class="service-field service-wide">Açıklama<textarea name="description"></textarea></label><footer><button class="button"><?=$editId ? 'Güncelle' : 'Kaydet'?></button><a class="cancel-link" href="<?=e(url('patient-followup.php?id='.$id))?>">İptal</a></footer></form><script>document.addEventListener('DOMContentLoaded',()=>{const values=<?=json_encode($form, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;Object.entries(values).forEach(([name,value])=>{const field=document.querySelector(`[name="${name}"]`);if(field&&name!=='branch_name')field.value=value??'';});});</script>
