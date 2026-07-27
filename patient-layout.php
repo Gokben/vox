@@ -14,6 +14,20 @@ if (!function_exists('format_date_tr')) {
 function patient_header(string $title, string $active = 'patients'): void
 {
     $userId = (int)($_SESSION['user']['id'] ?? 0);
+    if ($userId > 0) {
+        try {
+            $userStatement = db()->prepare('SELECT name,email,role FROM users WHERE id=? AND active=1');
+            $userStatement->execute([$userId]);
+            $currentUser = $userStatement->fetch();
+            if ($currentUser) {
+                $_SESSION['user']['name'] = (string)$currentUser['name'];
+                $_SESSION['user']['email'] = (string)$currentUser['email'];
+                $_SESSION['user']['role'] = (string)$currentUser['role'];
+            }
+        } catch (Throwable $e) {
+            // Oturumdaki mevcut bilgi, veritabanına geçici olarak erişilemezse kullanılmaya devam eder.
+        }
+    }
     $rawName = (string)($_SESSION['user']['name'] ?? 'Kullanıcı');
     $name = e($rawName);
     $role = e(role_label(current_role()));
