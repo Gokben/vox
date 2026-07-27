@@ -154,7 +154,15 @@ if ($editId && trim((string)$form['complaint']) === '') $form['complaint'] = (st
 if ($patientOutcome !== '' && ($form['result_name'] === '' || $form['result_name'] === 'Beklemede')) $form['result_name'] = $patientOutcome;
 if ($editId && trim((string)$form['related_personnel']) === '') $form['related_personnel'] = patient_staff_list($patient, $staffNames);
 if (trim((string)$form['related_personnel']) !== '' && (trim((string)$form['contact_person']) === '' || $form['contact_person'] === 'Vox Yöneticisi')) $form['contact_person'] = $form['related_personnel'];
-$contactPersonOptions = array_values(array_unique($staffNames));
+
+// Pasif personel yeni seçimlerde gösterilmez. Ancak hasta kartında ilgili
+// personel olarak daha önce kaydedilmişse, geçmiş kaydı korumak için görünür.
+$activeStaffNames = patient_staff_names();
+$contactPersonOptions = array_values(array_unique($activeStaffNames));
+$registeredPersonnel = preg_split('/\s*,\s*/u', (string)$form['related_personnel'], -1, PREG_SPLIT_NO_EMPTY) ?: [];
+foreach ($registeredPersonnel as $person) {
+    if (!in_array($person, $contactPersonOptions, true)) $contactPersonOptions[] = $person;
+}
 $currentContactPerson = trim((string)$form['contact_person']);
 if ($currentContactPerson !== '') {
     $normalizePerson = static function (string $name): string {
