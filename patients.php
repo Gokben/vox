@@ -74,6 +74,7 @@ if ($q !== '') {
 $whereSql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
 $yearCounts = [];
 foreach (db()->query("SELECT CASE WHEN record_date LIKE '2023%' THEN 2023 WHEN record_date LIKE '2024%' THEN 2024 WHEN record_date LIKE '2026%' THEN 2026 ELSE 2025 END AS y, COUNT(*) AS total FROM patients GROUP BY y") as $countRow) $yearCounts[(int)$countRow['y']] = (int)$countRow['total'];
+$allPatientCount = (int)db()->query('SELECT COUNT(*) FROM patients')->fetchColumn();
 $countStmt = db()->prepare('SELECT COUNT(*) FROM patients' . $whereSql);
 $countStmt->execute($args);
 $total = (int)$countStmt->fetchColumn();
@@ -154,8 +155,8 @@ body .vuexy-actions{gap:8px!important}body .vuexy-actions>a,body .vuexy-actions>
  if(!toolbar||!table)return;
  table.querySelectorAll('tbody tr').forEach(row=>{row.style.cursor='default';row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,input,form'))return;const edit=row.querySelector('a[href*="patient-form.php?id="]');if(edit)window.location.href=edit.href});});
  const yearSelect=document.createElement('select');yearSelect.className='year-select';yearSelect.setAttribute('aria-label','Hasta kayıt yılı');
- yearSelect.innerHTML='<option value="2023" <?=$year===2023?'selected':''?>>2023 (<?=(int)($yearCounts[2023]??0)?> kayıt)</option><option value="2024" <?=$year===2024?'selected':''?>>2024 (<?=(int)($yearCounts[2024]??0)?> kayıt)</option><option value="2025" <?=$year===2025?'selected':''?>>2025 (<?=(int)($yearCounts[2025]??0)?> kayıt)</option><option value="2026" <?=$year===2026?'selected':''?>>2026 (<?=(int)($yearCounts[2026]??0)?> kayıt)</option>';
- yearSelect.addEventListener('change',()=>{const url=new URL(window.location.href);url.searchParams.set('year',yearSelect.value);url.searchParams.delete('page');url.searchParams.delete('all');if(!url.searchParams.get('q'))url.searchParams.delete('q');window.location.href=url.toString()});
+ yearSelect.innerHTML='<option value="all" <?=$showAll?'selected':''?>>Tüm Kayıtlar (<?=$allPatientCount?> kayıt)</option><option value="2023" <?=!$showAll&&$year===2023?'selected':''?>>2023 (<?=(int)($yearCounts[2023]??0)?> kayıt)</option><option value="2024" <?=!$showAll&&$year===2024?'selected':''?>>2024 (<?=(int)($yearCounts[2024]??0)?> kayıt)</option><option value="2025" <?=!$showAll&&$year===2025?'selected':''?>>2025 (<?=(int)($yearCounts[2025]??0)?> kayıt)</option><option value="2026" <?=!$showAll&&$year===2026?'selected':''?>>2026 (<?=(int)($yearCounts[2026]??0)?> kayıt)</option>';
+ yearSelect.addEventListener('change',()=>{const url=new URL(window.location.href);url.searchParams.delete('page');if(yearSelect.value==='all'){url.searchParams.set('all','1');url.searchParams.delete('q')}else{url.searchParams.set('year',yearSelect.value);url.searchParams.delete('all');if(!url.searchParams.get('q'))url.searchParams.delete('q')}window.location.href=url.toString()});
  toolbar.insertBefore(yearSelect,toolbar.querySelector('.vuexy-search'));
  document.getElementById('patient-table-filter')?.addEventListener('submit',event=>{const form=event.currentTarget;form.querySelector('input[name="search_columns"]').value=visible.map((isVisible,index)=>isVisible?searchKeys[index]:null).filter(Boolean).join(',');let all=form.querySelector('input[name="all"]');if(!all){all=document.createElement('input');all.type='hidden';all.name='all';form.appendChild(all)}all.value=(form.querySelector('input[name="q"]')?.value.trim()==='')?'1':''});
  const picker=document.createElement('div');picker.className='column-picker';
