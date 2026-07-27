@@ -44,7 +44,8 @@ $activeSearchColumns = $hasSearchColumnSelection ? $requestedSearchColumns : $se
 $searchColumnsParam = implode(',', $activeSearchColumns);
 $where = [];
 $args = [];
-if ($q === '' && !$showAll) $where[] = $year === 2025 ? "(record_date LIKE '2025%' OR record_date IS NULL OR record_date='')" : "record_date LIKE '".$year."%'";
+// Arama da kayıt seçimindeki kapsamda yapılır: seçili yıl veya Tüm Kayıtlar.
+if (!$showAll) $where[] = $year === 2025 ? "(record_date LIKE '2025%' OR record_date IS NULL OR record_date='')" : "record_date LIKE '".$year."%'";
 if ($q !== '') {
     $searchExpressions = [];
     $addSearch = static function (string $expression, int $argumentCount = 1) use (&$searchExpressions, &$args, $q): void {
