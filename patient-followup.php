@@ -38,6 +38,25 @@ foreach ($extraColumns as $definition) {
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS app_migrations (migration_key VARCHAR(190) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)'
     : 'CREATE TABLE IF NOT EXISTS app_migrations (migration_key VARCHAR(190) PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+$servicePersonnelNameMigration = '20260728_service_contact_person_full_names_v1';
+$servicePersonnelNameCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+$servicePersonnelNameCheck->execute([$servicePersonnelNameMigration]);
+if (!$servicePersonnelNameCheck->fetchColumn()) {
+    $servicePersonnelNames = [
+        'Yeliz' => 'Yeliz Girgin Özkan',
+        'Büşra' => 'Büşra Akar Avcı',
+        'Erva' => 'Erva Özsarı',
+        'Güneş' => 'Güneş İba',
+        'Merve' => 'Merve Koçal',
+        'Şeyma' => 'Şeyma Nur Büyükkayın',
+        'Cansu, Belma Baysan' => 'Merve Cansu Eryılmaz, Belma Baysan',
+        'Büşra, Belma Baysan' => 'Büşra Akar Avcı, Belma Baysan',
+        'Cansu, Büşra' => 'Merve Cansu Eryılmaz, Büşra Akar Avcı',
+    ];
+    $normalizeContactPerson = $pdo->prepare('UPDATE patient_services SET contact_person=? WHERE contact_person=?');
+    foreach ($servicePersonnelNames as $oldName => $fullName) $normalizeContactPerson->execute([$fullName, $oldName]);
+    $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$servicePersonnelNameMigration]);
+}
 $serviceMigrationKey = '20260725_patient_service_cards_and_personnel_v1';
 $serviceMigrationCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
 $serviceMigrationCheck->execute([$serviceMigrationKey]);
