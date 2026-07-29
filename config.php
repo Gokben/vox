@@ -14,6 +14,7 @@ defined('DB_HOST') || define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 defined('DB_NAME') || define('DB_NAME', getenv('DB_NAME') ?: 'vox');
 defined('DB_USER') || define('DB_USER', getenv('DB_USER') ?: 'vox_user');
 defined('DB_PASS') || define('DB_PASS', getenv('DB_PASS') ?: '');
+$useLocalSqlite = $isLocalEnvironment && (!defined('LOCAL_DB_DRIVER') || LOCAL_DB_DRIVER !== 'mysql');
 
 ini_set('session.use_strict_mode', '1');
 if ($isLocalEnvironment) {
@@ -27,8 +28,8 @@ function db(): PDO
 {
     static $pdo;
     if (!$pdo) {
-        global $isLocalEnvironment;
-        if ($isLocalEnvironment) {
+        global $useLocalSqlite;
+        if ($useLocalSqlite) {
             $pdo = new PDO('sqlite:' . __DIR__ . '/storage/vox.sqlite');
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
@@ -38,8 +39,13 @@ function db(): PDO
             'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
             DB_USER,
             DB_PASS,
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
+            ]
         );
+        $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
     }
     return $pdo;
 }

@@ -111,7 +111,7 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
     </div>
     <h2>Finansal ve Depo Bilgileri</h2><div class="stock-grid">
       <label>Kritik / Asgari Stok<input type="number" min="0" name="min_stock" value="<?=e((string)$form['min_stock'])?>"></label><label>Azami Stok<input type="number" min="0" name="max_stock" value="<?=e((string)$form['max_stock'])?>"></label>
-      <label>Stok Tipi<select name="stock_type"><option value="">Seçiniz</option><?php foreach(['İşitme Cihazı','Sarf Malzeme','Pil'] as $stockType):?><option <?=$form['stock_type']===$stockType?'selected':''?>><?=e($stockType)?></option><?php endforeach?></select></label>
+      <label>Stok Tipi<select name="stock_type"><option value="">Seçiniz</option><?php foreach(['İşitme Cihazı','Sarf Malzeme','Pil','Şarj Cihazı'] as $stockType):?><option <?=$form['stock_type']===$stockType?'selected':''?>><?=e($stockType)?></option><?php endforeach?></select></label>
     </div>
     <footer><a href="<?=e(url('stocks.php'))?>">İptal</a><button class="button"><?=$editing ? 'Güncelle' : 'Kaydet'?></button></footer>
   </form>

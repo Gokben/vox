@@ -77,17 +77,16 @@ priceListsLink.textContent = 'Liste Fiyatları';
 stockSubmenu.append(stockEntryLink, stockCardLink, priceListsLink);
 stockMenuLink.setAttribute('aria-haspopup', 'true');
 stockMenuLink.setAttribute('aria-expanded', 'false');
-stockMenuLink.addEventListener('click', () => {});
-document.addEventListener('click', event => {
-  const keepStockMenuOpen = location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php');
-  if (!stockGroup.contains(event.target) && !keepStockMenuOpen) {
-    stockGroup.classList.remove('open');
-    stockMenuLink.setAttribute('aria-expanded', 'false');
-  }
+stockMenuLink.addEventListener('click', event => {
+  event.preventDefault();
+  const open = stockGroup.classList.toggle('open');
+  stockMenuLink.setAttribute('aria-expanded', String(open));
+  sessionStorage.setItem('vox.stockMenuOpen', open ? '1' : '0');
 });
+stockSubmenu.addEventListener('click', event => { if (event.target.closest('a')) sessionStorage.setItem('vox.stockMenuOpen', '1'); });
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
-if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php')) { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
+if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php') || sessionStorage.getItem('vox.stockMenuOpen') === '1') { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
 if (location.pathname.endsWith('/stock-entry.php')) stockEntryLink.classList.add('active');
 if (location.pathname.endsWith('/stocks.php')) stockCardLink.classList.add('active');
 if (location.pathname.endsWith('/price-lists.php')) priceListsLink.classList.add('active');
@@ -172,14 +171,6 @@ setupMenuLink.addEventListener('click', event => {
 setupSubmenu.addEventListener('click', event => {
   if (event.target.closest('a')) sessionStorage.setItem('vox.setupMenuOpen', '1');
 });
-document.addEventListener('click', event => {
-  // Kurulum sayfalarında form kartına tıklamak sol alt menüyü kapatmamalıdır.
-  if (!isSetupPage && !setupGroup.contains(event.target)) {
-    setupGroup.classList.remove('open');
-    setupMenuLink.setAttribute('aria-expanded', 'false');
-    sessionStorage.setItem('vox.setupMenuOpen', '0');
-  }
-});
 setupMenuLink.before(setupGroup);
 setupGroup.append(setupMenuLink, setupSubmenu);
 const setupPages = ['brands.php','cash-categories.php','service-names.php','service-types.php'];
@@ -192,35 +183,41 @@ const reportMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(l
 const followUpMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Takipler'));
 const salesMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Satışlar'));
 if (reportMenuLink && followUpMenuLink && salesMenuLink) {
+  if (reportMenuLink.lastChild && reportMenuLink.lastChild.nodeType === Node.TEXT_NODE) reportMenuLink.lastChild.nodeValue = ' Listeler';
+  if (followUpMenuLink.lastChild && followUpMenuLink.lastChild.nodeType === Node.TEXT_NODE) followUpMenuLink.lastChild.nodeValue = ' İşitme Cihazları';
+  followUpMenuLink.href = <?= json_encode(url('hearing-devices.php')) ?>;
+  salesMenuLink.href = <?= json_encode(url('sales.php')) ?>;
   const reportGroup = document.createElement('div');
   reportGroup.className = 'report-menu-group';
   const reportSubmenu = document.createElement('div');
   reportSubmenu.className = 'report-submenu';
-  const resultMenuLink = document.createElement('a');
-  resultMenuLink.href = <?= json_encode(url('patient-results.php')) ?>;
-  resultMenuLink.textContent = 'Hasta Görüşmeleri Sonuç Raporu';
-  if (location.pathname.endsWith('/patient-results.php')) {
-    resultMenuLink.classList.add('active');
+  const resultListLink = document.createElement('a');
+  resultListLink.href = <?= json_encode(url('result-list.php')) ?>;
+  resultListLink.textContent = 'Sonuç Listesi';
+  const listPages = ['result-list.php', 'patient-results.php', 'hearing-devices.php', 'sales.php'];
+  const shouldOpenListsMenu = listPages.includes(location.pathname.split('/').pop()) || sessionStorage.getItem('vox.listsMenuOpen') === '1';
+  if (shouldOpenListsMenu) {
+    resultListLink.classList.add('active');
     reportMenuLink.classList.add('active');
+    reportGroup.classList.add('open');
   }
-  reportSubmenu.append(followUpMenuLink, salesMenuLink, resultMenuLink);
+  if (location.pathname.endsWith('/hearing-devices.php')) { resultListLink.classList.remove('active'); followUpMenuLink.classList.add('active'); }
+  if (location.pathname.endsWith('/sales.php')) { resultListLink.classList.remove('active'); salesMenuLink.classList.add('active'); }
+  reportSubmenu.append(followUpMenuLink, salesMenuLink, resultListLink);
   reportMenuLink.setAttribute('aria-haspopup', 'true');
   reportMenuLink.setAttribute('aria-expanded', 'false');
+  if (shouldOpenListsMenu) reportMenuLink.setAttribute('aria-expanded', 'true');
   reportMenuLink.addEventListener('click', event => {
     event.preventDefault();
     const isOpen = reportGroup.classList.toggle('open');
     reportMenuLink.setAttribute('aria-expanded', String(isOpen));
+    sessionStorage.setItem('vox.listsMenuOpen', isOpen ? '1' : '0');
   });
-  document.addEventListener('click', event => {
-    if (!reportGroup.contains(event.target)) {
-      reportGroup.classList.remove('open');
-      reportMenuLink.setAttribute('aria-expanded', 'false');
-    }
-  });
+  reportSubmenu.addEventListener('click', event => { if (event.target.closest('a')) sessionStorage.setItem('vox.listsMenuOpen', '1'); });
   reportMenuLink.before(reportGroup);
   reportGroup.append(reportMenuLink, reportSubmenu);
   const reportMenuStyle = document.createElement('style');
-  reportMenuStyle.textContent = '.patient-nav{overflow:visible!important}.report-menu-group{position:relative;flex:0 0 auto}.report-submenu{display:none;position:absolute;z-index:20;top:calc(100% + 3px);left:0;min-width:170px;padding:6px;border:1px solid #e1e2e8;border-radius:8px;background:#fff;box-shadow:0 8px 18px rgba(47,43,61,.16)}.report-menu-group.open .report-submenu{display:grid;gap:2px}.report-submenu a{font-size:14px!important;padding:9px 10px!important}[data-theme=dark] .report-submenu{background:#30334d;border-color:#454a63}';
+  reportMenuStyle.textContent = '.patient-nav{overflow:visible!important}.report-menu-group{position:relative;flex:0 0 auto}.report-submenu{display:none;position:absolute;z-index:20;top:calc(100% + 3px);left:0;min-width:170px;padding:6px;border:1px solid #e1e2e8;border-radius:8px;background:#fff;box-shadow:0 8px 18px rgba(47,43,61,.16)}.report-menu-group.open .report-submenu{display:grid;gap:2px}.report-lists-group{position:relative}.report-menu-group.open .report-lists-submenu{display:none}.report-menu-group.open .report-lists-group.open .report-lists-submenu{display:grid;top:0;left:calc(100% + 3px)}.report-submenu a{font-size:14px!important;padding:9px 10px!important}[data-theme=dark] .report-submenu{background:#30334d;border-color:#454a63}';
   document.head.append(reportMenuStyle);
 }
 const calendarMenuLink = [...document.querySelectorAll('.patient-nav a')].find(link => link.getAttribute('href')?.includes('patient-form.php'));
