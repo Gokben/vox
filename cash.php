@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/config.php';
 require_login();
 require __DIR__ . '/cash-bootstrap.php';
+require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
@@ -29,6 +30,7 @@ if ($driver === 'sqlite') {
         amount NUMERIC NOT NULL,
         payment_type TEXT NOT NULL,
         category_id INTEGER NULL,
+        source_url TEXT NULL,
         created_by INTEGER NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(category_id) REFERENCES cash_categories(id) ON DELETE RESTRICT
@@ -62,8 +64,9 @@ if ($driver === 'sqlite') {
         description VARCHAR(255) NOT NULL,
         transaction_type ENUM('income','expense') NOT NULL,
         amount DECIMAL(14,2) NOT NULL,
-        payment_type ENUM('cash','credit_card') NOT NULL,
+        payment_type ENUM('cash','credit_card','mail_order','term') NOT NULL,
         category_id INT UNSIGNED NULL,
+        source_url VARCHAR(255) NULL,
         created_by INT UNSIGNED NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX cash_transaction_date_idx(transaction_date),
@@ -96,19 +99,37 @@ function cash_money(float $value): string
 function cash_balance_until(PDO $pdo, string $date): float
 {
     $opening = (float)$pdo->query('SELECT opening_balance FROM cash_settings WHERE id=1')->fetchColumn();
-    $statement = $pdo->prepare("SELECT
-        COALESCE(SUM(CASE WHEN transaction_type='income' THEN amount ELSE 0 END),0) income,
-        COALESCE(SUM(CASE WHEN transaction_type='expense' THEN amount ELSE 0 END),0) expense
-        FROM cash_transactions WHERE transaction_date<=?");
+    $statement = $pdo->prepare("SELECT transaction_type,payment_type,amount,term_schedule FROM cash_transactions WHERE transaction_date<=?");
     $statement->execute([$date]);
-    $totals = $statement->fetch() ?: ['income' => 0, 'expense' => 0];
-    return $opening + (float)$totals['income'] - (float)$totals['expense'];
+    $income = 0.0;
+    $expense = 0.0;
+    foreach ($statement->fetchAll() as $transaction) {
+        $amount = $transaction['payment_type'] === 'term' ? cash_paid_term_total($transaction['term_schedule'] ?? null) : (float)$transaction['amount'];
+        if ($transaction['transaction_type'] === 'income') $income += $amount; else $expense += $amount;
+    }
+    return $opening + $income - $expense;
 }
 
-$message = '';
+function cash_paid_term_total(?string $schedule): float
+{
+    $items = json_decode((string)$schedule, true);
+    if (!is_array($items)) return 0.0;
+    $total = 0.0;
+    foreach ($items as $item) {
+        if (!is_array($item) || empty($item['paid'])) continue;
+        $amount = preg_replace('/[^0-9,.-]/u', '', (string)($item['amount'] ?? ''));
+        $total += (float)str_replace(',', '.', $amount);
+    }
+    return $total;
+}
+
+$message = (string)($_SESSION['cash_flash_message'] ?? '');
+unset($_SESSION['cash_flash_message']);
 $error = '';
 $activeTab = (string)($_GET['tab'] ?? 'transactions');
 if (!in_array($activeTab, ['transactions', 'closing'], true)) $activeTab = 'transactions';
+$sourceUrlFilter = trim((string)($_GET['source_url'] ?? ''));
+$returnUrl = trim((string)($_POST['return_url'] ?? ''));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -126,13 +147,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $type = (string)($_POST['transaction_type'] ?? '');
             $amount = (float)str_replace(',', '.', (string)($_POST['amount'] ?? '0'));
             $paymentType = (string)($_POST['payment_type'] ?? '');
+            $installmentCount = max(1, (int)($_POST['installment_count'] ?? 1));
+            $bankName = trim((string)($_POST['bank_name'] ?? ''));
+            $commissionRate = (float)str_replace(',', '.', (string)($_POST['commission_rate'] ?? '0'));
+            $currentAccountId = (int)($_POST['current_account_id'] ?? 0);
             $categoryId = (int)($_POST['category_id'] ?? 0);
-            if ($date === '' || $description === '' || !in_array($type, ['income', 'expense'], true) || $amount <= 0 || !in_array($paymentType, ['cash', 'credit_card'], true)) {
+            $sourceUrl = trim((string)($_POST['source_url'] ?? ''));
+            $termSchedule = null;
+            if ($paymentType === 'term') {
+                $termSchedule = [];
+                foreach ((array)($_POST['term_amount'] ?? []) as $index => $termAmount) $termSchedule[] = ['date'=>(string)(($_POST['term_date'] ?? [])[$index] ?? ''),'amount'=>(string)$termAmount,'paid'=>isset(($_POST['term_paid'] ?? [])[$index])];
+                $termSchedule = json_encode($termSchedule, JSON_UNESCAPED_UNICODE);
+            }
+            if ($paymentType === 'term' && trim((string)($_POST['term_schedule_json'] ?? '')) !== '') $termSchedule = (string)$_POST['term_schedule_json'];
+            $cashRecordedAmount = $paymentType === 'term' ? cash_paid_term_total($termSchedule) : $amount;
+            if ($date === '' || $description === '' || !in_array($type, ['income', 'expense'], true) || $amount <= 0 || !in_array($paymentType, ['cash', 'credit_card', 'mail_order', 'term'], true)) {
                 throw new RuntimeException('İşlem bilgilerini eksiksiz ve geçerli olarak girin.');
             }
-            $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,category_id,created_by) VALUES(?,?,?,?,?,?,?)')
-                ->execute([$date, $description, $type, $amount, $paymentType, $categoryId ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
+            if ($paymentType === 'mail_order' && !$currentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
+            $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                ->execute([$date, $description, $type, $cashRecordedAmount, $paymentType, $installmentCount, $bankName ?: null, $commissionRate ?: null, $currentAccountId ?: null, $termSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
+            $extraAmountRaw = trim((string)($_POST['extra_amount'] ?? ''));
+            if ($extraAmountRaw !== '') {
+                $extraDate = $date;
+                $extraDescription = trim((string)($_POST['extra_description'] ?? ''));
+                $extraAmount = (float)str_replace(',', '.', $extraAmountRaw);
+                $extraPaymentType = (string)($_POST['extra_payment_type'] ?? $paymentType);
+                $extraInstallmentCount = max(1, (int)($_POST['extra_installment_count'] ?? 1));
+                $extraBankName = trim((string)($_POST['extra_bank_name'] ?? ''));
+                $extraCommissionRate = (float)str_replace(',', '.', (string)($_POST['extra_commission_rate'] ?? '0'));
+                $extraCurrentAccountId = (int)($_POST['extra_current_account_id'] ?? 0);
+                if ($extraDate === '' || $extraDescription === '' || $extraAmount <= 0 || !in_array($extraPaymentType, ['cash', 'credit_card', 'mail_order', 'term'], true)) {
+                    throw new RuntimeException('İkinci gelir kaydının bilgilerini eksiksiz ve geçerli olarak girin.');
+                }
+                if ($extraPaymentType === $paymentType) {
+                    throw new RuntimeException('İki gelir kaydında aynı ödeme şekli kullanılamaz.');
+                }
+                if ($extraPaymentType === 'mail_order' && !$extraCurrentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
+                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,category_id,source_url,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$extraDate, $extraDescription, $type, $extraAmount, $extraPaymentType, $extraInstallmentCount, $extraBankName ?: null, $extraCommissionRate ?: null, $extraCurrentAccountId ?: null, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
+            }
             $message = 'Kasa işlemi kaydedildi.';
+            $activeTab = 'transactions';
+        } elseif ($action === 'update_transaction') {
+            $transactionId = (int)($_POST['id'] ?? 0);
+            $date = trim((string)($_POST['transaction_date'] ?? ''));
+            $description = trim((string)($_POST['description'] ?? ''));
+            $amount = (float)str_replace(',', '.', (string)($_POST['amount'] ?? '0'));
+            $paymentType = (string)($_POST['payment_type'] ?? '');
+            $installmentCount = max(1, (int)($_POST['installment_count'] ?? 1));
+            $bankName = trim((string)($_POST['bank_name'] ?? ''));
+            $commissionRate = (float)str_replace(',', '.', (string)($_POST['commission_rate'] ?? '0'));
+            $currentAccountId = (int)($_POST['current_account_id'] ?? 0);
+            $termSchedule = null;
+            if ($paymentType === 'term') {
+                $termSchedule = [];
+                foreach ((array)($_POST['term_amount'] ?? []) as $index => $termAmount) $termSchedule[] = ['date'=>(string)(($_POST['term_date'] ?? [])[$index] ?? ''),'amount'=>(string)$termAmount,'paid'=>isset(($_POST['term_paid'] ?? [])[$index])];
+                $termSchedule = json_encode($termSchedule, JSON_UNESCAPED_UNICODE);
+            }
+            if ($paymentType === 'term' && trim((string)($_POST['term_schedule_json'] ?? '')) !== '') $termSchedule = (string)$_POST['term_schedule_json'];
+            $cashRecordedAmount = $paymentType === 'term' ? cash_paid_term_total($termSchedule) : $amount;
+            if (!$transactionId || $date === '' || $description === '' || $amount <= 0 || !in_array($paymentType, ['cash', 'credit_card', 'mail_order', 'term'], true)) {
+                throw new RuntimeException('İşlem bilgilerini eksiksiz ve geçerli olarak girin.');
+            }
+            if ($paymentType === 'mail_order' && !$currentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
+            $pdo->prepare("UPDATE cash_transactions SET transaction_date=?,description=?,amount=?,payment_type=?,installment_count=?,bank_name=?,commission_rate=?,current_account_id=?,term_schedule=? WHERE id=? AND transaction_type='income'")
+                ->execute([$date, $description, $cashRecordedAmount, $paymentType, $installmentCount, $bankName ?: null, $commissionRate ?: null, $currentAccountId ?: null, $termSchedule, $transactionId]);
+            $message = 'Kasa işlemi güncellendi.';
             $activeTab = 'transactions';
         } elseif ($action === 'delete_transaction') {
             $pdo->prepare('DELETE FROM cash_transactions WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
@@ -179,23 +260,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (RuntimeException $exception) {
         $error = $exception->getMessage();
     }
+    if ((string)($_POST['ajax'] ?? '') === '1') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => $error === '', 'message' => $error ?: $message], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($error === '' && $message !== '') {
+        $_SESSION['cash_flash_message'] = $message;
+        if ($returnUrl !== '' && str_starts_with($returnUrl, url('patient-followup.php'))) {
+            header('Location: ' . $returnUrl);
+            exit;
+        }
+        redirect('cash.php?tab=' . urlencode($activeTab));
+    }
 }
 
 $openingBalance = (float)$pdo->query('SELECT opening_balance FROM cash_settings WHERE id=1')->fetchColumn();
-$totalStatement = $pdo->query("SELECT
-    COALESCE(SUM(CASE WHEN transaction_type='income' THEN amount ELSE 0 END),0) income,
-    COALESCE(SUM(CASE WHEN transaction_type='expense' THEN amount ELSE 0 END),0) expense,
-    COALESCE(SUM(CASE WHEN payment_type='cash' AND transaction_type='income' THEN amount WHEN payment_type='cash' AND transaction_type='expense' THEN -amount ELSE 0 END),0) cash_total,
-    COALESCE(SUM(CASE WHEN payment_type='credit_card' AND transaction_type='income' THEN amount WHEN payment_type='credit_card' AND transaction_type='expense' THEN -amount ELSE 0 END),0) card_total
-    FROM cash_transactions");
-$totals = $totalStatement->fetch() ?: ['income' => 0, 'expense' => 0, 'cash_total' => 0, 'card_total' => 0];
+$totals = ['income' => 0.0, 'expense' => 0.0, 'cash_total' => 0.0, 'card_total' => 0.0];
+foreach ($pdo->query('SELECT transaction_type,payment_type,amount,term_schedule FROM cash_transactions')->fetchAll() as $transaction) {
+    $amount = $transaction['payment_type'] === 'term' ? cash_paid_term_total($transaction['term_schedule'] ?? null) : (float)$transaction['amount'];
+    $direction = $transaction['transaction_type'] === 'income' ? 1 : -1;
+    if ($direction > 0) $totals['income'] += $amount; else $totals['expense'] += $amount;
+    if ($transaction['payment_type'] === 'cash') $totals['cash_total'] += $direction * $amount;
+    if ($transaction['payment_type'] === 'credit_card') $totals['card_total'] += $direction * $amount;
+}
 $income = (float)$totals['income'];
 $expense = (float)$totals['expense'];
 $netBalance = $openingBalance + $income - $expense;
 
 $categories = $pdo->query('SELECT c.*,p.name parent_name FROM cash_categories c LEFT JOIN cash_categories p ON p.id=c.parent_id ORDER BY active DESC,COALESCE(c.parent_id,c.id),c.parent_id IS NOT NULL,c.name')->fetchAll();
 $activeCategories = array_values(array_filter($categories, static fn(array $category): bool => (bool)$category['active']));
-$transactions = $pdo->query('SELECT t.*,c.name category_name FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500')->fetchAll();
+if ($sourceUrlFilter !== '') {
+    $transactionStatement = $pdo->prepare("SELECT t.*,c.name category_name FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id WHERE t.source_url=? AND NOT (t.payment_type='term' AND t.amount<=0) ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500");
+    $transactionStatement->execute([$sourceUrlFilter]);
+    $transactions = $transactionStatement->fetchAll();
+} else {
+    $transactions = $pdo->query("SELECT t.*,c.name category_name FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id WHERE NOT (t.payment_type='term' AND t.amount<=0) ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500")->fetchAll();
+}
+$transactions = array_values(array_filter(array_map(static function (array $transaction): array {
+    if ($transaction['payment_type'] === 'term') $transaction['amount'] = cash_paid_term_total($transaction['term_schedule'] ?? null);
+    return $transaction;
+}, $transactions), static fn(array $transaction): bool => $transaction['payment_type'] !== 'term' || (float)$transaction['amount'] > 0));
 $closings = $pdo->query('SELECT * FROM cash_closings ORDER BY closing_date DESC,id DESC LIMIT 365')->fetchAll();
 
 patient_header('Kasa', 'cash');
@@ -226,18 +331,18 @@ patient_header('Kasa', 'cash');
         <label>İşlem Türü<select name="transaction_type" required><option value="income">Gelir</option><option value="expense">Gider</option></select></label>
         <label>Açıklama<input name="description" maxlength="255" value="<?=e($_POST['description'] ?? '')?>" required></label>
         <label>Tutar<input type="number" name="amount" min="0.01" step="0.01" value="<?=e($_POST['amount'] ?? '')?>" required></label>
-        <label>Ödeme Türü<select name="payment_type" required><option value="cash">Nakit</option><option value="credit_card">Kredi Kartı</option></select></label>
+        <label>Ödeme Türü<select name="payment_type" required><option value="cash">Nakit</option><option value="credit_card">Kredi Kartı</option><option value="mail_order">Mail Order</option><option value="term">Vadeli</option></select></label>
         <label>Kategori<select name="category_id"><option value="">Kategorisiz</option><?php foreach ($activeCategories as $category): ?><option value="<?=(int)$category['id']?>"><?=e(($category['parent_name'] ? $category['parent_name'] . ' / ' : '') . $category['name'])?></option><?php endforeach ?></select></label>
         <div class="cash-actions"><button>Kaydet</button></div>
       </form>
     </details>
     <section class="cash-card">
-      <header><div><h2>Kasa Hareketleri</h2><p><?=count($transactions)?> kayıt</p></div>
+      <header><div><h2>Kasa Hareketleri</h2><p><?=count($transactions)?> kayıt<?=$sourceUrlFilter !== '' ? ' · Bu hizmet kartına ait hareketler' : ''?></p></div>
         <form class="opening-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_opening"><label>Devreden Kasa<input type="number" step="0.01" name="opening_balance" value="<?=number_format($openingBalance,2,'.','')?>"></label><button>Kaydet</button></form>
       </header>
       <div class="cash-table-wrap"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Kategori</th><th>Ödeme</th><th>Giren</th><th>Çıkan</th><th>İşlemler</th></tr></thead><tbody>
-      <?php foreach ($transactions as $transaction): ?><tr>
-        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=e($transaction['description'])?></td><td><?=e($transaction['category_name'] ?? '—')?></td><td><?=$transaction['payment_type'] === 'cash' ? 'Nakit' : 'Kredi Kartı'?></td>
+      <?php foreach ($transactions as $transaction): ?><tr class="<?=!empty($transaction['source_url']) ? 'cash-source-row' : ''?>" data-source-url="<?=e((string)($transaction['source_url'] ?? ''))?>">
+        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=e($transaction['description'])?></td><td><?=e($transaction['category_name'] ?? '—')?></td><td><?=e(['cash'=>'Nakit','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?></td>
         <td class="money income"><?=$transaction['transaction_type'] === 'income' ? cash_money((float)$transaction['amount']) : '—'?></td>
         <td class="money expense"><?=$transaction['transaction_type'] === 'expense' ? cash_money((float)$transaction['amount']) : '—'?></td>
         <td><form method="post" onsubmit="return confirm('Bu kasa işlemi silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete_transaction"><input type="hidden" name="id" value="<?=(int)$transaction['id']?>"><button class="cash-delete" title="Sil" aria-label="Kasa işlemini sil"><i class="ti tabler-trash"></i></button></form></td>
@@ -265,8 +370,12 @@ patient_header('Kasa', 'cash');
     <?php if (!$closings): ?><tr><td colspan="6" class="empty">Henüz günlük kapanış kaydı bulunmuyor.</td></tr><?php endif ?></tbody></table></div></section>
   <?php endif ?>
 </main>
+<script>
+document.querySelectorAll('.cash-source-row').forEach(row=>row.addEventListener('dblclick',event=>{if(event.target.closest('button,form,a,input,select,textarea'))return;const source=row.dataset.sourceUrl;if(!source)return;const target=new URL(source,window.location.origin);target.searchParams.set('open_income_record','1');window.location.href=target.toString();}));
+</script>
 <style>
 .cash-page{max-width:1280px!important;margin:0 auto!important;padding:96px 32px 48px!important}.cash-page-head{margin-bottom:22px}.cash-page-head h1{margin:0 0 6px;font-size:30px}.cash-page-head p,.cash-card header p,.cash-accordion summary p{margin:0;color:var(--muted)}
+.cash-source-row{cursor:pointer}.cash-source-row:hover{background:rgba(25,169,75,.06)}
 .cash-notice{margin-bottom:18px;padding:13px 16px;border-radius:8px}.cash-notice.success{background:#daf5e3;color:#0d7130}.cash-notice.error{background:#ffe3e3;color:#a21d1d}
 .cash-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:22px}.cash-summary article{display:flex;flex-direction:column;gap:8px;min-height:108px;padding:20px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 3px 12px #1e283c0f}.cash-summary span{color:var(--muted)}.cash-summary strong{font-size:23px}.cash-summary small{color:var(--muted);line-height:1.4}.income{color:#19a94b!important}.expense{color:#e04f55!important}
 .cash-tabs{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto}.cash-tabs a{padding:12px 18px;border-radius:8px;background:#e8f7ed;color:#16883d;text-decoration:none;font-weight:700;white-space:nowrap}.cash-tabs a.active{background:#19a94b;color:#fff}
