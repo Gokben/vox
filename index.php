@@ -53,7 +53,7 @@ patient_header('Ana Sayfa','home');
 <main class="patient-container dashboard">
   <section class="page-head"><div><h1>Hasta Kayıtları</h1><p>Hasta bilgilerini kaydedin, takip edin ve süreçleri yönetin.</p></div></section>
   <section class="dashboard-overview">
-    <article class="dashboard-hero"><h2>Hasta Kayıt Merkezi</h2><p>Hasta süreçlerini tek ekrandan takip edin.</p><div class="hero-metrics"><div><b><?=$total?></b> Toplam kayıt</div><div><b><?=$approved?></b> Onaylanan</div><div><b><?=$considering?></b> Düşünecek</div><div><b><?=$rejected?></b> Reddedilen</div></div></article>
+    <article class="dashboard-hero"><h2>Vox İşitme ERP</h2><p>Hasta süreçlerini tek ekrandan takip edin.</p><div class="hero-metrics"><div><b><?=$total?></b> Toplam kayıt</div><div><b><?=$approved?></b> Onaylanan</div><div><b><?=$considering?></b> Düşünecek</div><div><b><?=$rejected?></b> Reddedilen</div></div></article>
     <article class="card dashboard-mini"><h3>Seçilen Yıl</h3><p><?=$selectedChartYear?> yılı kayıt görünümü</p><span class="mini-number"><?=array_sum(array_column($selectedYearMonths,'total'))?></span><span>Hasta kaydı</span><div class="mini-line"></div></article>
     <article class="card dashboard-mini"><div class="status-head"><span>Onay Durumu</span><b><?= $total ? round(($approved / $total) * 100) : 0 ?>%</b></div><div class="status-number"><?=$approved?></div><div class="status-grid"><div class="status-item"><span>Düşünecek</span><b><?=$considering?></b></div><div class="status-item"><span>Reddedilen</span><b><?=$rejected?></b></div></div><div class="status-progress"><i style="width:<?= $total ? round(($approved / $total) * 100) : 0 ?>%"></i></div></article>
   </section>
