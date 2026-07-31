@@ -51,7 +51,7 @@ patient_header('Ana Sayfa','home');
 @media(max-width:1180px){.dashboard-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-hero{grid-column:span 2}}@media(max-width:700px){.dashboard-overview,.sales-success-grid{grid-template-columns:1fr}.dashboard-hero{grid-column:auto}.dashboard-hero,.dashboard-mini{min-height:220px}.hero-metrics{margin-top:26px}.sales-success-card{padding:20px}.success-donut{flex-basis:112px;width:112px;height:112px}}
 </style>
 <main class="patient-container dashboard">
-  <section class="page-head"><div><h1>Hasta Kayıtları</h1><p>Hasta bilgilerini kaydedin, takip edin ve süreçleri yönetin.</p></div><div class="page-actions"><a class="icon-button" href="<?=url('patients.php')?>" title="Tüm kayıtları aç">⤢</a><a class="button" href="<?=url('patient-form.php')?>">+ Yeni Hasta Kaydı</a></div></section>
+  <section class="page-head"><div><h1>Hasta Kayıtları</h1><p>Hasta bilgilerini kaydedin, takip edin ve süreçleri yönetin.</p></div></section>
   <section class="dashboard-overview">
     <article class="dashboard-hero"><h2>Hasta Kayıt Merkezi</h2><p>Hasta süreçlerini tek ekrandan takip edin.</p><div class="hero-metrics"><div><b><?=$total?></b> Toplam kayıt</div><div><b><?=$approved?></b> Onaylanan</div><div><b><?=$considering?></b> Düşünecek</div><div><b><?=$rejected?></b> Reddedilen</div></div></article>
     <article class="card dashboard-mini"><h3>Seçilen Yıl</h3><p><?=$selectedChartYear?> yılı kayıt görünümü</p><span class="mini-number"><?=array_sum(array_column($selectedYearMonths,'total'))?></span><span>Hasta kaydı</span><div class="mini-line"></div></article>
