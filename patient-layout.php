@@ -343,6 +343,27 @@ if(settingsPages[currentSettingsPage]){
   style.textContent = 'body .vox-save-icon{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:42px!important;min-width:42px!important;padding:0!important;border:0!important;border-radius:7px!important;background:#19a94b!important;color:#fff!important;line-height:1!important;box-sizing:border-box!important}body .vox-save-icon:hover{background:#148d3e!important}body .vox-save-icon>.ti{display:block!important;flex:0 0 20px!important;width:20px!important;height:20px!important;min-width:20px!important;min-height:20px!important;margin:0!important;padding:0!important;background-color:currentColor!important;font-size:20px!important;line-height:20px!important;-webkit-mask-size:100% 100%!important;mask-size:100% 100%!important}';
   document.head.appendChild(style);
 })();
+ </script>
+<script>
+(()=>{
+  const notificationKey='vox-save-notification';
+  const showSavedNotification=()=>{
+    document.querySelector('.vox-save-notification')?.remove();
+    const notice=document.createElement('div');
+    notice.className='vox-save-notification';
+    notice.textContent='Kaydedildi';
+    document.body.append(notice);
+    setTimeout(()=>notice.classList.add('visible'),0);
+    setTimeout(()=>{notice.classList.remove('visible');setTimeout(()=>notice.remove(),220);},2600);
+  };
+  const isSaveAction=button=>/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test((button?.textContent||'').trim())||/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test(button?.getAttribute('title')||'')||/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test(button?.getAttribute('aria-label')||'');
+  if(sessionStorage.getItem(notificationKey)==='1'){sessionStorage.removeItem(notificationKey);showSavedNotification();}
+  document.addEventListener('submit',event=>{if(!event.defaultPrevented){sessionStorage.setItem(notificationKey,'1');showSavedNotification();}},true);
+  document.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&isSaveAction(button))showSavedNotification();});
+  const style=document.createElement('style');
+  style.textContent='.vox-save-notification{position:fixed;z-index:3000;right:24px;bottom:24px;padding:12px 18px;border-radius:7px;background:#19a94b;color:#fff;font-weight:700;box-shadow:0 8px 22px rgba(25,169,75,.28);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s}.vox-save-notification.visible{opacity:1;transform:translateY(0)}';
+  document.head.append(style);
+})();
 </script></body></html>
 <?php
 }
