@@ -135,6 +135,8 @@ $consumableStocks = $consumableStatement->fetchAll();
 $serviceActions = array_filter(service_action_definitions(), static fn(array $action): bool => (int)$action['active'] === 1);
 $repairIssueDefinitions = array_filter(complaint_definitions(), static fn(array $issue): bool => (int)$issue['active'] === 1);
 $openIncomeRecord = isset($_GET['open_income_record']);
+$openSalesDetails = isset($_GET['open_sales_details']);
+$fromSgkList = isset($_GET['from_sgk_list']);
 $editId = (int)($_GET['edit'] ?? 0);
 if ($openIncomeRecord && !$editId) {
     $latestSaleStatement = $pdo->prepare("SELECT id FROM patient_services WHERE patient_id=? AND service_name='Satış' ORDER BY id DESC LIMIT 1");
@@ -148,6 +150,22 @@ if ($editId) {
     $editStatement->execute([$editId, $id]);
     $serviceCard = $editStatement->fetch() ?: [];
     if (!$serviceCard) { http_response_code(404); exit('Hizmet kartı bulunamadı.'); }
+}
+
+// Stok çıkışı oluşmuş satıştaki ürünler, iade/iptal işlemi olmadan değiştirilemez.
+$saleStockLocked = false;
+if ($serviceCard && trim((string)($serviceCard['service_name'] ?? '')) === 'Satış' && trim((string)($serviceCard['record_no'] ?? '')) !== '') {
+    $savedProductDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
+    if (!is_array($savedProductDetails)) $savedProductDetails = [];
+    foreach ($savedProductDetails as $key => $savedValue) {
+        if (preg_match('/^sales_(?:brand|model|device(?:_|$)|charger_|consumable_)/', (string)$key) && trim((string)$savedValue) !== '') {
+            $saleStockLocked = true;
+            break;
+        }
+    }
+    $stockExitStatement = $pdo->prepare("SELECT 1 FROM stock_movements WHERE movement_type='Çıkış' AND description=? LIMIT 1");
+    $stockExitStatement->execute(['Hizmet kartı satışı: ' . trim((string)$serviceCard['record_no'])]);
+    $saleStockLocked = $saleStockLocked || (bool)$stockExitStatement->fetchColumn();
 }
 
 // Kasa tahsilatı tamamlanan satışın hizmet türü sonradan değiştirilmemelidir.
@@ -164,6 +182,7 @@ $hasCompletedCashTransaction = static function () use ($pdo, $id): bool {
 $serviceNameLocked = $editId > 0
     && trim((string)($serviceCard['service_name'] ?? '')) === 'Satış'
     && $hasCompletedCashTransaction();
+$saleProductDeleteLocked = $saleStockLocked && $serviceNameLocked;
 $savedCashPaymentType = '';
 $savedCashRecord = [];
 $savedCashRecords = [];
@@ -181,6 +200,14 @@ if (trim((string)($serviceCard['service_name'] ?? '')) === 'Satış') {
         $savedCashRecord = [];
     }
 }
+$savedSalesDetailsForIncome = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
+if (!is_array($savedSalesDetailsForIncome)) $savedSalesDetailsForIncome = [];
+$hasSelectedSalesPaymentType = trim((string)($savedSalesDetailsForIncome['sales_payment_type'] ?? '')) !== '';
+$showIncomeRecordButton = $editId > 0
+    && trim((string)($serviceCard['service_name'] ?? '')) === 'Satış'
+    && $hasSelectedSalesPaymentType
+    && count($savedCashRecords) === 0;
+$showSalesDetailsButton = $editId > 0 && $saleStockLocked;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -192,6 +219,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cashDeleteStatement->execute([$cashDeleteId, url('patient-followup.php?id=' . $id)]);
         redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
     }
+    if ($action === 'cash_cancel_income' && $postedEditId > 0) {
+        $cancelIncomeStatement = $pdo->prepare("DELETE FROM cash_transactions WHERE transaction_type='income' AND source_url=?");
+        $cancelIncomeStatement->execute([url('patient-followup.php?id=' . $id)]);
+        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+    }
+    if ($action === 'cash_term_schedule_only') {
+        $cashId = (int)($_POST['cash_id'] ?? 0);
+        $plan = trim((string)($_POST['term_schedule'] ?? ''));
+        $check = $pdo->prepare("UPDATE cash_transactions SET term_schedule=? WHERE id=? AND transaction_type='income' AND source_url=? AND payment_type='term'");
+        $check->execute([$plan ?: null, $cashId, url('patient-followup.php?id=' . $id)]);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => $check->rowCount() > 0]);
+        exit;
+    }
+    if ($action === 'cash_update_only' && $postedEditId > 0) {
+        $saleTotalStatement = $pdo->prepare("SELECT sales_details FROM patient_services WHERE id=? AND patient_id=? AND service_name='Satış'");
+        $saleTotalStatement->execute([$postedEditId, $id]);
+        $saleTotalDetails = json_decode((string)$saleTotalStatement->fetchColumn(), true);
+        if (!is_array($saleTotalDetails)) $saleTotalDetails = [];
+        $moneyValue = static function (mixed $value): float {
+            $text = preg_replace('/[^0-9,.-]/u', '', (string)$value);
+            if (str_contains($text, ',')) $text = str_replace('.', '', $text);
+            return (float)str_replace(',', '.', $text);
+        };
+        $scheduleTotal = static function (string $schedule) use ($moneyValue): float {
+            $total = 0.0;
+            foreach ((array)json_decode($schedule, true) as $installment) $total += $moneyValue($installment['amount'] ?? 0);
+            return $total;
+        };
+        $saleTotal = $moneyValue($saleTotalDetails['sales_payment_amount'] ?? 0);
+        $primaryType = (string)($_POST['cash_update_payment_type'] ?? '');
+        $primarySchedule = (string)($_POST['cash_update_term_schedule'] ?? $_POST['term_schedule_json'] ?? '');
+        $primaryTotal = $primaryType === 'term' ? $scheduleTotal($primarySchedule) : $moneyValue($_POST['cash_update_amount'] ?? 0);
+        $extraType = (string)($_POST['cash_update_extra_payment_type'] ?? '');
+        $extraSchedule = (string)($_POST['cash_update_extra_term_schedule'] ?? '');
+        $extraTotal = $extraType === 'term' ? $scheduleTotal($extraSchedule) : $moneyValue($_POST['cash_update_extra_amount'] ?? 0);
+        if ($saleTotal > 0 && abs(($primaryTotal + $extraTotal) - $saleTotal) > 0.009) {
+            $_SESSION['income_validation_error'] = 'Gelir kayıtları toplamı, Satış Bilgileri ekranındaki ' . number_format($saleTotal, 2, ',', '.') . ' ₺ toplam tutara eşit olmalıdır. Lütfen düzeltin ve yeniden kaydedin.';
+            $_SESSION['income_validation_draft'] = [
+                'payment_type' => $extraType,
+                'amount' => (string)($_POST['cash_update_extra_amount'] ?? ''),
+                'description' => (string)($_POST['cash_update_extra_description'] ?? ''),
+                'installment_count' => (string)($_POST['cash_update_extra_installment_count'] ?? '1'),
+                'bank_name' => (string)($_POST['cash_update_extra_bank_name'] ?? ''),
+                'commission_rate' => (string)($_POST['cash_update_extra_commission_rate'] ?? ''),
+                'current_account_id' => (string)($_POST['cash_update_extra_current_account_id'] ?? ''),
+                'term_schedule' => $extraSchedule,
+            ];
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
+        }
+    }
     $cashUpdateId = (int)($_POST['cash_update_id'] ?? 0);
     if ($cashUpdateId) {
         $cashUpdateDate = trim((string)($_POST['cash_update_date'] ?? ''));
@@ -202,6 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cashUpdateBank = trim((string)($_POST['cash_update_bank_name'] ?? ''));
         $cashUpdateRate = (float)str_replace(',', '.', (string)($_POST['cash_update_commission_rate'] ?? '0'));
         $cashUpdateTermSchedule = trim((string)($_POST['cash_update_term_schedule'] ?? ''));
+        if ($cashUpdateTermSchedule === '') $cashUpdateTermSchedule = trim((string)($_POST['term_schedule_json'] ?? ''));
         if ($cashUpdatePayment !== 'term') $cashUpdateTermSchedule = '';
         if ($cashUpdatePayment === 'term' && $cashUpdateTermSchedule !== '') {
             $cashUpdateAmount = 0.0;
@@ -211,8 +290,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         if ($cashUpdateDate !== '' && $cashUpdateDescription !== '' && ($cashUpdateAmount > 0 || $cashUpdatePayment === 'term') && in_array($cashUpdatePayment, ['cash','credit_card','mail_order','term'], true)) {
-            $cashUpdateStatement = $pdo->prepare("UPDATE cash_transactions SET transaction_date=?,description=?,amount=?,payment_type=?,installment_count=?,bank_name=?,commission_rate=?,term_schedule=? WHERE id=? AND transaction_type='income'");
-            $cashUpdateStatement->execute([$cashUpdateDate, $cashUpdateDescription, $cashUpdateAmount, $cashUpdatePayment, $cashUpdateInstallments, $cashUpdateBank ?: null, $cashUpdateRate ?: null, $cashUpdateTermSchedule ?: null, $cashUpdateId]);
+            if ($cashUpdatePayment === 'term' && $cashUpdateTermSchedule === '') {
+                $cashUpdateStatement = $pdo->prepare("UPDATE cash_transactions SET transaction_date=?,description=?,amount=?,payment_type=?,installment_count=?,bank_name=?,commission_rate=? WHERE id=? AND transaction_type='income'");
+                $cashUpdateStatement->execute([$cashUpdateDate, $cashUpdateDescription, $cashUpdateAmount, $cashUpdatePayment, $cashUpdateInstallments, $cashUpdateBank ?: null, $cashUpdateRate ?: null, $cashUpdateId]);
+            } else {
+                $cashUpdateStatement = $pdo->prepare("UPDATE cash_transactions SET transaction_date=?,description=?,amount=?,payment_type=?,installment_count=?,bank_name=?,commission_rate=?,term_schedule=? WHERE id=? AND transaction_type='income'");
+                $cashUpdateStatement->execute([$cashUpdateDate, $cashUpdateDescription, $cashUpdateAmount, $cashUpdatePayment, $cashUpdateInstallments, $cashUpdateBank ?: null, $cashUpdateRate ?: null, $cashUpdateTermSchedule ?: null, $cashUpdateId]);
+            }
         }
     }
     $cashUpdateExtraId = (int)($_POST['cash_update_extra_id'] ?? 0);
@@ -258,6 +342,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     if ($action === 'cash_update_only') {
+        if ((string)($_POST['ajax'] ?? '') === '1') {
+            $cashRefreshStatement = $pdo->prepare("SELECT id,transaction_date,amount,description,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule FROM cash_transactions WHERE source_url=? AND transaction_type='income' ORDER BY transaction_date,id");
+            $cashRefreshStatement->execute([url('patient-followup.php?id=' . $id)]);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => true, 'records' => $cashRefreshStatement->fetchAll()]);
+            exit;
+        }
         redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
     }
     $savedServiceName = '';
@@ -294,35 +385,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
         'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>(string)($_POST['repair_details'] ?? ''), 'sales_details'=>$postedServiceName === 'Satış' ? (string)($_POST['sales_details'] ?? '') : null, 'description'=>trim((string)($_POST['description'] ?? '')),
     ];
+    if ($saleProductDeleteLocked && $postedEditId && $postedServiceName === 'Satış') {
+        $savedSalesDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
+        $postedSalesDetails = json_decode((string)$values['sales_details'], true);
+        if (!is_array($savedSalesDetails)) $savedSalesDetails = [];
+        if (!is_array($postedSalesDetails)) $postedSalesDetails = [];
+        $productGroup = static function (string $key): ?string {
+            if (preg_match('/^sales_device_([2-4])_/', $key, $match)) return 'device_' . $match[1];
+            if (preg_match('/^sales_(?:brand|model|device_(?:serial|sgk|discount_rate|net_price))$/', $key)) return 'device_1';
+            if (str_starts_with($key, 'sales_charger_')) return 'charger';
+            if (str_starts_with($key, 'sales_consumable_')) return 'consumable';
+            return null;
+        };
+        $lockedGroups = [];
+        foreach ($savedSalesDetails as $key => $savedValue) {
+            $group = $productGroup((string)$key);
+            if ($group !== null && trim((string)$savedValue) !== '') $lockedGroups[$group] = true;
+        }
+        foreach (array_keys($lockedGroups) as $lockedGroup) {
+            $hasPostedProduct = false;
+            foreach ($postedSalesDetails as $key => $postedValue) {
+                if ($productGroup((string)$key) === $lockedGroup && trim((string)$postedValue) !== '') {
+                    $hasPostedProduct = true;
+                    break;
+                }
+            }
+            if ($hasPostedProduct) continue;
+            foreach (array_keys($postedSalesDetails) as $key) {
+                if ($productGroup((string)$key) === $lockedGroup) unset($postedSalesDetails[$key]);
+            }
+            foreach ($savedSalesDetails as $key => $savedValue) {
+                if ($productGroup((string)$key) === $lockedGroup) $postedSalesDetails[$key] = $savedValue;
+            }
+        }
+        $values['stock_id'] = $serviceCard['stock_id'] ?? null;
+        $values['sales_details'] = json_encode($postedSalesDetails, JSON_UNESCAPED_UNICODE);
+    }
     if ($postedServiceName === 'Satış' && trim((string)($_POST['sales_invoice_no'] ?? '')) !== '') {
         $salesDetails = json_decode((string)$values['sales_details'], true);
         if (!is_array($salesDetails)) $salesDetails = [];
         $salesDetails['sales_invoice_no'] = trim((string)$_POST['sales_invoice_no']);
         $values['sales_details'] = json_encode($salesDetails, JSON_UNESCAPED_UNICODE);
     }
+    if ($postedServiceName === 'Satış') {
+        $salesDetails = json_decode((string)$values['sales_details'], true);
+        if (!is_array($salesDetails)) $salesDetails = [];
+        $hasDevice = false;
+        foreach ([1, 2, 3, 4] as $deviceNumber) {
+            $suffix = $deviceNumber === 1 ? '' : '_' . $deviceNumber;
+            $deviceKeys = $deviceNumber === 1
+                ? ['sales_brand', 'sales_model', 'sales_device_serial']
+                : ['sales_brand' . $suffix, 'sales_model' . $suffix, 'sales_device_serial' . $suffix];
+            foreach ($deviceKeys as $key) {
+                if (trim((string)($salesDetails[$key] ?? '')) !== '') { $hasDevice = true; break 2; }
+            }
+        }
+        $hasCharger = trim((string)($salesDetails['sales_charger_brand'] ?? '')) !== ''
+            || trim((string)($salesDetails['sales_charger_model'] ?? '')) !== '';
+        $hasConsumable = (int)($salesDetails['sales_consumable_stock_id'] ?? 0) > 0;
+        $paymentType = trim((string)($salesDetails['sales_payment_type'] ?? ''));
+        if (!$hasDevice && !$hasCharger && !$hasConsumable && $paymentType === '') {
+            $values['service_name'] = '';
+            $values['stock_id'] = null;
+            $values['sales_details'] = null;
+        }
+    }
     if ($values['record_no'] === '') $values['record_no'] = 'HK' . date('ymdHis');
+    $savedServiceId = $postedEditId;
     if ($postedEditId) {
         $set = implode(',', array_map(static fn(string $column): string => $column . '=?', array_keys($values)));
         $pdo->prepare('UPDATE patient_services SET ' . $set . ' WHERE id=? AND patient_id=?')->execute([...array_values($values), $postedEditId, $id]);
     } else {
         $columns = array_merge(['patient_id'], array_keys($values));
         $pdo->prepare('INSERT INTO patient_services (' . implode(',', $columns) . ') VALUES (' . implode(',', array_fill(0, count($columns), '?')) . ')')->execute([$id, ...array_values($values)]);
+        $savedServiceId = (int)$pdo->lastInsertId();
         $pdo->prepare('UPDATE patients SET service_location=NULL WHERE id=?')->execute([$id]);
-        if ($postedServiceName === 'Satış') {
+    }
+    // Satış bilgileri ilk defa kaydedildikten sonra da stok çıkışı oluşturulur.
+    // Aynı hizmet kartı tekrar kaydedilirse önce eski çıkışlar yenilenir; mükerrer stok düşümü oluşmaz.
+    if ($postedServiceName === 'Satış') {
             $salesDetails = json_decode((string)$values['sales_details'], true);
             if (!is_array($salesDetails)) $salesDetails = [];
             $accountId = filter_var($salesDetails['sales_current_account'] ?? null, FILTER_VALIDATE_INT) ?: null;
+            $invoiceNo = trim((string)($salesDetails['sales_invoice_no'] ?? ''));
             $movementDate = $values['service_date'] ?: date('Y-m-d');
             $description = 'Hizmet kartı satışı: ' . $values['record_no'];
+            $pdo->prepare("DELETE FROM stock_movements WHERE movement_type='Çıkış' AND description=?")->execute([$description]);
             $findStock = $pdo->prepare('SELECT id FROM stock_cards WHERE stock_type=? AND brand=? AND model=? ORDER BY id LIMIT 1');
-            $addExit = $pdo->prepare('INSERT INTO stock_movements(stock_id,movement_type,quantity,movement_date,description,current_account_id,serial_numbers) VALUES(?,?,?,?,?,?,?)');
-            $addDeviceExit = static function (string $type, string $brand, string $model, string $serial, int $quantity = 1) use ($findStock, $addExit, $movementDate, $description, $accountId): void {
+            $addExit = $pdo->prepare('INSERT INTO stock_movements(stock_id,movement_type,quantity,movement_date,description,current_account_id,invoice_no,serial_numbers) VALUES(?,?,?,?,?,?,?,?)');
+            $addDeviceExit = static function (string $type, string $brand, string $model, string $serial, int $quantity = 1) use ($findStock, $addExit, $movementDate, $description, $accountId, $invoiceNo): void {
                 if ($brand === '' || $model === '' || $quantity < 1) return;
                 $findStock->execute([$type, $brand, $model]);
                 $stockId = (int)$findStock->fetchColumn();
                 if (!$stockId) return;
                 $serialNumbers = $serial === '' ? null : json_encode([$serial], JSON_UNESCAPED_UNICODE);
-                $addExit->execute([$stockId, 'Çıkış', $quantity, $movementDate, $description, $accountId, $serialNumbers]);
+                $addExit->execute([$stockId, 'Çıkış', $quantity, $movementDate, $description, $accountId, $invoiceNo ?: null, $serialNumbers]);
             };
             $addDeviceExit('İşitme Cihazı', trim((string)($salesDetails['sales_brand'] ?? '')), trim((string)($salesDetails['sales_model'] ?? '')), trim((string)($salesDetails['sales_device_serial'] ?? '')));
             for ($deviceNumber = 2; $deviceNumber <= 4; $deviceNumber++) {
@@ -332,17 +489,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $consumableStockId = filter_var($salesDetails['sales_consumable_stock_id'] ?? null, FILTER_VALIDATE_INT);
             $consumableQuantity = max(0, (int)($salesDetails['sales_consumable_quantity'] ?? 0));
             if ($consumableStockId && $consumableQuantity > 0) {
-                $addExit->execute([$consumableStockId, 'Çıkış', $consumableQuantity, $movementDate, $description, $accountId, null]);
+                $addExit->execute([$consumableStockId, 'Çıkış', $consumableQuantity, $movementDate, $description, $accountId, $invoiceNo ?: null, null]);
             }
-        }
     }
+    if (isset($_POST['return_to_sales_details']) && $savedServiceId > 0) redirect('patient-followup.php?id=' . $id . '&edit=' . $savedServiceId . '&open_sales_details=1');
     redirect('patient-followup.php?id=' . $id);
 }
 
 $servicesStatement = $pdo->prepare('SELECT * FROM patient_services WHERE patient_id=? ORDER BY service_date DESC,id DESC');
 $servicesStatement->execute([$id]);
 $services = $servicesStatement->fetchAll();
+$incomeValidationError = (string)($_SESSION['income_validation_error'] ?? '');
+$incomeValidationDraft = $_SESSION['income_validation_draft'] ?? [];
+if (!is_array($incomeValidationDraft)) $incomeValidationDraft = [];
+unset($_SESSION['income_validation_error']);
+unset($_SESSION['income_validation_draft']);
 patient_header('Hizmetler', 'patients');
+if ($incomeValidationError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const openIncome=()=>{const form=document.querySelector('form[action*="cash.php"]'),modal=form?.parentElement;if(!modal){setTimeout(openIncome,50);return;}modal.hidden=false;modal.style.display='grid';setTimeout(()=>alert(<?=json_encode($incomeValidationError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0);};openIncome();},350));</script><?php endif;
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
 $form = array_merge(['record_no'=>'HK' . date('ymdHis'),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'Beklemede','complaint'=>(string)($patient['anamnesis'] ?? ''),'observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
 if ($form['result_name'] === 'Red') $form['result_name'] = 'Ret';
@@ -399,24 +562,27 @@ if ($currentContactPerson !== '') {
 .satisfaction{padding-left:0!important;text-align:center!important}.satisfaction>label{text-align:center!important;margin-bottom:14px!important}.faces{justify-content:center!important;gap:20px!important}.faces label{width:66px!important;height:66px!important;font-size:40px!important}
 .faces input:checked+label{outline:3px solid #19a94b!important;box-shadow:0 0 0 5px rgba(25,169,75,.16)!important}.action-box .action-add-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:44px!important;min-width:44px!important;padding:0!important;font-size:24px!important;font-weight:400!important;line-height:1!important}
 .action-box{display:block!important;margin:14px 0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.action-box .service-field{grid-template-columns:150px minmax(0,1fr)!important;margin:14px 0!important}
-.service-form-head{display:flex!important;align-items:center!important;justify-content:space-between!important}.service-back-link{color:var(--muted)!important;text-decoration:none!important;font-size:14px!important;white-space:nowrap}.service-back-link:hover{color:#19a94b!important}
+.service-form-head{display:flex!important;align-items:center!important;justify-content:space-between!important}.service-form-actions{display:flex!important;align-items:center!important;gap:12px!important}.service-back-link{color:var(--muted)!important;text-decoration:none!important;font-size:14px!important;white-space:nowrap}.service-back-link:hover{color:#19a94b!important}
 .service-input-with-icon{display:flex!important;align-items:stretch!important;grid-column:2!important;min-height:40px!important;border:1px solid #d5d3de!important;border-radius:6px!important;background:var(--card)!important;overflow:hidden!important}.service-input-icon{display:grid!important;place-items:center!important;flex:0 0 46px!important;width:46px!important;color:#686574!important;font-size:17px!important}.service-input-with-icon input,.service-input-with-icon select,.service-input-with-icon textarea{width:100%!important;min-width:0!important;height:38px!important;min-height:38px!important;margin:0!important;padding:8px 12px 8px 0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.service-input-with-icon textarea{height:76px!important;padding-top:10px!important}
-.service-name-locked{display:flex!important;align-items:center!important;gap:8px!important;grid-column:2!important}.service-name-locked input{grid-column:auto!important;flex:1!important;background:#f4f4f6!important;color:#6d6b78!important;cursor:not-allowed!important}.service-detail-button{display:inline-grid!important;place-items:center!important;flex:0 0 40px!important;width:40px!important;height:40px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#19a94b!important;color:#fff!important;cursor:pointer!important;font-size:19px!important}.service-detail-button:hover{background:#14833d!important}
+.service-name-locked{display:flex!important;align-items:center!important;gap:8px!important;grid-column:2!important}.service-name-locked input{grid-column:auto!important;flex:1!important;background:#f4f4f6!important;color:#6d6b78!important;cursor:not-allowed!important}.service-name-income-slot{display:flex!important;align-items:center!important;gap:8px!important;grid-column:2!important;width:100%!important;min-width:0!important}.service-name-income-slot select,.service-name-income-slot>.service-input-with-icon{grid-column:auto!important;flex:1 1 auto!important;width:100%!important;min-width:0!important}.service-detail-button,.sales-details-link{display:inline-grid!important;place-items:center!important;flex:0 0 40px!important;width:40px!important;height:40px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#19a94b!important;color:#fff!important;cursor:pointer!important;font-size:19px!important}.sales-details-link{text-decoration:none!important}.service-detail-button:hover,.sales-details-link:hover{background:#14833d!important}.sales-income-link{display:inline-grid!important;place-items:center!important;flex:0 0 40px!important;width:40px!important;height:40px!important;margin:0!important;padding:0!important;border-radius:6px!important;background:#19a94b!important;color:#fff!important;text-decoration:none!important;font-size:19px!important}.sales-income-link:hover{background:#14833d!important}
+.service-detail-button,.sales-details-link{box-sizing:border-box!important;align-self:center!important;flex-basis:36px!important;width:36px!important;min-width:36px!important;max-width:36px!important;height:36px!important;min-height:36px!important;max-height:36px!important;font-size:18px!important}
 @media(max-width:720px){.services-page{max-width:none!important;padding:92px 14px 30px!important}.services-head{padding-right:170px!important}.services-head .button{right:16px}.service-form-head{padding-right:16px!important}.action-box .service-field{grid-template-columns:1fr!important}.service-input-with-icon{grid-column:1!important}}
 </style>
+<style>.service-form footer .button{box-sizing:border-box!important;width:36px!important;min-width:36px!important;max-width:36px!important;height:36px!important;min-height:36px!important;max-height:36px!important;padding:0!important;display:inline-grid!important;place-items:center!important}</style>
 <main class="patient-container services-page"><section class="services-card">
-<?php if($showForm): ?><header class="services-head service-form-head"><h2><?= $editId ? 'Hizmet Kartı Düzenle' : 'Yeni Hizmet Kartı' ?> - <?=e($patient['full_name'])?></h2><a class="service-back-link" href="<?=e(url('patient-followup.php?id='.$id))?>">Listeye dön</a></header><form id="service-card-form" class="service-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=$editId?>"><input type="hidden" id="repair_details" name="repair_details" value="<?=e((string)$form['repair_details'])?>"><input type="hidden" id="sales_stock_id" name="stock_id" value="<?=e((string)($form['stock_id'] ?? ''))?>"><input type="hidden" id="sales_details" name="sales_details" value="<?=e((string)($form['sales_details'] ?? ''))?>">
-<label class="service-field">Kayıt No<input name="record_no" value="HK<?=date('ymdHis')?>"></label><label class="service-field">Kayıt Tarihi<input type="date" name="record_date" value="<?=e((string)$form['service_date'])?>"></label>
-<div class="service-three"><label class="service-field">Randevu Tarihi<input type="date" name="appointment_date" value="<?=date('Y-m-d')?>"></label><label class="service-field">Başlangıç Saati<select name="start_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if($hour===19&&$minute>0)continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>"><?=$time?></option><?php endforeach;endfor;?></select></label><label class="service-field">Bitiş Saati<select name="end_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if(($hour===9&&$minute<15)||($hour===19&&$minute>0))continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>"><?=$time?></option><?php endforeach;endfor;?></select></label></div>
-<label class="service-field">Hizmet Tipi<select name="service_type"><option value="">Seçiniz</option><?php foreach($serviceCardTypes as $type):?><option value="<?=e($type['name'])?>"><?=e($type['name'])?></option><?php endforeach?></select></label><label class="service-field">Hizmet Yeri<select name="service_location"><option value="">Seçiniz</option><?php foreach($serviceLocations as $location):?><option value="<?=e($location['name'])?>"><?=e($location['name'])?></option><?php endforeach?></select></label>
-<label class="service-field service-wide">Şube Seçin<select name="branch_id"><option value="">Seçiniz</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=((string)$patient['branch_name']===(string)$branch['name'])?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select><input type="hidden" name="branch_name" value="<?=e((string)$patient['branch_name'])?>"></label>
-<label class="service-field">İlgilenen Kişi<select name="contact_person"><option value="">Seçiniz</option><?php foreach($contactPersonOptions as $person):?><option value="<?=e($person)?>"><?=e($person)?></option><?php endforeach?></select></label><label class="service-field">Randevu Durumu<select name="appointment_status"><option>Beklemede</option><option>Onaylandı</option><option>Tamamlandı</option><option>İptal</option></select></label>
-<label class="service-field service-wide">Anamnez<textarea name="complaint" placeholder="Anamnez Girin"></textarea></label><label class="service-field service-wide">Gözlem<textarea name="observation" placeholder="Gözlem Girin"></textarea></label>
-<?php if ($serviceNameLocked): ?><label class="service-field">Hizmet Adı<span class="service-name-locked"><input value="<?=e((string)$form['service_name'])?>" readonly aria-label="Kilitli hizmet adı"><input type="hidden" name="service_name" value="<?=e((string)$form['service_name'])?>"><button type="button" class="service-detail-button" id="service-detail-button" title="Satış detayını aç" aria-label="Satış detayını aç"><i class="ti tabler-file-search"></i></button></span></label><?php else: ?><label class="service-field">Hizmet Adı<select name="service_name"><option value="">Seçiniz</option><?php foreach($serviceNames as $serviceName):?><option value="<?=e($serviceName['name'])?>"><?=e($serviceName['name'])?></option><?php endforeach?></select></label><?php endif; ?><label class="service-field">Sonuç<select name="result_name"><option>Beklemede</option><option>Onay</option><option>Düşünecek</option><option>Ret</option><option>Tamamlandı</option><option>İptal</option></select></label>
-<section class="action-box"><label class="service-field">Aksiyon<select name="action_name"><option value="">Seçiniz</option><?php foreach($serviceActions as $serviceAction):?><option value="<?=e($serviceAction['name'])?>"><?=e($serviceAction['name'])?></option><?php endforeach?></select></label><label class="service-field">Aksiyon Tarihi<input type="date" name="action_date" value="<?=date('Y-m-d')?>"></label></section>
-<div class="satisfaction"><label>Memnuniyet</label><div class="faces"><?php foreach(['🙂','😐','🙁','😡'] as $score=>$face):?><input id="s<?=$score+1?>" type="radio" name="satisfaction" value="<?=$score+1?>" <?=$score===0?'checked':''?>><label for="s<?=$score+1?>"><?=$face?></label><?php endforeach?></div></div>
-<label class="service-field service-wide">Açıklama<textarea name="description"></textarea></label><footer><button class="button"><?=$editId ? 'Güncelle' : 'Kaydet'?></button><a class="cancel-link" href="<?=e(url('patient-followup.php?id='.$id))?>">İptal</a></footer></form><script>document.addEventListener('DOMContentLoaded',()=>{const values=<?=json_encode($form, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;Object.entries(values).forEach(([name,value])=>{const field=document.querySelector(`[name="${name}"]`);if(field&&name!=='branch_name')field.value=value??'';});});</script>
-<script>document.addEventListener('DOMContentLoaded',()=>{document.getElementById('service-detail-button')?.addEventListener('click',()=>{const modal=document.getElementById('sales-details-modal');if(!modal)return;modal.hidden=false;modal.setAttribute('aria-hidden','false');});});</script>
+<?php if($showForm): ?><header class="services-head service-form-head"><h2><?= $editId ? 'Hizmet Kartı Düzenle' : 'Yeni Hizmet Kartı' ?> - <?=e($patient['full_name'])?></h2><span class="service-form-actions"><a class="service-back-link" href="<?=e(url('patient-followup.php?id='.$id))?>">Listeye dön</a></span></header><form id="service-card-form" class="service-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=$editId?>"><input type="hidden" id="repair_details" name="repair_details" value="<?=e((string)$form['repair_details'])?>"><input type="hidden" id="sales_stock_id" name="stock_id" value="<?=e((string)($form['stock_id'] ?? ''))?>"><input type="hidden" id="sales_details" name="sales_details" value="<?=e((string)($form['sales_details'] ?? ''))?>">
+<label class="service-field">Kayıt No<input name="record_no" value="<?=e((string)$form['record_no'])?>"></label><label class="service-field">Kayıt Tarihi<input type="date" name="record_date" value="<?=e((string)$form['service_date'])?>"></label>
+<div class="service-three"><label class="service-field">Randevu Tarihi<input type="date" name="appointment_date" value="<?=e((string)$form['appointment_date'])?>"></label><label class="service-field">Başlangıç Saati<select name="start_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if($hour===19&&$minute>0)continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['start_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label><label class="service-field">Bitiş Saati<select name="end_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if(($hour===9&&$minute<15)||($hour===19&&$minute>0))continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['end_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label></div>
+<label class="service-field">Hizmet Tipi<select name="service_type"><option value="">Seçiniz</option><?php foreach($serviceCardTypes as $type):?><option value="<?=e($type['name'])?>" <?=((string)$form['service_type']===(string)$type['name'])?'selected':''?>><?=e($type['name'])?></option><?php endforeach?></select></label><label class="service-field">Hizmet Yeri<select name="service_location"><option value="">Seçiniz</option><?php foreach($serviceLocations as $location):?><option value="<?=e($location['name'])?>" <?=((string)$form['service_location']===(string)$location['name'])?'selected':''?>><?=e($location['name'])?></option><?php endforeach?></select></label>
+<label class="service-field service-wide">Şube Seçin<select name="branch_id"><option value="">Seçiniz</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=((int)$form['branch_id']===(int)$branch['id'])?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select><input type="hidden" name="branch_name" value="<?=e((string)$form['branch_name'])?>"></label>
+<label class="service-field">İlgilenen Kişi<select name="contact_person"><option value="">Seçiniz</option><?php foreach($contactPersonOptions as $person):?><option value="<?=e($person)?>" <?=((string)$form['contact_person']===(string)$person)?'selected':''?>><?=e($person)?></option><?php endforeach?></select></label><label class="service-field">Randevu Durumu<select name="appointment_status"><?php foreach(['Beklemede','Onaylandı','Tamamlandı','İptal'] as $status):?><option <?=((string)$form['appointment_status']===$status)?'selected':''?>><?=$status?></option><?php endforeach?></select></label>
+<label class="service-field service-wide">Anamnez<textarea name="complaint" placeholder="Anamnez Girin"><?=e((string)$form['complaint'])?></textarea></label><label class="service-field service-wide">Gözlem<textarea name="observation" placeholder="Gözlem Girin"><?=e((string)$form['observation'])?></textarea></label>
+<?php if ($serviceNameLocked): ?><label class="service-field">Hizmet Adı<span class="service-name-locked"><input value="<?=e((string)$form['service_name'])?>" readonly aria-label="Kilitli hizmet adı"><input type="hidden" name="service_name" value="<?=e((string)$form['service_name'])?>"><button type="button" class="service-detail-button" id="service-detail-button" title="Satış detayını aç" aria-label="Satış detayını aç"><i class="ti tabler-file-search"></i></button></span></label><?php else: ?><label class="service-field">Hizmet Adı<span class="service-name-income-slot"><select name="service_name"><option value="">Seçiniz</option><?php foreach($serviceNames as $serviceName):?><option value="<?=e($serviceName['name'])?>" <?=((string)$form['service_name']===(string)$serviceName['name'])?'selected':''?>><?=e($serviceName['name'])?></option><?php endforeach?></select><?php if($showSalesDetailsButton): ?><button type="button" class="sales-details-link" id="sales-details-link" title="Satış Kartını Aç" aria-label="Satış Kartını Aç"><i class="ti tabler-file-search"></i></button><?php endif ?></span></label><?php endif; ?><label class="service-field">Sonuç<select name="result_name"><?php foreach(['Beklemede','Onay','Düşünecek','Ret','Tamamlandı','İptal'] as $result):?><option <?=((string)$form['result_name']===$result)?'selected':''?>><?=$result?></option><?php endforeach?></select></label>
+<section class="action-box"><label class="service-field">Aksiyon<select name="action_name"><option value="">Seçiniz</option><?php foreach($serviceActions as $serviceAction):?><option value="<?=e($serviceAction['name'])?>" <?=((string)$form['action_name']===(string)$serviceAction['name'])?'selected':''?>><?=e($serviceAction['name'])?></option><?php endforeach?></select></label><label class="service-field">Aksiyon Tarihi<input type="date" name="action_date" value="<?=e((string)$form['action_date'])?>"></label></section>
+<div class="satisfaction"><label>Memnuniyet</label><div class="faces"><?php foreach(['🙂','😐','🙁','😡'] as $score=>$face):?><input id="s<?=$score+1?>" type="radio" name="satisfaction" value="<?=$score+1?>" <?=((int)$form['satisfaction']===$score+1)?'checked':''?>><label for="s<?=$score+1?>"><?=$face?></label><?php endforeach?></div></div>
+<label class="service-field service-wide">Açıklama<textarea name="description"><?=e((string)$form['description'])?></textarea></label><footer><button class="button"><?=$editId ? 'Güncelle' : 'Kaydet'?></button><a class="cancel-link" href="<?=e(url('patient-followup.php?id='.$id))?>">İptal</a></footer></form>
+<script>(()=>{const iconByField={record_no:'tabler-hash',record_date:'tabler-calendar',appointment_date:'tabler-calendar-event',start_time:'tabler-clock',end_time:'tabler-clock',service_type:'tabler-phone',service_location:'tabler-building',branch_id:'tabler-building-community',contact_person:'tabler-user',appointment_status:'tabler-calendar-check',complaint:'tabler-notes',observation:'tabler-eye',service_name:'tabler-clipboard-list',result_name:'tabler-circle-check',action_name:'tabler-bolt',action_date:'tabler-calendar-event',description:'tabler-file-text'};document.querySelectorAll('.service-form input[name],.service-form select[name],.service-form textarea[name]').forEach(field=>{if(field.type==='hidden'||field.closest('.service-input-with-icon'))return;const icon=iconByField[field.name];if(!icon)return;const wrapper=document.createElement('span');wrapper.className='service-input-with-icon';const iconSlot=document.createElement('span');iconSlot.className='service-input-icon';iconSlot.innerHTML=`<i class="ti ${icon}" aria-hidden="true"></i>`;field.parentNode.insertBefore(wrapper,field);wrapper.append(iconSlot,field);});})();</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const openSalesDetails=()=>{const modal=document.getElementById('sales-details-modal');if(!modal)return;modal.hidden=false;modal.setAttribute('aria-hidden','false');};document.getElementById('service-detail-button')?.addEventListener('click',openSalesDetails);document.getElementById('sales-details-link')?.addEventListener('click',openSalesDetails);});</script>
 <?php else: ?><header class="services-head"><h2>Hasta Hizmet Kartı Yönetimi - <?=e($patient['full_name'])?></h2><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&new=1'))?>">＋ Yeni Hizmet Kartı Ekle</a></header><div class="services-toolbar"><span>Toplam <?=count($services)?> kayıt</span><span>Ara: <input type="search" placeholder="Ara"></span></div><table class="services-table"><thead><tr><th>SIRA</th><th>TARİH</th><th>DURUM</th><th>YAPILAN İŞLEM</th><th>AKSİYON</th><th>İLGİLENEN</th><th>ŞUBE</th><th>İŞLEM</th></tr></thead><tbody><?php foreach($services as $index=>$service):?><tr data-edit-url="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id']))?>"><td><?=$index+1?></td><td><?=e(format_date_tr($service['service_date']))?></td><td><?=e($service['service_status'])?></td><td><?=e($service['service_name'] ?? '')?:'—'?></td><td><?=e(format_date_tr($service['action_date']))?></td><td><?=e($service['contact_person'] ?? '')?></td><td><?=e($service['branch_name'])?></td><td><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" style="display:inline" onsubmit="return confirm('Bu hizmet kartı silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="edit_id" value="<?=(int)$service['id']?>"><button class="button" style="background:#e04f55" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></td></tr><?php endforeach;if(!$services):?><tr><td colspan="8" class="service-empty">Henüz hizmet kartı bulunmuyor.</td></tr><?php endif?></tbody></table><script>document.querySelectorAll('.services-table tbody tr[data-edit-url]').forEach(row=>{row.style.cursor='pointer';row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});</script><?php endif; ?>
 </section></main>
 <?php if (!$showForm): ?>
@@ -447,11 +613,11 @@ if ($currentContactPerson !== '') {
 </script>
 <?php endif; ?>
 <style>
-.repair-modal[hidden]{display:none!important}.repair-modal{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;padding:20px}.repair-modal-backdrop{position:absolute;inset:0;background:rgba(32,33,45,.5)}.repair-dialog{position:relative;width:min(760px,100%);max-height:calc(100vh - 40px);overflow:auto;border-radius:10px;background:#fff;box-shadow:0 18px 46px rgba(0,0,0,.28)}.repair-dialog>header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #e1e2e8}.repair-dialog h2{margin:0;font-size:18px;color:#2f2b3d}.repair-dialog h2 .ti{vertical-align:-2px;margin-right:7px}.repair-close{border:0;background:transparent;color:#8b8a95;font-size:30px;line-height:1;cursor:pointer}.repair-body{display:grid;gap:14px;padding:20px 24px}.repair-body>label,.repair-body fieldset{display:flex;flex-direction:column;gap:7px;color:#2f2b3d;font-size:14px}.repair-body small{color:#8b8a95;font-weight:400}.repair-body input:not([type=checkbox]),.repair-body select,.repair-body textarea{box-sizing:border-box;width:100%;min-height:38px;padding:8px 11px;border:1px solid #d5d3de;border-radius:6px;background:#fff;font:inherit;color:#2f2b3d}.repair-body textarea{min-height:70px;resize:vertical}.repair-check{font-size:13px;font-weight:400}.repair-body fieldset{margin:0;padding:0;border:0}.repair-body fieldset>label{display:inline-flex;align-items:center;gap:6px;margin-right:12px;font-size:14px}.repair-issues{border:1px solid #e1e2e8!important;border-radius:6px!important;padding:10px!important;max-height:205px;overflow:auto}.repair-issues>label,.repair-issue-head{display:grid;grid-template-columns:1fr 120px 120px;align-items:center;gap:8px;padding:5px 0}.repair-issues input{justify-self:start;width:16px;height:16px}.repair-issue-head{color:#8b8a95;font-size:13px}.repair-switch{display:flex!important;flex-direction:row!important;align-items:center;gap:8px}.repair-switch input{width:38px;height:21px;accent-color:#19a94b}.repair-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}.repair-grid label{display:flex;flex-direction:column;gap:7px;font-size:14px}.repair-dialog>footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px 20px}.repair-cancel{border:1px solid #d5d3de;border-radius:6px;padding:10px 16px;background:#fff;color:#5d5b6d;cursor:pointer}@media(max-width:620px){.repair-modal{padding:8px}.repair-body,.repair-dialog>header,.repair-dialog>footer{padding-left:16px;padding-right:16px}.repair-issues>label,.repair-issue-head{grid-template-columns:1fr 70px 70px}.repair-grid{grid-template-columns:1fr}}
+.repair-modal[hidden]{display:none!important}.repair-modal{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;padding:20px}.repair-modal-backdrop{position:absolute;inset:0;background:rgba(32,33,45,.5)}.repair-dialog{position:relative;width:min(760px,100%);max-height:calc(100vh - 40px);overflow:auto;border-radius:10px;background:#fff;box-shadow:0 18px 46px rgba(0,0,0,.28)}.repair-dialog>header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #e1e2e8}.repair-dialog h2{margin:0;font-size:18px;color:#2f2b3d}.repair-dialog h2 .ti{vertical-align:-2px;margin-right:7px}.repair-close{border:0;background:transparent;color:#8b8a95;font-size:30px;line-height:1;cursor:pointer}.repair-body{display:grid;gap:14px;padding:20px 24px}.repair-body>label,.repair-body fieldset{display:flex;flex-direction:column;gap:7px;color:#2f2b3d;font-size:14px}.repair-body small{color:#8b8a95;font-weight:400}.repair-body input:not([type=checkbox]),.repair-body select,.repair-body textarea{box-sizing:border-box;width:100%;min-height:38px;padding:8px 11px;border:1px solid #d5d3de;border-radius:6px;background:#fff;font:inherit;color:#2f2b3d}.repair-body textarea{min-height:70px;resize:vertical}.repair-check{font-size:13px;font-weight:400}.repair-body fieldset{margin:0;padding:0;border:0}.repair-body fieldset>label{display:inline-flex;align-items:center;gap:6px;margin-right:12px;font-size:14px}.repair-issues{border:1px solid #e1e2e8!important;border-radius:6px!important;padding:10px!important;max-height:205px;overflow:auto}.repair-issues>label,.repair-issue-head{display:grid;grid-template-columns:1fr 120px 120px;align-items:center;gap:8px;padding:5px 0}.repair-issues input{justify-self:start;width:16px;height:16px}.repair-issue-head{color:#8b8a95;font-size:13px}.repair-switch{display:flex!important;flex-direction:row!important;align-items:center;gap:8px}.repair-switch input{width:38px;height:21px;accent-color:#19a94b}.repair-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}.repair-grid label{display:flex;flex-direction:column;gap:7px;font-size:14px}.repair-dialog>footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px 20px}.repair-cancel{border:1px solid #d5d3de;border-radius:6px;padding:10px 16px;background:#fff;color:#5d5b6d;cursor:pointer}form[action*="cash.php"]>footer button{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:36px!important;min-width:36px!important;max-width:36px!important;height:36px!important;min-height:36px!important;max-height:36px!important;padding:0!important}@media(max-width:620px){.repair-modal{padding:8px}.repair-body,.repair-dialog>header,.repair-dialog>footer{padding-left:16px;padding-right:16px}.repair-issues>label,.repair-issue-head{grid-template-columns:1fr 70px 70px}.repair-grid{grid-template-columns:1fr}}
 </style>
 <?php if($showForm): ?>
 <style>
-.repair-body .repair-issues>label,.repair-body .repair-issues>.repair-issue-head{display:grid!important;grid-template-columns:minmax(0,1fr) 120px 120px!important;align-items:center!important;gap:8px!important;width:100%!important;margin:0!important}.repair-body .repair-issues>label>input{justify-self:center!important;margin:0!important}.repair-body .repair-issues>.repair-issue-head>span:not(:first-child){text-align:center!important}.sales-details-dialog{width:min(920px,100%)}.sales-details-dialog .repair-body{grid-template-columns:repeat(3,minmax(0,1fr))}.sales-device-button{grid-column:1/-1;justify-self:start}.sales-device-details{display:grid;grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:14px}.sales-device-details[hidden]{display:none}.sales-product-cancel{position:relative;top:4px!important;display:grid;box-sizing:border-box;place-items:center;justify-self:start;align-self:center;grid-column:4;grid-row:1;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin-left:-13px;padding:0!important;border:0;border-radius:50%;background:#ea5455;color:#fff;font-size:18px;line-height:1}.sales-details-dialog .repair-body>label,.sales-details-dialog .repair-body .sales-device-details>label,.sales-details-dialog .repair-body #hearing-device-details-2>label,.sales-details-dialog .repair-body #charger-device-details>label{border:3px solid #fff;border-radius:7px;padding:9px}.sales-details-dialog .repair-body .sales-device-details>label>input,.sales-details-dialog .repair-body .sales-device-details>label>select,.sales-details-dialog .repair-body #hearing-device-details-2>label>input,.sales-details-dialog .repair-body #hearing-device-details-2>label>select{border:3px solid #159447}.sales-details-dialog .repair-body #charger-device-details>label>input,.sales-details-dialog .repair-body #charger-device-details>label>select{border:3px solid #795548}@media(max-width:620px){.sales-details-dialog .repair-body,.sales-device-details{grid-template-columns:1fr}.sales-product-cancel{justify-self:end}}
+.repair-body .repair-issues>label,.repair-body .repair-issues>.repair-issue-head{display:grid!important;grid-template-columns:minmax(0,1fr) 120px 120px!important;align-items:center!important;gap:8px!important;width:100%!important;margin:0!important}.repair-body .repair-issues>label>input{justify-self:center!important;margin:0!important}.repair-body .repair-issues>.repair-issue-head>span:not(:first-child){text-align:center!important}.sales-details-dialog{width:min(920px,100%)}.sales-details-dialog .repair-body{grid-template-columns:repeat(3,minmax(0,1fr))}.sales-details-dialog>footer button{box-sizing:border-box!important;width:36px!important;min-width:36px!important;max-width:36px!important;height:36px!important;min-height:36px!important;max-height:36px!important;padding:0!important}.sales-device-button{grid-column:1/-1;justify-self:start}.sales-device-details{display:grid;grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:14px}.sales-device-details[hidden]{display:none}.sales-product-cancel{position:relative;top:4px!important;display:grid;box-sizing:border-box;place-items:center;justify-self:start;align-self:center;grid-column:4;grid-row:1;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin-left:-13px;padding:0!important;border:0;border-radius:50%;background:#ea5455;color:#fff;font-size:18px;line-height:1}.sales-details-dialog .repair-body>label,.sales-details-dialog .repair-body .sales-device-details>label,.sales-details-dialog .repair-body #hearing-device-details-2>label,.sales-details-dialog .repair-body #charger-device-details>label{border:3px solid #fff;border-radius:7px;padding:9px}.sales-details-dialog .repair-body .sales-device-details>label>input,.sales-details-dialog .repair-body .sales-device-details>label>select,.sales-details-dialog .repair-body #hearing-device-details-2>label>input,.sales-details-dialog .repair-body #hearing-device-details-2>label>select{border:3px solid #159447}.sales-details-dialog .repair-body #charger-device-details>label>input,.sales-details-dialog .repair-body #charger-device-details>label>select{border:3px solid #795548}@media(max-width:620px){.sales-details-dialog .repair-body,.sales-device-details{grid-template-columns:1fr}.sales-product-cancel{justify-self:end}}
 </style>
 <style>
 .sales-price-tooltip{position:relative}.sales-price-tooltip[data-list-price]:hover::after{content:attr(data-list-price);position:absolute;z-index:10;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);padding:6px 9px;border-radius:5px;background:#ea5455;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 3px 8px rgba(234,84,85,.28)}.sales-details-dialog .repair-body [id^="hearing-device-details-"]>label{border:3px solid #fff;border-radius:7px;padding:9px}.sales-details-dialog .repair-body [id^="hearing-device-details-"]>label>input,.sales-details-dialog .repair-body [id^="hearing-device-details-"]>label>select{border:3px solid #159447}.sales-details-dialog .repair-body #consumable-details>label{border:3px solid #fff;border-radius:7px;padding:9px}.sales-details-dialog .repair-body #consumable-details>label>input,.sales-details-dialog .repair-body #consumable-details>label>select{border:3px solid #e6b800}
@@ -478,7 +644,7 @@ if ($currentContactPerson !== '') {
 <?php endif; ?>
 <?php if($showForm): ?>
 <div id="sales-stock-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-close></div><section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-stock-title"><header><h2 id="sales-stock-title">Satış Stoğu Seç</h2><button type="button" class="repair-close" data-sales-close aria-label="Kapat">×</button></header><div class="repair-body"><input id="sales-stock-search" type="search" placeholder="Stok kodu, adı, marka veya model ara" autocomplete="off"><div id="sales-stock-list"><?php foreach($stockCards as $stock): $label=trim((string)$stock['stock_code'].' — '.(string)$stock['stock_name']); ?><button type="button" class="sales-stock-item" data-id="<?=(int)$stock['id']?>" data-label="<?=e($label)?>" data-search="<?=e(mb_strtolower($label.' '.(string)$stock['brand'].' '.(string)$stock['model'], 'UTF-8'))?>"><?=e($label)?></button><?php endforeach; if(!$stockCards): ?><p>Stok kartı bulunamadı.</p><?php endif; ?></div></div><footer><button type="button" class="repair-cancel" data-sales-close>İptal</button></footer></section></div>
-<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Bilgileri</h2><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<input name="sales_device_serial" autocomplete="off"></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto Oranı<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Toplam Tutar<input inputmode="decimal" name="sales_payment_amount" autocomplete="off" readonly></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><button type="button" class="button" id="sales-details-save">Tamam</button></footer></section></div>
+<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Bilgileri</h2><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<input name="sales_device_serial" autocomplete="off"></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % ya da TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Toplam Tutar<input inputmode="decimal" name="sales_payment_amount" autocomplete="off" readonly></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><button type="button" class="button" id="sales-details-save">Tamam</button></footer></section></div>
 <?php endif; ?>
 <script>
 (() => {
@@ -501,9 +667,11 @@ if ($currentContactPerson !== '') {
 })();
 </script>
 <script>
-(() => {
+const initializeSalesScreen=()=>{
   const form=document.getElementById('service-card-form'), service=form?.querySelector('[name="service_name"]'), modal=document.getElementById('sales-stock-modal'), value=document.getElementById('sales_stock_id'), search=document.getElementById('sales-stock-search'), details=document.getElementById('sales_details'), detailsModal=document.getElementById('sales-details-modal');
   if(!form||!service||!modal||!value)return;
+  const saleStockLocked=<?=json_encode($saleProductDeleteLocked)?>;
+  let savedSaleProducts={};try{savedSaleProducts=JSON.parse(details?.value||'{}')||{};}catch(_){savedSaleProducts={};}
   let salesTitleClicks=0,salesTitleTimer=0;
   detailsModal?.querySelector('#sales-details-title')?.addEventListener('click',()=>{salesTitleClicks++;clearTimeout(salesTitleTimer);if(salesTitleClicks===3){salesTitleClicks=0;alert('Değerli Eşim Belma Seni Çok Seviyorum');return;}salesTitleTimer=setTimeout(()=>{salesTitleClicks=0;},700);});
   const hearingDeviceStocks=<?=json_encode($hearingDeviceStocks, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
@@ -519,7 +687,9 @@ if ($currentContactPerson !== '') {
   const consumableStocks=<?=json_encode($consumableStocks, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
   const formatTurkishMoney=value=>new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value))+' ₺';
   const parseTurkishMoney=value=>{const normalized=String(value??'').replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.');const amount=Number(normalized);return Number.isFinite(amount)?amount:null;};
-  const updateTotalAmount=()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]');if(!totalField)return;const netFields=['sales_device_net_price','sales_device_2_net_price','sales_device_3_net_price','sales_device_4_net_price','sales_charger_net_price'];let total=netFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);const consumablePrice=parseTurkishMoney(detailsModal?.querySelector('[name="sales_consumable_price"]')?.value)||0,consumableQuantity=Number(detailsModal?.querySelector('[name="sales_consumable_quantity"]')?.value)||0;total+=consumablePrice*consumableQuantity;totalField.value=total>0?formatTurkishMoney(total):'';const paymentType=detailsModal?.querySelector('[name="sales_payment_type"]'),paymentLocked=<?=json_encode($savedCashRecord !== [])?>;if(paymentType){paymentType.disabled=paymentLocked||total<=0;paymentType.title=paymentLocked?'Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.':(total<=0?'Toplam tutar girilmeden ödeme şekli seçilemez.':'');}};
+  const formatSgkMoneyFields=()=>detailsModal?.querySelectorAll('[name$="_sgk"]').forEach(field=>{const amount=parseTurkishMoney(field.value);if(amount!==null&&amount>0)field.value=formatTurkishMoney(amount);});
+  detailsModal?.addEventListener('focusout',event=>{const field=event.target;if(!(field instanceof HTMLInputElement)||!field.name.endsWith('_sgk'))return;const amount=parseTurkishMoney(field.value);if(amount!==null&&amount>0)field.value=formatTurkishMoney(amount);});
+  const updateTotalAmount=()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]');if(!totalField)return;const netFields=['sales_device_net_price','sales_device_2_net_price','sales_device_3_net_price','sales_device_4_net_price','sales_charger_net_price'];let total=netFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);const consumablePrice=parseTurkishMoney(detailsModal?.querySelector('[name="sales_consumable_price"]')?.value)||0,consumableQuantity=Number(detailsModal?.querySelector('[name="sales_consumable_quantity"]')?.value)||0;total+=consumablePrice*consumableQuantity;totalField.value=total>0?formatTurkishMoney(total):'';const paymentType=detailsModal?.querySelector('[name="sales_payment_type"]'),paymentLocked=<?=json_encode($savedCashRecord !== [])?>;if(paymentType){if(total<=0)paymentType.value='';paymentType.disabled=paymentLocked||total<=0;paymentType.title=paymentLocked?'Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.':(total<=0?'Ürün ve toplam tutar olmadan ödeme şekli seçilemez.':'');}};
   const applyDiscount=(listPriceField,discountField,netPriceField)=>{if(!listPriceField||!discountField||!netPriceField)return;const listPrice=parseTurkishMoney(listPriceField.dataset.listPrice||listPriceField.value),raw=discountField.value.trim(),discount=parseTurkishMoney(raw);if(listPrice===null)return;if(raw===''||discount===null)netPriceField.value=formatTurkishMoney(listPrice);else netPriceField.value=formatTurkishMoney(Math.max(0,raw.includes('%')?listPrice*(1-discount/100):listPrice-discount));updateTotalAmount();};
   detailsModal?.addEventListener('focusout',event=>{const field=event.target;if(!(field instanceof HTMLInputElement)||!field.name.endsWith('_discount_rate'))return;const raw=field.value.trim();if(raw===''||raw.includes('%'))return;const amount=parseTurkishMoney(raw);if(amount!==null)field.value=formatTurkishMoney(amount);});
   const setListPriceHint=(fields,stock)=>{const price=Number(stock?.sale_price),modelField=fields[1],modelLabel=modelField?.closest('label'),hint=stock&&Number.isFinite(price)?'Liste fiyatı: '+formatTurkishMoney(price):'';if(!modelLabel)return;modelLabel.classList.add('sales-price-tooltip');if(hint)modelLabel.dataset.listPrice=hint;else delete modelLabel.dataset.listPrice;};
@@ -531,7 +701,7 @@ if ($currentContactPerson !== '') {
   const toggleChargerDetails=show=>{chargerDetails.hidden=!show;chargerDetails.style.display=show?'grid':'none';};
   toggleChargerDetails(false);
   const chargerBrandSelect=chargerDetails.querySelector('[name="sales_charger_brand"]'),chargerModelSelect=chargerDetails.querySelector('[name="sales_charger_model"]'),chargerPriceInput=chargerDetails.querySelector('[name="sales_charger_price"]'),chargerSerialInput=detailsModal?.querySelector('[name="sales_charger_serial"]');
-  const chargerSerialLabel=chargerSerialInput?.closest('label');if(chargerSerialLabel){chargerDetails.append(chargerSerialLabel);chargerSerialLabel.style.cssText='display:flex;flex-direction:column;gap:7px';chargerSerialLabel.insertAdjacentHTML('afterend','<label>SGK<input inputmode="decimal" name="sales_charger_sgk" autocomplete="off"></label><label>İskonto Oranı<input inputmode="decimal" name="sales_charger_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_charger_net_price" autocomplete="off"></label>');}
+  const chargerSerialLabel=chargerSerialInput?.closest('label');if(chargerSerialLabel){chargerDetails.append(chargerSerialLabel);chargerSerialLabel.style.cssText='display:flex;flex-direction:column;gap:7px';chargerSerialLabel.insertAdjacentHTML('afterend','<label>SGK<input inputmode="decimal" name="sales_charger_sgk" autocomplete="off"></label><label>İskonto % ya da TL<input inputmode="decimal" name="sales_charger_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_charger_net_price" autocomplete="off"></label>');}
   const chargerDiscountInput=chargerDetails.querySelector('[name="sales_charger_discount_rate"]'),chargerNetPriceInput=chargerDetails.querySelector('[name="sales_charger_net_price"]');
   chargerDetails.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');
   const renameFieldLabel=(field,label)=>{const fieldLabel=field?.closest('label');if(fieldLabel?.firstChild?.nodeType===Node.TEXT_NODE)fieldLabel.firstChild.nodeValue=label;};
@@ -547,12 +717,12 @@ if ($currentContactPerson !== '') {
   consumableSelect?.addEventListener('change',syncConsumablePrice);consumableQuantityInput?.addEventListener('input',updateTotalAmount);
   const toggleConsumableDetails=show=>{consumableDetails.hidden=!show;consumableDetails.style.display=show?'grid':'none';};
   toggleConsumableDetails(false);
-  const syncChargerModels=()=>{const brand=chargerBrandSelect?.value||'';if(!brand){chargerModelSelect.replaceChildren(new Option('Önce marka seçiniz',''));chargerModelSelect.disabled=true;return;}const current=chargerModelSelect.value||'';fillSelect(chargerModelSelect,chargerDeviceStocks.filter(stock=>stock.brand===brand).map(stock=>stock.model),'Model seçiniz',current);chargerModelSelect.disabled=false;};
+  const syncChargerModels=()=>{const brand=chargerBrandSelect?.value||'';if(!brand){chargerModelSelect.replaceChildren(new Option('Önce marka seçiniz',''));chargerModelSelect.disabled=true;return;}const current=chargerModelSelect.dataset.value||chargerModelSelect.value||'';fillSelect(chargerModelSelect,chargerDeviceStocks.filter(stock=>stock.brand===brand).map(stock=>stock.model),'Model seçiniz',current);chargerModelSelect.disabled=false;};
   const fillChargerSerial=()=>{const stock=chargerDeviceStocks.find(item=>item.brand===(chargerBrandSelect?.value||'')&&item.model===(chargerModelSelect?.value||''));setListPriceHint([chargerBrandSelect,chargerModelSelect,chargerSerialInput],stock);if(chargerPriceInput)chargerPriceInput.value=stock&&stock.sale_price!==null&&stock.sale_price!==''?formatTurkishMoney(stock.sale_price):'';applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput);if(!stock||!chargerSerialInput)return;try{const serials=JSON.parse(stock.serial_numbers||'[]');const serial=Array.isArray(serials)?serials.find(value=>String(value).trim()!==''):'';if(serial)chargerSerialInput.value=serial;}catch(_){}};
-  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Marka seçiniz');syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{if(chargerSerialInput)chargerSerialInput.value='';if(chargerPriceInput)chargerPriceInput.value='';if(chargerNetPriceInput)chargerNetPriceInput.value='';syncChargerModels();});chargerModelSelect?.addEventListener('change',()=>{if(chargerSerialInput)chargerSerialInput.value='';fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
+  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Marka seçiniz');syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';if(chargerSerialInput)chargerSerialInput.value='';if(chargerPriceInput)chargerPriceInput.value='';if(chargerNetPriceInput)chargerNetPriceInput.value='';syncChargerModels();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';if(chargerSerialInput)chargerSerialInput.value='';fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
   const syncDeviceModels=()=>{if(!modelSelect)return;const brand=brandSelect?.value||'';if(!brand){modelSelect.replaceChildren(new Option('Önce marka seçiniz',''));modelSelect.value='';modelSelect.disabled=true;return;}const current=modelSelect.dataset.value||modelSelect.value||'';fillSelect(modelSelect,hearingDeviceStocks.filter(stock=>stock.brand===brand).map(stock=>stock.model),'Model seçiniz',current);modelSelect.disabled=false;};
   const fillDeviceSerial=()=>{const stock=hearingDeviceStocks.find(item=>item.brand===(brandSelect?.value||'')&&item.model===(modelSelect?.value||''));setListPriceHint([brandSelect,modelSelect,deviceSerialInput],stock);if(deviceNetPriceInput){const listPrice=stock&&stock.sale_price!==null&&stock.sale_price!==''?formatTurkishMoney(stock.sale_price):'';deviceNetPriceInput.dataset.listPrice=listPrice;deviceNetPriceInput.value=listPrice;}applyDiscount(deviceNetPriceInput,deviceDiscountInput,deviceNetPriceInput);if(!stock||!deviceSerialInput||deviceSerialInput.value.trim()!=='')return;try{const serials=JSON.parse(stock.serial_numbers||'[]');const serial=Array.isArray(serials)?serials.find(value=>String(value).trim()!==''):'';if(serial)deviceSerialInput.value=serial;}catch(_){}};
-  if(brandSelect){fillSelect(brandSelect,hearingDeviceStocks.map(stock=>stock.brand),'Marka seçiniz',brandSelect.dataset.value||'');brandSelect.addEventListener('change',()=>{modelSelect.dataset.value='';if(deviceSerialInput)deviceSerialInput.value='';if(deviceNetPriceInput){deviceNetPriceInput.value='';delete deviceNetPriceInput.dataset.listPrice;}syncDeviceModels();});}modelSelect?.addEventListener('change',()=>{if(deviceSerialInput)deviceSerialInput.value='';fillDeviceSerial();});deviceDiscountInput?.addEventListener('input',()=>applyDiscount(deviceNetPriceInput,deviceDiscountInput,deviceNetPriceInput));syncDeviceModels();
+  if(brandSelect){fillSelect(brandSelect,hearingDeviceStocks.map(stock=>stock.brand),'Marka seçiniz',brandSelect.dataset.value||'');brandSelect.addEventListener('change',()=>{modelSelect.dataset.value='';if(deviceSerialInput)deviceSerialInput.value='';if(deviceNetPriceInput){deviceNetPriceInput.value='';delete deviceNetPriceInput.dataset.listPrice;}syncDeviceModels();});}modelSelect?.addEventListener('change',()=>{modelSelect.dataset.value='';if(deviceSerialInput)deviceSerialInput.value='';fillDeviceSerial();});deviceDiscountInput?.addEventListener('input',()=>applyDiscount(deviceNetPriceInput,deviceDiscountInput,deviceNetPriceInput));syncDeviceModels();
   const items=[...modal.querySelectorAll('.sales-stock-item')], isSales=()=>service.value.trim().toLocaleLowerCase('tr-TR')==='satış', open=()=>{modal.hidden=false;modal.setAttribute('aria-hidden','false');search?.focus()}, close=()=>{modal.hidden=true;modal.setAttribute('aria-hidden','true')};
   const paymentField=detailsModal?.querySelector('[name="sales_payment_type"]')?.closest('label');
   if(paymentField){const cashLink=document.createElement('a');cashLink.href=<?=json_encode(url('cash.php'))?>;cashLink.title='Kasa';cashLink.setAttribute('aria-label','Kasa');cashLink.innerHTML='<i class="ti tabler-cash-register" style="font-size:22px;line-height:1"></i>';cashLink.style.cssText='position:relative;top:7px;display:inline-flex;align-items:center;justify-content:center;align-self:center;width:38px;min-width:38px;max-width:38px;height:38px;min-height:38px;max-height:38px;margin-top:8px;padding:0;border-radius:6px;background:#19a94b;color:#fff;text-decoration:none';paymentField.after(cashLink);const cashModal=document.createElement('div');cashModal.hidden=true;cashModal.style.cssText='position:fixed;z-index:1200;inset:0;display:none;place-items:center;padding:16px;background:rgba(20,70,40,.38)';cashModal.innerHTML='<form action="<?=e(url('cash.php'))?>" method="post" style="width:min(430px,100%);border:1px solid #b9e5c7;border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 18px 46px rgba(18,91,48,.24)"><header style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#19a94b;color:#fff;font-weight:700">GELİR KAYIT <button type="button" data-cash-close style="border:0;background:transparent;color:#fff;font-size:25px;cursor:pointer">×</button></header><section style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;color:#16452b;font-size:13px"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_transaction"><input type="hidden" name="transaction_type" value="income"><label style="display:flex;flex-direction:column;gap:5px">İşlem Tarihi<input type="date" name="transaction_date" value="<?=date('Y-m-d')?>" required></label><label style="display:flex;flex-direction:column;gap:5px">Ödeme Türü<select name="payment_type" id="cash-modal-payment"><option value="cash">Nakit</option><option value="credit_card">Kredi Kartı</option><option value="mail_order">Mail Order</option><option value="term">Vadeli</option></select></label><label style="display:flex;flex-direction:column;gap:5px">Tutar<input name="amount" id="cash-modal-amount" inputmode="decimal" required></label><label style="display:flex;flex-direction:column;gap:5px">İşlem Tipi<select disabled><option>Kasa Girişi</option></select></label><label style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">Açıklama<textarea name="description" rows="3" required>Satış tahsilatı</textarea></label></section><footer style="display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;background:#edf9f0;border-top:1px solid #d5eddb"><button type="button" data-cash-close class="repair-cancel">İptal</button><button class="button" style="display:inline-flex;align-items:center;gap:6px;background:#19a94b;color:#fff"><i class="ti tabler-device-floppy"></i> Kaydet</button></footer></form>';document.body.append(cashModal);const closeCashModal=()=>{cashModal.hidden=true;cashModal.style.display='none';};cashModal.querySelectorAll('[data-cash-close]').forEach(button=>button.addEventListener('click',closeCashModal));cashModal.querySelector('form')?.addEventListener('submit',()=>{const amount=cashModal.querySelector('#cash-modal-amount');amount.value=String(parseTurkishMoney(amount.value)||'');});cashLink.addEventListener('click',event=>{event.preventDefault();const total=detailsModal?.querySelector('[name="sales_payment_amount"]')?.value||'';const payment=detailsModal?.querySelector('[name="sales_payment_type"]')?.value||'cash';cashModal.querySelector('#cash-modal-amount').value=total;cashModal.querySelector('#cash-modal-payment').value={'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'}[payment]||'cash';cashModal.hidden=false;cashModal.style.display='grid';});}
@@ -572,8 +742,8 @@ if ($currentContactPerson !== '') {
   const suppressTermBalanceFlicker=()=>{const extra=cashSourceForm?.querySelector('[data-extra-income]'),summary=extra?.querySelector('[data-income-header-total]'),saved=(window.__savedCashRecords||[]).find(record=>record.payment_type==='term'&&record.term_schedule);if(!extra||!summary||!saved)return;if(extra.dataset.termPlanRestored==='1'){summary.style.visibility='visible';return;}try{const plan=JSON.parse(saved.term_schedule)||[];if(!plan.length||!plan.every(item=>item.paid))return;const boxes=[...extra.querySelectorAll('[name="extra_term_paid[]"]')];summary.style.visibility=boxes.length===plan.length&&boxes.every(box=>box.checked)?'visible':'hidden';}catch(_){}};new MutationObserver(suppressTermBalanceFlicker).observe(cashSourceForm||document.body,{childList:true,subtree:true});cashSourceForm?.addEventListener('change',()=>setTimeout(suppressTermBalanceFlicker,0));suppressTermBalanceFlicker();
   const colorIncomeBalances=()=>cashSourceForm?.querySelectorAll('[data-income-header-total]').forEach(total=>{const text=total.textContent||'',parts=text.split(' · Bakiye: ');if(parts.length!==2||(total.dataset.balanceText===text&&total.dataset.balanceLayout==='vertical'&&total.children.length===3))return;total.dataset.balanceText=text;total.dataset.balanceLayout='vertical';total.style.whiteSpace='normal';total.style.lineHeight='1.4';total.innerHTML='<span style="display:block;color:#19a94b">'+parts[0]+'</span><span style="display:none"> · </span><span style="display:block;color:#e6525d">Bakiye: '+parts[1]+'</span>';});cashSourceForm?.addEventListener('input',()=>setTimeout(colorIncomeBalances,0));cashSourceForm?.addEventListener('change',()=>setTimeout(colorIncomeBalances,0));new MutationObserver(colorIncomeBalances).observe(cashSourceForm||document.body,{childList:true,subtree:true});colorIncomeBalances();
   const alignIncomeRecordTitles=()=>{const firstTitle=cashSourceForm?.querySelector('header h2'),secondTitle=cashSourceForm?.querySelector('[data-extra-income] strong');if(!firstTitle||!secondTitle)return;const firstStyle=getComputedStyle(firstTitle);secondTitle.style.marginLeft='4px';secondTitle.style.fontFamily=firstStyle.fontFamily;secondTitle.style.fontSize=firstStyle.fontSize;secondTitle.style.fontWeight=firstStyle.fontWeight;secondTitle.style.lineHeight=firstStyle.lineHeight;secondTitle.style.color=firstStyle.color;};new MutationObserver(alignIncomeRecordTitles).observe(cashSourceForm||document.body,{childList:true,subtree:true});alignIncomeRecordTitles();
-  if(cashRecordForm){const footer=cashRecordForm.querySelector('footer');if(footer){footer.style.padding='16px 24px 20px';footer.style.minHeight='';footer.querySelectorAll('button').forEach(button=>button.style.cssText+=';width:40px;min-width:40px;max-width:40px;height:40px;min-height:40px;max-height:40px;padding:0;box-sizing:border-box');}}
-  const normalizeCashFooterButtons=()=>cashSourceForm?.querySelectorAll('footer button').forEach(button=>{['width','min-width','max-width','height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'40px','important'));button.style.setProperty('padding','0','important');button.style.setProperty('box-sizing','border-box','important');});new MutationObserver(normalizeCashFooterButtons).observe(cashRecordForm?.querySelector('footer')||document.body,{childList:true,subtree:true});normalizeCashFooterButtons();
+  if(cashRecordForm){const footer=cashRecordForm.querySelector('footer');if(footer){footer.style.padding='16px 24px 20px';footer.style.minHeight='';footer.querySelectorAll('button').forEach(button=>button.style.cssText+=';width:36px;min-width:36px;max-width:36px;height:36px;min-height:36px;max-height:36px;padding:0;box-sizing:border-box');}}
+  const normalizeCashFooterButtons=()=>cashSourceForm?.querySelectorAll('footer button').forEach(button=>{['width','min-width','max-width','height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'44px','important'));button.style.setProperty('padding','0','important');button.style.setProperty('box-sizing','border-box','important');});new MutationObserver(normalizeCashFooterButtons).observe(cashRecordForm?.querySelector('footer')||document.body,{childList:true,subtree:true});normalizeCashFooterButtons();
   const normalizeIncomeDescriptions=()=>cashSourceForm?.querySelectorAll('textarea[name="description"],textarea[name="extra_description"]').forEach(field=>{field.maxLength=256;field.rows=2;field.style.setProperty('height','48px','important');field.style.setProperty('min-height','48px','important');});new MutationObserver(normalizeIncomeDescriptions).observe(cashSourceForm||document.body,{childList:true,subtree:true});normalizeIncomeDescriptions();
   if(cashSourceForm){
     const sourceInput=document.createElement('input');sourceInput.type='hidden';sourceInput.name='source_url';sourceInput.value=<?=json_encode(url('patient-followup.php?id='.$id))?>;cashSourceForm.append(sourceInput);
@@ -706,21 +876,27 @@ if ($currentContactPerson !== '') {
   paymentSelect?.addEventListener('change',()=>{
     syncCashIcon();
     if(paymentSelect.value&&cashSourceForm?.dataset.saved!=='1'&&!<?=json_encode($serviceNameLocked)?>)cashIconLink?.click();
-  });syncCashIcon();if(<?=json_encode($openIncomeRecord)?>)setTimeout(()=>cashIconLink?.click(),0);
+  });syncCashIcon();if(<?=json_encode($openIncomeRecord)?>)setTimeout(()=>{cashIconLink?.click();const pageUrl=new URL(location.href);pageUrl.searchParams.delete('open_income_record');history.replaceState(null,'',pageUrl.pathname+(pageUrl.search||''));},0);
   const detailFields=detailsModal?[...detailsModal.querySelectorAll('[name]')]:[], deviceDetails=document.getElementById('hearing-device-details'), addDeviceButton=document.getElementById('add-hearing-device');
   const setProductType=type=>{const body=detailsModal?.querySelector('.repair-body');if(!detailsModal||!body)return;detailsModal.dataset.productType=type;body.classList.remove('sales-product-device','sales-product-consumable','sales-product-charger');const productClass={'İşitme Cihazı':'sales-product-device','Sarf Malzeme':'sales-product-consumable','Şarj Cihazı':'sales-product-charger'}[type];if(productClass)body.classList.add(productClass);};
-  const restoreDetails=()=>{try{const saved=JSON.parse(details?.value||'{}');detailFields.forEach(field=>{if(Object.prototype.hasOwnProperty.call(saved,field.name))field.value=saved[field.name]??'';});if(paymentSelect&&!paymentSelect.value)paymentSelect.value=<?=json_encode($savedCashPaymentType)?>;setProductType(saved.sales_product_type||'');syncCashIcon();}catch(_){if(paymentSelect&&!paymentSelect.value)paymentSelect.value=<?=json_encode($savedCashPaymentType)?>;}};
+  const restoreDetails=()=>{try{const saved=JSON.parse(details?.value||'{}');detailFields.forEach(field=>{if(Object.prototype.hasOwnProperty.call(saved,field.name))field.value=saved[field.name]??'';});if(brandSelect){brandSelect.value=saved.sales_brand||'';if(modelSelect)modelSelect.dataset.value=saved.sales_model||'';}if(chargerBrandSelect){chargerBrandSelect.value=saved.sales_charger_brand||'';if(chargerModelSelect)chargerModelSelect.dataset.value=saved.sales_charger_model||'';}formatSgkMoneyFields();if(paymentSelect&&!paymentSelect.value)paymentSelect.value=<?=json_encode($savedCashPaymentType)?>;setProductType(saved.sales_product_type||'');syncCashIcon();}catch(_){if(paymentSelect&&!paymentSelect.value)paymentSelect.value=<?=json_encode($savedCashPaymentType)?>;}};
   const persistDetails=()=>{if(!details)return;const saved={};detailsModal?.querySelectorAll('[name]').forEach(field=>saved[field.name]=field.value);if(detailsModal?.dataset.productType)saved.sales_product_type=detailsModal.dataset.productType;details.value=JSON.stringify(saved);};const invoiceStore=document.createElement('input');invoiceStore.type='hidden';invoiceStore.name='sales_invoice_no';form.append(invoiceStore);const syncInvoice=()=>{invoiceStore.value=detailsModal?.querySelector('[name="sales_invoice_no"]')?.value||'';persistDetails();};detailsModal?.querySelector('[name="sales_invoice_no"]')?.addEventListener('input',syncInvoice);detailsModal?.querySelector('[name="sales_invoice_no"]')?.addEventListener('change',syncInvoice);form.addEventListener('submit',syncInvoice);
   const openDetails=()=>{if(detailsModal){detailsModal.hidden=false;detailsModal.setAttribute('aria-hidden','false');}};
-  const closeDetails=()=>{if(detailsModal){detailsModal.hidden=true;detailsModal.setAttribute('aria-hidden','true');}};
+  const closeDetails=()=>{if(detailsModal){detailsModal.hidden=true;detailsModal.setAttribute('aria-hidden','true');}if(productWasRemoved){details.value='';value.value='';service.value='';document.getElementById('sales-details-link')?.remove();document.querySelector('.sales-income-link')?.remove();service.dispatchEvent(new Event('change'));}};
   const loadSavedCashCards=()=>{const records=window.__savedCashRecords||[],first=records[0],second=records[1];if(first?.payment_type==='term'){renderPrimaryTermSchedule();const installment=cashSourceForm?.querySelector('[name="installment_count"]');if(installment)installment.value=String(first.installment_count||1);renderPrimaryTermSchedule();if(!first.term_schedule){const payment=cashSourceForm?.querySelector('[data-primary-term-amount]');if(payment){payment.value=formatTurkishMoney(first.amount);payment.dispatchEvent(new Event('input'));}}placePrimaryTermTotal();}if(!second)return;const addButton=cashSourceForm?.querySelector('[aria-label="Bir gelir kaydı daha ekle"]');if(!addButton)return;addButton.click();setTimeout(()=>{const extra=cashSourceForm?.querySelector('[data-extra-income]');if(!extra)return;const set=(name,value)=>{const field=extra.querySelector(`[name="${name}"]`);if(field)field.value=value??'';};set('extra_payment_type',second.payment_type);set('extra_bank_name',second.bank_name);set('extra_current_account_id',second.current_account_id);set('extra_installment_count',second.installment_count||1);set('extra_commission_rate',second.commission_rate||'');set('extra_amount',formatTurkishMoney(second.amount));set('extra_description',second.description||'');const heading=extra.querySelector('strong');if(heading&&!heading.querySelector('[aria-label="İkinci gelir kaydını sil"]')){const deleteButton=document.createElement('button');deleteButton.type='button';deleteButton.title='İkinci gelir kaydını sil';deleteButton.setAttribute('aria-label','İkinci gelir kaydını sil');deleteButton.innerHTML='<i class="ti tabler-trash"></i>';deleteButton.style.cssText='float:right;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:5px;background:#e6525d;color:#fff;cursor:pointer';deleteButton.addEventListener('click',()=>{if(!confirm('Bu ikinci gelir kaydını silmek istiyor musunuz?'))return;const form=document.createElement('form');form.method='post';form.action=<?=json_encode(url('patient-followup.php?id='.$id))?>;const values={csrf:<?=json_encode(csrf())?>,action:'cash_delete_only',edit_id:<?=json_encode((string)$editId)?>,cash_delete_id:second.id};Object.entries(values).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);});document.body.append(form);form.submit();});heading.append(deleteButton);}extra.querySelector('[name="extra_payment_type"]')?.dispatchEvent(new Event('change',{bubbles:true}));if(second.payment_type==='term'&&second.term_schedule){try{const plan=JSON.parse(second.term_schedule)||[];setTimeout(()=>plan.forEach((item,index)=>{const date=extra.querySelectorAll('[name="extra_term_date[]"]')[index],amount=extra.querySelectorAll('[data-term-amount]')[index],paid=extra.querySelectorAll('[name="extra_term_paid[]"]')[index];if(date)date.value=item.date||date.value;if(amount)amount.value=(parseTurkishMoney(item.amount)||0)>0?formatTurkishMoney(parseTurkishMoney(item.amount)):'';if(paid)paid.checked=!!item.paid;}),0);}catch(_){}}repairIncomeLayouts();},30);};
   const restoreSavedTermSchedule=()=>{const first=(window.__savedCashRecords||[])[0];if(first?.payment_type!=='term'||!first.term_schedule)return;let plan=[];try{plan=JSON.parse(first.term_schedule)||[]}catch(_){return;}const dates=[...cashSourceForm.querySelectorAll('[name="term_date[]"]')],amounts=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')],paid=[...cashSourceForm.querySelectorAll('[name="term_paid[]"]')];plan.forEach((item,index)=>{if(dates[index]&&item.date)dates[index].value=item.date;if(amounts[index])amounts[index].value=item.amount||'';if(paid[index])paid[index].checked=!!item.paid;});const total=cashSourceForm.querySelector('[name="amount"]');if(total)total.value=formatTurkishMoney(plan.reduce((sum,item)=>sum+(parseTurkishMoney(item.amount)||0),0));};
   const restoreExtraTermSchedule=()=>{const second=(window.__savedCashRecords||[]).find(record=>record.payment_type==='term'&&record.term_schedule),extra=cashSourceForm?.querySelector('[data-extra-income]');if(!second||!extra)return;try{const plan=JSON.parse(second.term_schedule)||[];const dates=extra.querySelectorAll('[name="extra_term_date[]"]'),amounts=extra.querySelectorAll('[data-term-amount]'),paid=extra.querySelectorAll('[name="extra_term_paid[]"]');if(!amounts.length)return;plan.forEach((item,index)=>{if(dates[index]&&item.date)dates[index].value=item.date;if(amounts[index])amounts[index].value=(parseTurkishMoney(item.amount)||0)>0?formatTurkishMoney(parseTurkishMoney(item.amount)):'';if(paid[index])paid[index].checked=!!item.paid;});const total=extra.querySelector('[name="extra_amount"]');if(total)total.value=String(plan.reduce((sum,item)=>sum+(parseTurkishMoney(item.amount)||0),0));extra.dataset.termPlanRestored='1';setTimeout(()=>{showIncomeHeaderTotals();suppressTermBalanceFlicker();},0);}catch(_){}};
   cashSourceForm?.addEventListener('change',event=>{if(event.target.matches('[name="extra_payment_type"],[name="extra_installment_count"]'))setTimeout(restoreExtraTermSchedule,0);});
   document.addEventListener('click',event=>{const button=event.target.closest('[title="Gelir kaydını güncelle"]');if(!button||!cashSourceForm)return;event.preventDefault();event.stopImmediatePropagation();const dates=[...cashSourceForm.querySelectorAll('[name="term_date[]"]')],amounts=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')],paid=[...cashSourceForm.querySelectorAll('[name="term_paid[]"]')],plan=dates.map((date,index)=>({date:date.value,amount:amounts[index]?.value||'',paid:!!paid[index]?.checked})),extra=cashSourceForm.querySelector('[data-extra-income]'),extraRecord=(window.__savedCashRecords||[])[1]||{},extraPlan=[...extra?.querySelectorAll('[name="extra_term_date[]"]')||[]].map((date,index)=>({date:date.value,amount:extra?.querySelectorAll('[data-term-amount]')[index]?.value||'',paid:!!extra?.querySelectorAll('[name="extra_term_paid[]"]')[index]?.checked}));const form=document.createElement('form');form.method='post';form.action=location.href;const values={csrf:<?=json_encode(csrf())?>,action:'cash_update_only',edit_id:new URLSearchParams(location.search).get('edit')||'',cash_update_id:cashSourceForm.querySelector('[name="id"]')?.value||'',cash_update_date:cashSourceForm.querySelector('[name="transaction_date"]')?.value||'',cash_update_description:cashSourceForm.querySelector('[name="description"]')?.value||'',cash_update_amount:String(parseTurkishMoney(cashSourceForm.querySelector('[name="amount"]')?.value)||''),cash_update_payment_type:cashSourceForm.querySelector('[name="payment_type"]')?.value||'',cash_update_installment_count:cashSourceForm.querySelector('[name="installment_count"]')?.value||'1',cash_update_bank_name:cashSourceForm.querySelector('[name="bank_name"]')?.value||'',cash_update_commission_rate:cashSourceForm.querySelector('[name="commission_rate"]')?.value||'',cash_update_term_schedule:JSON.stringify(plan),cash_update_extra_id:extraRecord.id||'',cash_update_extra_description:extra?.querySelector('[name="extra_description"]')?.value||'',cash_update_extra_amount:String(parseTurkishMoney(extra?.querySelector('[name="extra_amount"]')?.value)||''),cash_update_extra_payment_type:extra?.querySelector('[name="extra_payment_type"]')?.value||'',cash_update_extra_installment_count:extra?.querySelector('[name="extra_installment_count"]')?.value||'1',cash_update_extra_bank_name:extra?.querySelector('[name="extra_bank_name"]')?.value||'',cash_update_extra_commission_rate:extra?.querySelector('[name="extra_commission_rate"]')?.value||'',cash_update_extra_current_account_id:extra?.querySelector('[name="extra_current_account_id"]')?.value||'',cash_update_extra_term_schedule:JSON.stringify(extraPlan)};Object.entries(values).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);});document.body.append(form);form.submit();},true);
-  const validateTermPayments=()=>{const primaryType=salesPaymentToCashType(paymentSelect?.value||'')||cashSourceForm?.querySelector('[name="payment_type"]')?.value;if(primaryType==='mail_order'&&!cashSourceForm?.querySelector('[name="current_account_id"]')?.value){alert('Mail Order için cari hesap seçmelisiniz.');cashSourceForm?.querySelector('[name="current_account_id"]')?.focus();return false;}const extra=cashSourceForm?.querySelector('[data-extra-income]');if(extra?.querySelector('[name="extra_payment_type"]')?.value==='mail_order'&&!extra.querySelector('[name="extra_current_account_id"]')?.value){alert('Mail Order için cari hesap seçmelisiniz.');extra.querySelector('[name="extra_current_account_id"]')?.focus();return false;}if(primaryType!=='term')return true;const amounts=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')],hasPrimaryPayment=amounts.some(input=>(parseTurkishMoney(input.value)||0)>0);if(!hasPrimaryPayment)return true;const empty=amounts.find(input=>(parseTurkishMoney(input.value)||0)<=0);if(!empty)return true;alert('Vadeli ödeme için tüm aylık ödeme alanlarını doldurun.');empty.focus();return false;};window.addEventListener('click',event=>{const button=event.target.closest('form[action*="cash.php"] footer button');if(!button||button.matches('[data-cash-close]')||button.matches('[aria-label="Bir gelir kaydı daha ekle"]'))return;if(!validateTermPayments()){event.preventDefault();event.stopPropagation();}},true);cashSourceForm?.addEventListener('submit',event=>{if(!validateTermPayments()){event.preventDefault();event.stopImmediatePropagation();}},true);
+  const validateTermPayments=()=>{const saleTotal=parseTurkishMoney(detailsModal?.querySelector('[name="sales_payment_amount"]')?.value)||0,primarySchedule=[...cashSourceForm?.querySelectorAll('[data-primary-term-amount]')||[]].reduce((sum,input)=>sum+(parseTurkishMoney(input.value)||0),0),primaryAmount=primarySchedule||(parseTurkishMoney(cashSourceForm?.querySelector('[name="amount"]')?.value)||0),extra=cashSourceForm?.querySelector('[data-extra-income]'),extraSchedule=[...extra?.querySelectorAll('[data-term-amount]')||[]].reduce((sum,input)=>sum+(parseTurkishMoney(input.value)||0),0),extraAmount=extraSchedule||(parseTurkishMoney(extra?.querySelector('[name="extra_amount"]')?.value)||0);if(saleTotal>0&&Math.abs((primaryAmount+extraAmount)-saleTotal)>0.009){alert('Gelir kayıtları toplamı, Satış Bilgileri ekranındaki toplam tutara eşit olmalıdır.\nLütfen düzeltin ve yeniden kaydedin.');return false;}const primaryType=salesPaymentToCashType(paymentSelect?.value||'')||cashSourceForm?.querySelector('[name="payment_type"]')?.value;if(primaryType==='mail_order'&&!cashSourceForm?.querySelector('[name="current_account_id"]')?.value){alert('Mail Order için cari hesap seçmelisiniz.');cashSourceForm?.querySelector('[name="current_account_id"]')?.focus();return false;}if(extra?.querySelector('[name="extra_payment_type"]')?.value==='mail_order'&&!extra.querySelector('[name="extra_current_account_id"]')?.value){alert('Mail Order için cari hesap seçmelisiniz.');extra.querySelector('[name="extra_current_account_id"]')?.focus();return false;}if(primaryType!=='term')return true;const amounts=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')],hasPrimaryPayment=amounts.some(input=>(parseTurkishMoney(input.value)||0)>0);if(!hasPrimaryPayment)return true;const empty=amounts.find(input=>(parseTurkishMoney(input.value)||0)<=0);if(!empty)return true;alert('Vadeli ödeme için tüm aylık ödeme alanlarını doldurun.');empty.focus();return false;};window.addEventListener('click',event=>{const button=event.target.closest('form[action*="cash.php"] footer button');if(!button||button.matches('[data-cash-close]')||button.matches('[aria-label="Bir gelir kaydı daha ekle"]'))return;if(!validateTermPayments()){event.preventDefault();event.stopPropagation();}},true);cashSourceForm?.addEventListener('submit',event=>{if(!validateTermPayments()){event.preventDefault();event.stopImmediatePropagation();}},true);
   cashSourceForm?.addEventListener('submit',()=>{const old=cashSourceForm.querySelector('[name="term_schedule_json"]');old?.remove();const plan=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')].map((amount,index)=>({date:cashSourceForm.querySelectorAll('[name="term_date[]"]')[index]?.value||'',amount:amount.value||'',paid:!!cashSourceForm.querySelectorAll('[name="term_paid[]"]')[index]?.checked}));if(plan.length){const hidden=document.createElement('input');hidden.type='hidden';hidden.name='term_schedule_json';hidden.value=JSON.stringify(plan);cashSourceForm.append(hidden);}const extra=cashSourceForm.querySelector('[data-extra-income]');if(extra?.querySelector('[name="extra_payment_type"]')?.value==='term'){const amounts=[...extra.querySelectorAll('[data-term-amount]')];amounts.forEach(input=>input.value=String(parseTurkishMoney(input.value)||0));const total=amounts.reduce((sum,input)=>sum+(parseTurkishMoney(input.value)||0),0),totalField=extra.querySelector('[name="extra_amount"]');if(totalField)totalField.value=String(total);}});
   cashSourceForm?.addEventListener('blur',event=>{if(!event.target.matches('[data-primary-term-amount],[data-extra-income] [data-term-amount]'))return;const amount=parseTurkishMoney(event.target.value);if(amount!==null&&amount>0)event.target.value=formatTurkishMoney(amount);},true);
+  // Vade planını her değişiklikte hazır tut: kaydet düğmesi formu erken okusa bile tüm taksitler gönderilir.
+  const syncPrimaryTermPlan=()=>{if(!cashSourceForm)return;const rows=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')],old=cashSourceForm.querySelector('[name="term_schedule_json"]');if(!rows.length){old?.remove();return;}const dates=[...cashSourceForm.querySelectorAll('[name="term_date[]"]')],paid=[...cashSourceForm.querySelectorAll('[name="term_paid[]"]')],plan=rows.map((amount,index)=>({date:dates[index]?.value||'',amount:amount.value||'',paid:!!paid[index]?.checked}));const input=old||document.createElement('input');input.type='hidden';input.name='term_schedule_json';input.value=JSON.stringify(plan);if(!old)cashSourceForm.append(input);};
+  cashSourceForm?.addEventListener('input',event=>{if(event.target.matches('[data-primary-term-amount],[name="term_date[]"]'))syncPrimaryTermPlan();},true);
+  cashSourceForm?.addEventListener('change',event=>{if(event.target.matches('[data-primary-term-amount],[name="term_date[]"],[name="term_paid[]"]'))syncPrimaryTermPlan();},true);
+  // Vade planı dinamik üretildiği için, form gönderilmeden önce tüm satırları tekil plan verisine zorla ekle.
+  cashSourceForm?.addEventListener('submit',()=>{const old=cashSourceForm.querySelector('[name="term_schedule_json"]');old?.remove();const rows=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')];if(!rows.length)return;const dates=[...cashSourceForm.querySelectorAll('[name="term_date[]"]')],paid=[...cashSourceForm.querySelectorAll('[name="term_paid[]"]')],plan=rows.map((amount,index)=>({date:dates[index]?.value||'',amount:amount.value||'',paid:!!paid[index]?.checked}));const input=document.createElement('input');input.type='hidden';input.name='term_schedule_json';input.value=JSON.stringify(plan);cashSourceForm.append(input);},true);
   const formatIncomeMoneyWhileTyping=event=>{
     const field=event.target;
     if(!(field instanceof HTMLInputElement)||!field.matches('[name="amount"],[name="extra_amount"],[data-primary-term-amount],[data-term-amount]'))return;
@@ -751,8 +927,9 @@ if ($currentContactPerson !== '') {
   if(deviceDetails)productActions.after(deviceDetails);
   const arrangeProductSections=()=>{let anchor=productActions;[deviceDetails,...[2,3,4].map(number=>detailsModal?.querySelector(`#hearing-device-details-${number}`)),chargerDetails,consumableDetails].filter(Boolean).forEach(section=>{anchor.after(section);anchor=section;});};
   addDeviceButton.textContent='İşitme Cihazı';
+  let productWasRemoved=false;
   const clearFields=names=>names.forEach(name=>{const field=detailsModal?.querySelector(`[name="${name}"]`);if(field)field.value='';});
-  const addProductCancel=(container,names,onClear)=>{const button=document.createElement('button');button.type='button';button.className='repair-cancel sales-product-cancel';button.textContent='×';button.title='Ürünü kaldır';button.setAttribute('aria-label','Ürünü kaldır');button.addEventListener('click',()=>{clearFields(names);onClear();updateTotalAmount();});container.append(button);return button;};
+  const addProductCancel=(container,names,onClear)=>{const button=document.createElement('button');button.type='button';button.className='repair-cancel sales-product-cancel';button.textContent='×';button.title='Ürünü kaldır';button.setAttribute('aria-label','Ürünü kaldır');const locked=saleStockLocked&&names.some(name=>String(savedSaleProducts[name]??'').trim()!=='');if(locked){button.title='Hasta ödeme yapmış. Ürünü silemezsiniz.';}button.addEventListener('click',()=>{if(locked){alert('Hasta ödeme yapmış. Ürünü silemezsiniz.');return;}productWasRemoved=true;clearFields(names);onClear();updateTotalAmount();});container.append(button);return button;};
   let consumableCancel=null;
   const showConsumableDetails=()=>{chargerDetails?.after(consumableDetails);toggleConsumableDetails(true);consumableCancel??=addProductCancel(consumableDetails,['sales_consumable_stock_id','sales_consumable_quantity','sales_consumable_price'],()=>{toggleConsumableDetails(false);if(detailsModal?.dataset.productType==='Sarf Malzeme')setProductType('');});};
   let firstDeviceCancel=null;
@@ -762,7 +939,7 @@ if ($currentContactPerson !== '') {
     if(number<2||number>4||detailsModal?.querySelector(`#hearing-device-details-${number}`))return;
     const previous=number===2?deviceDetails:detailsModal?.querySelector(`#hearing-device-details-${number-1}`);if(!previous)return;
     const device=document.createElement('div');device.id=`hearing-device-details-${number}`;device.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:14px';
-    device.innerHTML=`<label>İşitme Cihazı Markası<select name="sales_device_${number}_brand"></select></label><label>Model<select name="sales_device_${number}_model"></select></label><label>Seri No<input name="sales_device_${number}_serial" autocomplete="off"></label><label>SGK<input inputmode="decimal" name="sales_device_${number}_sgk" autocomplete="off"></label><label>İskonto Oranı<input inputmode="decimal" name="sales_device_${number}_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_${number}_net_price" autocomplete="off"></label>`;
+    device.innerHTML=`<label>İşitme Cihazı Markası<select name="sales_device_${number}_brand"></select></label><label>Model<select name="sales_device_${number}_model"></select></label><label>Seri No<input name="sales_device_${number}_serial" autocomplete="off"></label><label>SGK<input inputmode="decimal" name="sales_device_${number}_sgk" autocomplete="off"></label><label>İskonto % ya da TL<input inputmode="decimal" name="sales_device_${number}_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_${number}_net_price" autocomplete="off"></label>`;
     device.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');previous.after(device);
     const brand=device.querySelector(`[name="sales_device_${number}_brand"]`),model=device.querySelector(`[name="sales_device_${number}_model"]`),serial=device.querySelector(`[name="sales_device_${number}_serial"]`),discount=device.querySelector(`[name="sales_device_${number}_discount_rate"]`),netPrice=device.querySelector(`[name="sales_device_${number}_net_price"]`);
     const sync=()=>{if(!brand.value){model.replaceChildren(new Option('Önce marka seçiniz',''));model.disabled=true;return;}fillSelect(model,hearingDeviceStocks.filter(stock=>stock.brand===brand.value).map(stock=>stock.model),'Model seçiniz');model.disabled=false;};
@@ -781,32 +958,254 @@ if ($currentContactPerson !== '') {
   arrangeProductSections();
   updateTotalAmount();
   service.addEventListener('change',()=>{if(isSales()){close();openDetails();}else{value.value='';close();closeDetails()}});
-  modal.querySelectorAll('[data-sales-close]').forEach(x=>x.addEventListener('click',close));items.forEach(item=>item.addEventListener('click',()=>{value.value=item.dataset.id||'';close();openDetails()}));search?.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('tr-TR');items.forEach(item=>item.hidden=!!q&&!(item.dataset.search||'').includes(q))});detailsModal?.querySelectorAll('[data-sales-details-close]').forEach(x=>x.addEventListener('click',()=>{persistDetails();closeDetails()}));detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',()=>{persistDetails();form.requestSubmit()});form.addEventListener('submit',persistDetails);
-})();
-</script>
-<script>
-(() => {
-  const iconByField = {
-    record_no: 'tabler-hash', record_date: 'tabler-calendar', appointment_date: 'tabler-calendar-event',
-    start_time: 'tabler-clock', end_time: 'tabler-clock', service_type: 'tabler-phone',
-    service_location: 'tabler-building', branch_id: 'tabler-building-community', contact_person: 'tabler-user',
-    appointment_status: 'tabler-calendar-check', complaint: 'tabler-notes', observation: 'tabler-eye',
-    service_name: 'tabler-clipboard-list', result_name: 'tabler-circle-check', action_name: 'tabler-bolt',
-    action_date: 'tabler-calendar-event', description: 'tabler-file-text'
-  };
-  document.querySelectorAll('.service-form input[name],.service-form select[name],.service-form textarea[name]').forEach(field => {
-    if (field.type === 'hidden' || field.closest('.service-input-with-icon')) return;
-    const icon = iconByField[field.name];
-    if (!icon) return;
-    const wrapper = document.createElement('span');
-    wrapper.className = 'service-input-with-icon';
-    const iconSlot = document.createElement('span');
-    iconSlot.className = 'service-input-icon';
-    iconSlot.innerHTML = `<i class="ti ${icon}" aria-hidden="true"></i>`;
-    field.parentNode.insertBefore(wrapper, field);
-    wrapper.append(iconSlot, field);
-  });
-})();
+  modal.querySelectorAll('[data-sales-close]').forEach(x=>x.addEventListener('click',close));items.forEach(item=>item.addEventListener('click',()=>{value.value=item.dataset.id||'';close();openDetails()}));search?.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('tr-TR');items.forEach(item=>item.hidden=!!q&&!(item.dataset.search||'').includes(q))});detailsModal?.querySelectorAll('[data-sales-details-close]').forEach(x=>x.addEventListener('click',()=>{persistDetails();closeDetails()}));detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',async event=>{event.preventDefault();syncInvoice();let returnToSales=form.querySelector('[name="return_to_sales_details"]');if(!productWasRemoved){if(!returnToSales){returnToSales=document.createElement('input');returnToSales.type='hidden';returnToSales.name='return_to_sales_details';form.append(returnToSales);}returnToSales.value='1';}else{returnToSales?.remove();}const button=event.currentTarget;button.disabled=true;try{const response=await fetch(form.action||location.href,{method:'POST',body:new FormData(form),credentials:'same-origin'});if(!response.ok)throw new Error('Kayıt işlemi tamamlanamadı.');const responseUrl=new URL(response.url);const savedEditId=responseUrl.searchParams.get('edit');if(savedEditId){const editInput=form.querySelector('[name="edit_id"]');if(editInput)editInput.value=savedEditId;history.replaceState(null,'',responseUrl.pathname+'?'+responseUrl.searchParams.toString());}returnToSales?.remove();updateTotalAmount();if(productWasRemoved){closeDetails();const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',cleanUrl.pathname+'?'+cleanUrl.searchParams.toString());productWasRemoved=false;}alert('Kaydedildi');}catch(error){alert(error.message||'Kayıt işlemi tamamlanamadı.');}finally{button.disabled=false;}});form.addEventListener('submit',persistDetails);if(<?=json_encode($openSalesDetails)?>)setTimeout(openDetails,0);
+};
+if('requestIdleCallback' in window)window.requestIdleCallback(initializeSalesScreen,{timeout:300});else setTimeout(initializeSalesScreen,0);
 </script>
 <script>document.addEventListener('DOMContentLoaded',()=>{const serviceName=document.querySelector('#service-card-form [name="service_name"]');if(serviceName?.value.trim().toLocaleLowerCase('tr-TR')==='tamir')serviceName.dispatchEvent(new Event('change'));});</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const salesSave=document.getElementById('sales-details-save');if(!salesSave)return;salesSave.addEventListener('click',()=>{const nativeAlert=window.alert;let restored=false;window.alert=message=>{if(message==='Kaydedildi'){if(!restored){window.alert=nativeAlert;restored=true;}return;}return nativeAlert(message);};setTimeout(()=>{if(!restored){window.alert=nativeAlert;restored=true;}},15000);},true);});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const salesSave=document.getElementById('sales-details-save'),detailsModal=document.getElementById('sales-details-modal'),form=document.getElementById('service-card-form'),service=form?.querySelector('[name="service_name"]');
+  if(!salesSave||!detailsModal||!form||!service)return;
+  const hasSelectedProduct=()=>[...detailsModal.querySelectorAll('[name]')].some(field=>/^(sales_brand|sales_model|sales_device_(?:serial|net_price)|sales_charger_(?:brand|model|price)|sales_consumable_(?:stock_id|quantity|price)|sales_device_[2-4]_.+)$/.test(field.name)&&String(field.value||'').trim()!=='');
+  const closeChoice=()=>document.getElementById('sales-product-choice')?.remove();
+  const cancelSale=async()=>{
+    closeChoice();
+    salesSave.disabled=true;
+    service.value='';
+    const stockId=form.querySelector('[name="stock_id"]');
+    if(stockId)stockId.value='';
+    const salesDetails=form.querySelector('[name="sales_details"]');
+    if(salesDetails)salesDetails.value='';
+    try{
+      const response=await fetch(form.action||location.href,{method:'POST',body:new FormData(form),credentials:'same-origin'});
+      if(!response.ok)throw new Error('Kayıt işlemi tamamlanamadı.');
+      detailsModal.hidden=true;
+      detailsModal.setAttribute('aria-hidden','true');
+      document.getElementById('sales-details-link')?.remove();
+      document.querySelector('.sales-income-link')?.remove();
+      service.dispatchEvent(new Event('change',{bubbles:true}));
+    }catch(error){alert(error.message||'Kayıt işlemi tamamlanamadı.');}
+    finally{salesSave.disabled=false;}
+  };
+  const showChoice=()=>{
+    if(document.getElementById('sales-product-choice'))return;
+    const dialog=document.createElement('div');
+    dialog.id='sales-product-choice';
+    dialog.setAttribute('role','dialog');
+    dialog.setAttribute('aria-modal','true');
+    dialog.style.cssText='position:fixed;inset:0;z-index:10050;display:grid;place-items:center;background:rgba(0,0,0,.45);padding:16px';
+    dialog.innerHTML='<div style="width:min(430px,100%);background:#fff;border-radius:10px;padding:24px;box-shadow:0 16px 38px rgba(0,0,0,.25);color:#2f2b3d"><strong style="display:block;font-size:17px;margin-bottom:10px">Satış kaydı</strong><p style="margin:0 0 20px;line-height:1.5">Satış kartında ürün ve ödeme şekli bulunmuyor. Ürün seçmeye devam etmek ister misiniz?</p><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" data-choice="cancel" style="border:0;border-radius:6px;padding:9px 16px;cursor:pointer;background:#e6525d;color:#fff">İptal</button><button type="button" data-choice="select" style="border:0;border-radius:6px;padding:9px 16px;cursor:pointer;background:#19a94b;color:#fff">Ürün seç</button></div></div>';
+    dialog.querySelector('[data-choice="select"]')?.addEventListener('click',closeChoice);
+    dialog.querySelector('[data-choice="cancel"]')?.addEventListener('click',cancelSale);
+    document.body.append(dialog);
+  };
+  const hasPaymentType=()=>String(detailsModal.querySelector('[name="sales_payment_type"]')?.value||'').trim()!=='';
+  salesSave.addEventListener('click',event=>{
+    if(hasSelectedProduct())return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if(hasPaymentType()){alert('Satış kaydı için en az bir ürün seçmelisiniz.');return;}
+    showChoice();
+  },true);
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const service=document.querySelector('#service-card-form [name="service_name"]'),removeSaleActions=()=>{if(service?.value.trim()==='Satış')return;document.getElementById('sales-details-link')?.remove();document.querySelector('.sales-income-link')?.remove();};removeSaleActions();service?.addEventListener('change',removeSaleActions);const pageUrl=new URL(location.href);if(pageUrl.searchParams.has('open_sales_details')){setTimeout(()=>{removeSaleActions();document.getElementById('sales-details-modal')?.setAttribute('hidden','');pageUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',pageUrl.pathname+(pageUrl.search||''));},0);}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const renderIncomeSummary=()=>{const form=document.querySelector('form[action*="cash.php"]'),header=form?.querySelector('header');if(!form||!header)return;const amounts=[...form.querySelectorAll('[data-primary-term-amount]')],paid=[...form.querySelectorAll('[name="term_paid[]"]')],scheduled=amounts.reduce((sum,input)=>sum+(Number(String(input.value||'').replace(/[^0-9,.-]/g,'').replaceAll('.','').replace(',','.'))||0),0),total=scheduled||(Number(String(form.querySelector('[name="amount"]')?.value||'').replace(/[^0-9,.-]/g,'').replaceAll('.','').replace(',','.'))||0),paidTotal=amounts.reduce((sum,input,index)=>sum+(paid[index]?.checked?(Number(String(input.value||'').replace(/[^0-9,.-]/g,'').replaceAll('.','').replace(',','.'))||0):0),0),balance=Math.max(0,total-paidTotal),money=value=>value.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';let summary=header.querySelector('[data-income-header-total]');if(!summary){summary=document.createElement('span');summary.dataset.incomeHeaderTotal='1';summary.style.cssText='margin-left:auto;font-size:13px;font-weight:700;white-space:normal;line-height:1.4;text-align:right';header.append(summary);}summary.innerHTML='<span style="display:block;color:#19a94b">Ödenen: '+money(paidTotal)+'</span>'+(balance>0?'<span style="display:block;color:#e6525d">Bakiye: '+money(balance)+'</span>':'');};[100,350,800].forEach(delay=>setTimeout(renderIncomeSummary,delay));});
+document.addEventListener('DOMContentLoaded',()=>{const markOverdue=()=>{const form=document.querySelector('form[action*="cash.php"]');if(!form)return;const today=new Date();today.setHours(0,0,0,0);[...form.querySelectorAll('[name="term_date[]"]')].forEach((date,index)=>{const payment=date.closest('label')?.nextElementSibling,amount=payment?.querySelector('[data-primary-term-amount]'),paid=form.querySelectorAll('[name="term_paid[]"]')[index],due=date.value?new Date(date.value+'T00:00:00'):null,overdue=!!due&&due<today&&!paid?.checked;[date,amount].forEach(field=>{if(!field)return;field.style.borderColor=overdue?'#e0444c':'';field.style.color=overdue?'#e0444c':'';});});};document.addEventListener('input',event=>{if(event.target.matches('[name="term_date[]"],[name="term_paid[]"]'))markOverdue();});document.addEventListener('change',event=>{if(event.target.matches('[name="term_date[]"],[name="term_paid[]"]'))markOverdue();});[100,350,800].forEach(delay=>setTimeout(markOverdue,delay));});
+document.addEventListener('DOMContentLoaded',()=>{const cashId=<?=json_encode((int)($savedCashRecord['id'] ?? 0))?>;if(!cashId)return;document.addEventListener('change',event=>{if(!event.target.matches('[name="term_paid[]"]'))return;const form=event.target.closest('form[action*="cash.php"]');if(!form)return;const dates=[...form.querySelectorAll('[name="term_date[]"]')],amounts=[...form.querySelectorAll('[data-primary-term-amount]')],paid=[...form.querySelectorAll('[name="term_paid[]"]')],plan=dates.map((date,index)=>({date:date.value,amount:amounts[index]?.value||'',paid:!!paid[index]?.checked}));const data=new FormData();data.set('csrf',<?=json_encode(csrf())?>);data.set('action','cash_term_schedule_only');data.set('cash_id',String(cashId));data.set('term_schedule',JSON.stringify(plan));fetch(location.href,{method:'POST',body:data,credentials:'same-origin'});});});
+document.addEventListener('DOMContentLoaded',()=>{const formatTotal=()=>{const field=document.querySelector('form[action*="cash.php"] [name="amount"]');if(!field||!field.value.trim())return;const raw=field.value.replace(/[^0-9,.-]/g,''),amount=Number(raw.includes(',')?raw.replaceAll('.','').replace(',','.'):raw);if(Number.isFinite(amount))field.value=amount.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';};document.addEventListener('change',event=>{if(event.target.matches('[name="installment_count"]'))setTimeout(formatTotal,50);});[100,350,800].forEach(delay=>setTimeout(formatTotal,delay));});
+document.addEventListener('DOMContentLoaded',()=>{const form=document.querySelector('form[action*="cash.php"]');if(!form)return;form.addEventListener('submit',async event=>{if(event.defaultPrevented)return;event.preventDefault();const data=new FormData(form),amount=data.get('amount');if(typeof amount==='string'){const raw=amount.replace(/[^0-9,.-]/g,''),parsed=Number(raw.includes(',')?raw.replaceAll('.','').replace(',','.'):raw);if(Number.isFinite(parsed))data.set('amount',String(parsed));}data.set('ajax','1');const button=form.querySelector('footer button:not([data-cash-close])');if(button)button.disabled=true;try{const response=await fetch(new URL(form.getAttribute('action')||'cash.php',location.href),{method:'POST',body:data,credentials:'same-origin'}),result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Kayıt işlemi tamamlanamadı.');}catch(error){alert(error.message||'Kayıt işlemi tamamlanamadı.');}finally{if(button)button.disabled=false;}},false);});
+window.addEventListener('click',event=>{const button=event.target.closest('form[action*="cash.php"] footer button');if(!button||button.dataset.incomeUpdate==='1'||button.matches('[data-cash-close]')||button.matches('[aria-label="Bir gelir kaydı daha ekle"]'))return;const form=button.closest('form');if(!form)return;event.preventDefault();event.stopImmediatePropagation();form.requestSubmit();},true);
+</script>
+<style>
+form[action*="cash.php"]>footer{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important}
+form[action*="cash.php"].repair-dialog>footer{padding:16px 24px 20px!important;min-height:0!important}
+form[action*="cash.php"].repair-dialog>footer button{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;flex:0 0 44px!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important}
+form[action*="cash.php"].repair-dialog>footer button .ti{font-size:21px!important;line-height:1!important;font-weight:700!important}
+form[action*="cash.php"].repair-dialog>footer [aria-label="Bir gelir kaydı daha ekle"]{font-size:26px!important;font-weight:600!important;line-height:1!important}
+form[action*="cash.php"]>footer [data-cash-close]{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#e6525d!important;color:#fff!important}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const normalizeIncomeFooter=()=>{
+    const form=document.querySelector('form[action*="cash.php"]'),footer=form?.querySelector(':scope > footer');
+    if(!footer)return;
+    const footerButtons=[...footer.querySelectorAll('button')],addButton=footer.querySelector('[aria-label="Bir gelir kaydı daha ekle"]'),actionButtons=footerButtons.filter(button=>button!==addButton);
+    const cancel=footer.querySelector('[data-cash-close]')||actionButtons.find(button=>button!==actionButtons.at(-1));
+    if(cancel){
+      cancel.title='İptal';
+      cancel.setAttribute('aria-label','İptal');
+      Object.entries({width:'44px',minWidth:'44px',maxWidth:'44px',height:'44px',minHeight:'44px',maxHeight:'44px',padding:'0',boxSizing:'border-box'}).forEach(([property,value])=>cancel.style.setProperty(property.replace(/[A-Z]/g,letter=>'-'+letter.toLowerCase()),value,'important'));
+      cancel.style.setProperty('background','#e6525d','important');
+      cancel.style.setProperty('color','#fff','important');
+      cancel.style.setProperty('border','0','important');
+      if(!cancel.dataset.iconReady){cancel.innerHTML='<i class="ti tabler-arrow-back-up" aria-hidden="true"></i>';cancel.dataset.iconReady='1';}
+    }
+    const addIncome=footer.querySelector('[aria-label="Bir gelir kaydı daha ekle"]');
+    if(addIncome)Object.entries({width:'44px',minWidth:'44px',maxWidth:'44px',height:'44px',minHeight:'44px',maxHeight:'44px',padding:'0',boxSizing:'border-box'}).forEach(([property,value])=>addIncome.style.setProperty(property.replace(/[A-Z]/g,letter=>'-'+letter.toLowerCase()),value,'important'));
+    [...footer.querySelectorAll('button')].forEach(button=>{
+      if(button.matches('[data-cash-close],[aria-label="Bir gelir kaydı daha ekle"]'))return;
+      if(form.dataset.saved==='1'&&!button.dataset.updateGuard){
+        button.dataset.updateGuard='1';
+        const bypassCashSubmit=()=>{button.dataset.incomeUpdate='1';};
+        button.addEventListener('pointerdown',bypassCashSubmit);
+        button.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ')bypassCashSubmit();});
+      }
+      button.title='Kaydet';
+      button.setAttribute('aria-label','Kaydet');
+      button.style.cssText='display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#19a94b!important;color:#fff!important';
+      if(!button.dataset.iconReady){button.innerHTML='<i class="ti tabler-device-floppy" aria-hidden="true"></i>';button.dataset.iconReady='1';}
+    });
+  };
+  normalizeIncomeFooter();
+  new MutationObserver(normalizeIncomeFooter).observe(document.body,{childList:true,subtree:true});
+  const lockIncomeFooterSize=()=>document.querySelectorAll('form[action*="cash.php"].repair-dialog>footer button').forEach(button=>{
+    if(button.style.getPropertyValue('width')==='44px'&&button.style.getPropertyValue('height')==='44px')return;
+    ['width','min-width','max-width','height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'44px','important'));
+    button.style.setProperty('padding','0','important');
+    button.style.setProperty('box-sizing','border-box','important');
+  });
+  new MutationObserver(lockIncomeFooterSize).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
+  lockIncomeFooterSize();
+});
+</script>
+<script>
+window.addEventListener('click',event=>{
+  // Güncelle düğmesi formun action değerini değiştirse bile doğrulamayı modal üzerinde yap.
+  const button=event.target.closest('form.repair-dialog footer button');
+  if(!button||button.matches('[data-cash-close],[aria-label="Bir gelir kaydı daha ekle"]'))return;
+  const form=button.closest('form'),toNumber=value=>{
+    const source=String(value||'').replace(/[^0-9,.-]/g,'');
+    const normalized=source.includes(',')?source.replaceAll('.','').replace(',','.'):source;
+    return Number(normalized)||0;
+  };
+  if(!form)return;
+  const saleTotal=toNumber(document.querySelector('#sales-details-modal [name="sales_payment_amount"]')?.value);
+  if(saleTotal<=0)return;
+  const totalSchedule=[...form.querySelectorAll('[data-primary-term-amount]')].reduce((sum,input)=>sum+toNumber(input.value),0);
+  const primary=totalSchedule||toNumber(form.querySelector('[name="amount"]')?.value);
+  const extra=form.querySelector('[data-extra-income]');
+  const extraSchedule=[...extra?.querySelectorAll('[data-term-amount]')||[]].reduce((sum,input)=>sum+toNumber(input.value),0);
+  const extraAmount=extraSchedule||toNumber(extra?.querySelector('[name="extra_amount"]')?.value);
+  if(Math.abs((primary+extraAmount)-saleTotal)<=0.009)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  form.dataset.incomeValidationFailed='1';
+  const totalText=saleTotal.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
+  alert('Gelir kayıtları toplamı, Satış Bilgileri ekranındaki '+totalText+' toplam tutara eşit olmalıdır.\nLütfen düzeltin ve yeniden kaydedin.');
+},true);
+</script>
+<script>
+document.addEventListener('click',event=>{
+  const cancel=event.target.closest('form.repair-dialog [data-cash-close]');
+  const form=cancel?.closest('form.repair-dialog');
+  if(!form||form.dataset.incomeValidationFailed!=='1')return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const request=document.createElement('form');
+  request.method='post';
+  request.action=<?=json_encode(url('patient-followup.php?id='.$id))?>;
+  const values={csrf:<?=json_encode(csrf())?>,action:'cash_cancel_income',edit_id:<?=json_encode((string)$editId)?>};
+  Object.entries(values).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;request.append(input);});
+  document.body.append(request);
+  request.submit();
+},true);
+</script>
+<script>
+(()=>{
+  const originalAlert=window.alert.bind(window);
+  window.alert=message=>{
+    if(message!=='Gelir kayıtları toplamı, Satış Bilgileri ekranındaki toplam tutara eşit olmalıdır.\nLütfen düzeltin ve yeniden kaydedin.')return originalAlert(message);
+    const value=String(document.querySelector('#sales-details-modal [name="sales_payment_amount"]')?.value||'');
+    const raw=value.replace(/[^0-9,.-]/g,''),amount=Number(raw.includes(',')?raw.replaceAll('.','').replace(',','.'):raw);
+    const total=Number.isFinite(amount)?amount.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺':value;
+    originalAlert('Gelir kayıtları toplamı, Satış Bilgileri ekranındaki '+total+' toplam tutara eşit olmalıdır.\nLütfen düzeltin ve yeniden kaydedin.');
+  };
+})();
+</script>
+<?php if ($incomeValidationDraft): ?><script>
+window.addEventListener('DOMContentLoaded',()=>{
+  const draft=<?=json_encode($incomeValidationDraft, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const restoreDraft=()=>{
+    const form=document.querySelector('form[action*="cash.php"]'),add=form?.querySelector('[aria-label="Bir gelir kaydı daha ekle"]');
+    if(!form||!add){setTimeout(restoreDraft,60);return;}
+    if(!form.querySelector('[data-extra-income]'))add.click();
+    setTimeout(()=>{
+      const extra=form.querySelector('[data-extra-income]');
+      if(!extra)return;
+      const set=(name,value)=>{const field=extra.querySelector(`[name="${name}"]`);if(field)field.value=value??'';};
+      set('extra_payment_type',draft.payment_type);set('extra_bank_name',draft.bank_name);set('extra_current_account_id',draft.current_account_id);set('extra_installment_count',draft.installment_count||'1');set('extra_commission_rate',draft.commission_rate);set('extra_amount',draft.amount);set('extra_description',draft.description);
+      extra.querySelector('[name="extra_payment_type"]')?.dispatchEvent(new Event('change',{bubbles:true}));
+      if(draft.payment_type==='term'&&draft.term_schedule){
+        let plan=[];try{plan=JSON.parse(draft.term_schedule)||[]}catch(_){}
+        setTimeout(()=>plan.forEach((item,index)=>{const date=extra.querySelectorAll('[name="extra_term_date[]"]')[index],amount=extra.querySelectorAll('[data-term-amount]')[index];if(date)date.value=item.date||'';if(amount)amount.value=item.amount||'';}),120);
+      }
+    },100);
+  };
+  setTimeout(restoreDraft,420);
+});
+</script><?php endif; ?>
+<script>
+window.addEventListener('click',async event=>{
+  const button=event.target.closest('form.repair-dialog footer button[data-income-update="1"]');
+  if(!button)return;
+  const form=button.closest('form');
+  if(!form)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const money=value=>{const text=String(value||'').replace(/[^0-9,.-]/g,'');return text.includes(',')?text.replaceAll('.','').replace(',','.'):text;};
+  const schedule=(scope,dateName,amountSelector,paidName)=>[...scope.querySelectorAll(`[name="${dateName}"]`)].map((date,index)=>({date:date.value,amount:scope.querySelectorAll(amountSelector)[index]?.value||'',paid:!!scope.querySelectorAll(`[name="${paidName}"]`)[index]?.checked}));
+  const extra=form.querySelector('[data-extra-income]');
+  const records=window.__savedCashRecords||[];
+  const data=new FormData();
+  const set=(name,value)=>data.set(name,value??'');
+  set('csrf',<?=json_encode(csrf())?>);
+  set('action','cash_update_only');
+  set('ajax','1');
+  set('edit_id',new URLSearchParams(location.search).get('edit')||'');
+  set('cash_update_id',records[0]?.id||form.querySelector('[name="id"]')?.value||'');
+  set('cash_update_date',form.querySelector('[name="transaction_date"]')?.value||'');
+  set('cash_update_description',form.querySelector('[name="description"]')?.value||'');
+  set('cash_update_amount',money(form.querySelector('[name="amount"]')?.value));
+  set('cash_update_payment_type',form.querySelector('[name="payment_type"]')?.value||'');
+  set('cash_update_installment_count',form.querySelector('[name="installment_count"]')?.value||'1');
+  set('cash_update_bank_name',form.querySelector('[name="bank_name"]')?.value||'');
+  set('cash_update_commission_rate',form.querySelector('[name="commission_rate"]')?.value||'');
+  set('cash_update_term_schedule',JSON.stringify(schedule(form,'term_date[]','[data-primary-term-amount]','term_paid[]')));
+  set('cash_update_extra_id',records[1]?.id||'');
+  set('cash_update_extra_description',extra?.querySelector('[name="extra_description"]')?.value||'');
+  set('cash_update_extra_amount',money(extra?.querySelector('[name="extra_amount"]')?.value));
+  set('cash_update_extra_payment_type',extra?.querySelector('[name="extra_payment_type"]')?.value||'');
+  set('cash_update_extra_installment_count',extra?.querySelector('[name="extra_installment_count"]')?.value||'1');
+  set('cash_update_extra_bank_name',extra?.querySelector('[name="extra_bank_name"]')?.value||'');
+  set('cash_update_extra_commission_rate',extra?.querySelector('[name="extra_commission_rate"]')?.value||'');
+  set('cash_update_extra_current_account_id',extra?.querySelector('[name="extra_current_account_id"]')?.value||'');
+  set('cash_update_extra_term_schedule',JSON.stringify(extra?schedule(extra,'extra_term_date[]','[data-term-amount]','extra_term_paid[]'):[]));
+  button.disabled=true;
+  try{
+    const response=await fetch(location.href,{method:'POST',body:data,credentials:'same-origin'});
+    const result=await response.json();
+    if(!response.ok||!result.success)throw new Error(result.message||'Kayıt işlemi tamamlanamadı.');
+    if(Array.isArray(result.records))window.__savedCashRecords=result.records;
+    form.dataset.incomeValidationFailed='';
+    let notice=document.getElementById('income-save-notice');
+    if(!notice){notice=document.createElement('div');notice.id='income-save-notice';notice.style.cssText='position:fixed;right:24px;bottom:24px;z-index:2000;padding:11px 16px;border-radius:6px;background:#19a94b;color:#fff;font-size:14px;font-weight:700;box-shadow:0 8px 22px rgba(25,169,75,.28)';document.body.append(notice);}
+    notice.textContent='Kaydedildi';
+    notice.hidden=false;
+    clearTimeout(window.__incomeSaveNoticeTimer);
+    window.__incomeSaveNoticeTimer=setTimeout(()=>{notice.hidden=true;},2200);
+  }catch(error){alert(error.message||'Kayıt işlemi tamamlanamadı.');}
+  finally{button.disabled=false;}
+},true);
+</script>
+<?php if ($fromSgkList): ?>
+<style>#sales-details-modal input[name$="_sgk"]{border:2px solid #e04f55!important;box-shadow:0 0 0 2px rgba(224,79,85,.12)}</style>
+<?php endif; ?>
 <?php patient_footer(); ?>

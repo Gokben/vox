@@ -17,6 +17,7 @@ function ensure_cash_schema(PDO $pdo): void
         if (!in_array('commission_rate', array_column($columns, 'name'), true)) $pdo->exec('ALTER TABLE cash_transactions ADD COLUMN commission_rate NUMERIC NULL');
         if (!in_array('current_account_id', array_column($columns, 'name'), true)) $pdo->exec('ALTER TABLE cash_transactions ADD COLUMN current_account_id INTEGER NULL');
         if (!in_array('term_schedule', array_column($columns, 'name'), true)) $pdo->exec('ALTER TABLE cash_transactions ADD COLUMN term_schedule TEXT NULL');
+        if (!in_array('cash_register', array_column($columns, 'name'), true)) $pdo->exec("ALTER TABLE cash_transactions ADD COLUMN cash_register TEXT NOT NULL DEFAULT 'main'");
         $pdo->exec("CREATE TABLE IF NOT EXISTS cash_closings (id INTEGER PRIMARY KEY AUTOINCREMENT, closing_date TEXT NOT NULL UNIQUE, expected_balance NUMERIC NOT NULL, counted_balance NUMERIC NOT NULL, difference NUMERIC NOT NULL, note TEXT, created_by INTEGER NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)");
         $pdo->exec('INSERT OR IGNORE INTO cash_settings(id,opening_balance) VALUES(1,0)');
     } else {
@@ -44,6 +45,9 @@ function ensure_cash_schema(PDO $pdo): void
         $termScheduleColumn = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cash_transactions' AND column_name='term_schedule'");
         $termScheduleColumn->execute();
         if (!$termScheduleColumn->fetchColumn()) $pdo->exec('ALTER TABLE cash_transactions ADD COLUMN term_schedule TEXT NULL AFTER current_account_id');
+        $registerColumn = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cash_transactions' AND column_name='cash_register'");
+        $registerColumn->execute();
+        if (!$registerColumn->fetchColumn()) $pdo->exec("ALTER TABLE cash_transactions ADD COLUMN cash_register VARCHAR(20) NOT NULL DEFAULT 'main' AFTER term_schedule");
         $pdo->exec("ALTER TABLE cash_transactions MODIFY payment_type ENUM('cash','credit_card','mail_order','term') NOT NULL");
         $pdo->exec("CREATE TABLE IF NOT EXISTS cash_closings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, closing_date DATE NOT NULL UNIQUE, expected_balance DECIMAL(14,2) NOT NULL, counted_balance DECIMAL(14,2) NOT NULL, difference DECIMAL(14,2) NOT NULL, note VARCHAR(255) NULL, created_by INT UNSIGNED NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $pdo->exec('INSERT IGNORE INTO cash_settings(id,opening_balance) VALUES(1,0)');

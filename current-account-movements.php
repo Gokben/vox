@@ -9,6 +9,12 @@ try {
     $mailOrderStatement->execute([$id]);
     $mailOrderRows = $mailOrderStatement->fetchAll();
 } catch (Throwable $e) {}
+$sgkRows = [];
+try {
+    $sgkStatement = $pdo->prepare("SELECT transaction_date,movement_kind,amount,description,invoice_no,source_ref FROM current_account_transactions WHERE current_account_id=? ORDER BY transaction_date DESC,id DESC");
+    $sgkStatement->execute([$id]);
+    $sgkRows = $sgkStatement->fetchAll();
+} catch (Throwable $e) {}
 foreach ($mailOrderRows as &$mailOrder) {
     $mailOrder['invoice_no'] = '';
     $sourceQuery = [];
@@ -118,16 +124,26 @@ foreach ($rows as $row) {
 $groupedRows = array_values($groupedRows);
 foreach ($groupedRows as &$groupedRow) $groupedRow['gross_amount'] = $groupedRow['invoice_no'] !== '' ? (float)($invoiceGrossAmounts[$groupedRow['invoice_no']] ?? 0) : 0.0;
 unset($groupedRow);
+$isSgkAccount = (string)$account['code'] === 'CR-08';
 $accountBalance = 0.0;
 foreach ($groupedRows as $groupedRow) $accountBalance += ($groupedRow['movement_type'] === 'Giriş' ? 1 : -1) * (float)$groupedRow['total_price_with_vat'];
 foreach ($mailOrderRows as $mailOrder) $accountBalance -= (float)$mailOrder['amount'];
+foreach ($sgkRows as $sgkRow) $accountBalance += $sgkRow['movement_kind'] === 'debit' ? (float)$sgkRow['amount'] : -(float)$sgkRow['amount'];
 ?>
-<main class="patient-container cam-page">
+<main class="patient-container cam-page<?= $isSgkAccount ? ' sgk-account' : '' ?>">
+<style>.sgk-account .cam-card th:nth-child(6),.sgk-account .cam-card td:nth-child(6),.sgk-account .cam-card th:nth-child(7),.sgk-account .cam-card td:nth-child(7),.sgk-account .cam-card th:nth-child(8),.sgk-account .cam-card td:nth-child(8),.sgk-account .cam-card th:nth-child(9),.sgk-account .cam-card td:nth-child(9),.sgk-account .cam-card th:nth-child(11),.sgk-account .cam-card td:nth-child(11){display:none}.sgk-account .cam-card table{min-width:680px}.sgk-account .sgk-debit-row td:nth-child(5){color:#e04f55;font-weight:700}</style>
+<?php if ($isSgkAccount): ?><script>document.addEventListener('DOMContentLoaded',()=>{const header=document.querySelector('.sgk-account .cam-card th:nth-child(5)');if(header)header.textContent='TOPLAM';});</script><?php endif; ?>
   <section class="cam-card">
     <header><div><h1>Cari Hareketleri</h1><p><?=e($account['code'].' — '.$account['title'])?></p></div><div class="account-balance"><span>Bakiye</span><strong><?=e(number_format($accountBalance, 2, ',', '.'))?> TL</strong></div></header>
     <div><table>
       <thead><tr><th>TARİH</th><th>HAREKET</th><th>FATURA NO</th><th>MİKTAR</th><th>T. TUTAR</th><th>T. TUTAR (KDV'Lİ)</th><th>İSKONTOSUZ FATURA TUTARI</th><th>İSKONTO</th><th>ORT İSK.</th><th>ÖDEME TİPİ</th><th aria-label="İşlemler"></th></tr></thead>
       <tbody>
+      <?php foreach ($sgkRows as $sgkRow): ?>
+        <tr class="sgk-current-row <?= $sgkRow['movement_kind'] === 'debit' ? 'sgk-debit-row' : 'sgk-collection-row' ?>">
+          <td><?=e(format_date_tr($sgkRow['transaction_date']))?></td><td class="movement-<?= $sgkRow['movement_kind'] === 'debit' ? 'entry' : 'exit' ?>"><?= $sgkRow['movement_kind'] === 'debit' ? 'Borç' : 'Tahsilat' ?></td><td><?=e($sgkRow['invoice_no'] ?: '—')?></td><td>1</td>
+          <td><?=e(number_format((float)$sgkRow['amount'], 2, ',', '.'))?> TL</td><td><?=e(number_format((float)$sgkRow['amount'], 2, ',', '.'))?> TL</td><td>—</td><td>—</td><td>—</td><td>SGK</td><td>—</td>
+        </tr>
+      <?php endforeach; ?>
       <?php foreach ($mailOrderRows as $mailOrder): ?>
         <tr class="mail-order-outgoing">
           <td><?=e(format_date_tr($mailOrder['transaction_date']))?></td><td>Çıkış</td><td><span class="mail-order-invoice" title="<?=e($mailOrder['description'])?>"><?=e($mailOrder['invoice_no'] ?: '—')?></span></td><td>—</td>
@@ -141,7 +157,7 @@ foreach ($mailOrderRows as $mailOrder) $accountBalance -= (float)$mailOrder['amo
           <td>—</td><td><button type="button" class="invoice-details-toggle" data-invoice-row="<?=$index?>" title="Fatura kalemlerini göster" aria-label="Fatura kalemlerini göster">+</button></td>
         </tr>
         <tr class="invoice-detail-row" data-invoice-detail="<?=$index?>" hidden><td colspan="11"><table class="invoice-items"><thead><tr><th>STOK KARTI</th><th>MİKTAR</th><th>İSKONTO ORANI</th><th>FİYAT</th></tr></thead><tbody><?php foreach ($row['items'] as $item): ?><tr><td><?=e($item['stock'])?></td><td><?=e((string)$item['quantity'])?></td><td><form method="post" class="item-discount-inline"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_item_discount"><input type="hidden" name="movement_id" value="<?=e((string)$item['id'])?>"><input name="discount_rate" type="number" min="0" max="100" step="0.01" value="<?=e((string)$item['discount_rate'])?>"><span>%</span></form></td><td><?=e(number_format($item['price'], 2, ',', '.'))?> TL</td></tr><?php endforeach ?></tbody></table></td></tr>
-      <?php endforeach; if (!$groupedRows): ?>
+      <?php endforeach; if (!$groupedRows && !$mailOrderRows && !$sgkRows): ?>
         <tr><td colspan="11" class="empty">Bu cariye ait hareket bulunmuyor.</td></tr>
       <?php endif ?>
       </tbody>

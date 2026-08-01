@@ -45,7 +45,7 @@ function patient_header(string $title, string $active = 'patients'): void
     ?>
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=e($title)?> | <?=APP_NAME?></title><link rel="icon" type="image/png" href="<?=url('assets/favicon.png?v=20260713')?>">
-<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260725-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260725-6')?>"><script src="<?=url('assets/theme.js?v=20260725-33')?>" defer></script>
+<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260725-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260725-6')?>"><script src="<?=url('assets/theme.js?v=20260801-1')?>" defer></script>
 </head><body><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><span class="language">TR</span><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kartları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><span><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span><i class="icon-base ti tabler-settings"></i></span> Ayarlar</a><?php endif?></nav></header>
 <?php
 }
@@ -65,6 +65,9 @@ stockSubmenu.className = 'report-submenu';
 const stockEntryLink = document.createElement('a');
 stockEntryLink.href = <?= json_encode(url('stock-entry.php')) ?>;
 stockEntryLink.textContent = 'Stok Giriş';
+const stockExitLink = document.createElement('a');
+stockExitLink.href = <?= json_encode(url('stock-exit.php')) ?>;
+stockExitLink.textContent = 'Stok Çıkış';
 const stockCardLink = document.createElement('a');
 stockCardLink.href = <?= json_encode(url('stocks.php')) ?>;
 stockCardLink.textContent = 'Stok Kartı Listesi';
@@ -74,7 +77,7 @@ stockPricesLink.textContent = 'Liste Fiyatları';
 const priceListsLink = document.createElement('a');
 priceListsLink.href = <?= json_encode(url('price-lists.php')) ?>;
 priceListsLink.textContent = 'Liste Fiyatları';
-stockSubmenu.append(stockEntryLink, stockCardLink, priceListsLink);
+stockSubmenu.append(stockEntryLink, stockExitLink, stockCardLink, priceListsLink);
 stockMenuLink.setAttribute('aria-haspopup', 'true');
 stockMenuLink.setAttribute('aria-expanded', 'false');
 stockMenuLink.addEventListener('click', event => {
@@ -86,8 +89,9 @@ stockMenuLink.addEventListener('click', event => {
 stockSubmenu.addEventListener('click', event => { if (event.target.closest('a')) sessionStorage.setItem('vox.stockMenuOpen', '1'); });
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
-if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php') || sessionStorage.getItem('vox.stockMenuOpen') === '1') { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
+if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/stock-exit.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php') || sessionStorage.getItem('vox.stockMenuOpen') === '1') { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
 if (location.pathname.endsWith('/stock-entry.php')) stockEntryLink.classList.add('active');
+if (location.pathname.endsWith('/stock-exit.php')) stockExitLink.classList.add('active');
 if (location.pathname.endsWith('/stocks.php')) stockCardLink.classList.add('active');
 if (location.pathname.endsWith('/price-lists.php')) priceListsLink.classList.add('active');
 const technicalServiceMenuLink = document.createElement('a');
@@ -100,6 +104,12 @@ cashMenuLink.href = <?= json_encode(url('cash.php')) ?>;
 cashMenuLink.innerHTML = '<span><i class="icon-base ti tabler-briefcase-filled"></i></span> Kasa';
 technicalServiceMenuLink.after(cashMenuLink);
 if (location.pathname.endsWith('/cash.php')) cashMenuLink.classList.add('active');
+const preCashMenuLink = document.createElement('a');
+preCashMenuLink.href = <?= json_encode(url('cash-pre.php')) ?>;
+preCashMenuLink.innerHTML = '<span><i class="icon-base ti tabler-cash"></i></span> Ön Kasa';
+preCashMenuLink.style.paddingLeft = '24px';
+cashMenuLink.before(preCashMenuLink);
+if (location.pathname.endsWith('/cash-pre.php')) preCashMenuLink.classList.add('active');
 const currentAccountsMenuLink = document.createElement('a');
 currentAccountsMenuLink.href = <?= json_encode(url('current-accounts.php')) ?>;
 currentAccountsMenuLink.innerHTML = '<span><i class="icon-base ti tabler-address-book"></i></span> Cari Kartlar';
@@ -194,7 +204,10 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   const resultListLink = document.createElement('a');
   resultListLink.href = <?= json_encode(url('result-list.php')) ?>;
   resultListLink.textContent = 'Sonuç Listesi';
-  const listPages = ['result-list.php', 'patient-results.php', 'hearing-devices.php', 'sales.php'];
+  const sgkListLink = document.createElement('a');
+  sgkListLink.href = <?= json_encode(url('sgk-list.php')) ?>;
+  sgkListLink.textContent = 'SGK Listesi';
+  const listPages = ['result-list.php', 'patient-results.php', 'hearing-devices.php', 'sales.php', 'sgk-list.php'];
   const shouldOpenListsMenu = listPages.includes(location.pathname.split('/').pop()) || sessionStorage.getItem('vox.listsMenuOpen') === '1';
   if (shouldOpenListsMenu) {
     resultListLink.classList.add('active');
@@ -203,7 +216,8 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   }
   if (location.pathname.endsWith('/hearing-devices.php')) { resultListLink.classList.remove('active'); followUpMenuLink.classList.add('active'); }
   if (location.pathname.endsWith('/sales.php')) { resultListLink.classList.remove('active'); salesMenuLink.classList.add('active'); }
-  reportSubmenu.append(followUpMenuLink, salesMenuLink, resultListLink);
+  if (location.pathname.endsWith('/sgk-list.php')) { resultListLink.classList.remove('active'); sgkListLink.classList.add('active'); }
+  reportSubmenu.append(followUpMenuLink, salesMenuLink, resultListLink, sgkListLink);
   reportMenuLink.setAttribute('aria-haspopup', 'true');
   reportMenuLink.setAttribute('aria-expanded', 'false');
   if (shouldOpenListsMenu) reportMenuLink.setAttribute('aria-expanded', 'true');
@@ -228,6 +242,127 @@ if (calendarMenuLink) {
   if (calendarMenuLink.lastChild?.nodeType === Node.TEXT_NODE) calendarMenuLink.lastChild.textContent = ' Takvim';
   if (location.pathname.endsWith('/calendar.php')) calendarMenuLink.classList.add('active');
 }
+// Vuexy dikey menüdeki gibi: tek açık grup, kayarak açılan alt menü ve dönen ok.
+const menuAccordionStyle = document.createElement('style');
+menuAccordionStyle.textContent = `
+  .patient-nav .report-menu-group{position:static!important;overflow:hidden}
+  .patient-nav .report-menu-group>a{position:relative!important}
+  .patient-nav .report-menu-group>a::after{content:'›';position:absolute;right:16px;top:50%;font-size:22px;font-weight:400;line-height:1;transform:translateY(-50%) rotate(0deg);transition:transform .25s ease;color:var(--muted)}
+  .patient-nav .report-menu-group.open>a::after{transform:translateY(-50%) rotate(90deg)}
+  .patient-nav .report-submenu{display:block!important;max-height:0!important;opacity:0!important;overflow:hidden!important;pointer-events:none;transition:max-height .28s ease,opacity .2s ease!important}
+  .patient-nav .report-menu-group.open>.report-submenu{max-height:520px!important;opacity:1!important;pointer-events:auto}
+`;
+document.head.append(menuAccordionStyle);
+const menuGroups = () => [...document.querySelectorAll('.patient-nav > .report-menu-group')].filter(group => group.querySelector(':scope > .report-submenu'));
+const syncMenuGroup = group => {
+  const submenu = group.querySelector(':scope > .report-submenu');
+  const trigger = group.querySelector(':scope > a');
+  if (!submenu || !trigger) return;
+  const open = group.classList.contains('open');
+  // Açılış ve kapanış aynı CSS geçişini kullanır; eski satır içi yüksekliği temizle.
+  submenu.style.removeProperty('max-height');
+  trigger.setAttribute('aria-expanded', String(open));
+};
+const closeOtherMenuGroups = current => menuGroups().forEach(group => {
+  if (group === current) return;
+  group.classList.remove('open');
+  syncMenuGroup(group);
+});
+menuGroups().forEach(syncMenuGroup);
+document.querySelector('.patient-nav')?.addEventListener('click', event => {
+  const trigger = event.target.closest('.report-menu-group > a');
+  const group = trigger?.parentElement;
+  if (!trigger || !group?.classList.contains('report-menu-group')) return;
+  return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const willOpen = !group.classList.contains('open');
+  closeOtherMenuGroups(group);
+  group.classList.toggle('open', willOpen);
+  syncMenuGroup(group);
+  const name = trigger.textContent.trim().toLocaleLowerCase('tr-TR');
+  if (name.includes('stok')) sessionStorage.setItem('vox.stockMenuOpen', willOpen ? '1' : '0');
+  if (name.includes('kurulum')) sessionStorage.setItem('vox.setupMenuOpen', willOpen ? '1' : '0');
+  if (name.includes('listeler')) sessionStorage.setItem('vox.listsMenuOpen', willOpen ? '1' : '0');
+}, true);
+window.addEventListener('resize', () => menuGroups().forEach(syncMenuGroup));
+// Açılış eski menü davranışına döner; yalnızca kapanış kayan bir geçiş kullanır.
+const restoreMenuOpeningStyle = document.createElement('style');
+restoreMenuOpeningStyle.textContent = `
+  .patient-nav .report-menu-group{position:relative!important;overflow:visible!important}
+  .patient-nav .report-menu-group>a::after{content:none!important}
+  .patient-nav .report-submenu{display:none!important;max-height:none!important;opacity:1!important;overflow:visible!important;pointer-events:auto!important;transition:none!important}
+  .patient-nav .report-menu-group.open>.report-submenu{display:grid!important}
+  .patient-nav .report-menu-group.menu-closing>.report-submenu{display:grid!important;max-height:0!important;overflow:hidden!important;opacity:0!important;transition:max-height .24s ease,opacity .18s ease!important}
+`;
+document.head.append(restoreMenuOpeningStyle);
+document.querySelector('.patient-nav')?.addEventListener('click', event => {
+  const trigger = event.target.closest('.report-menu-group > a');
+  const group = trigger?.parentElement;
+  if (!trigger || !group?.classList.contains('open') || group.classList.contains('menu-closing')) return;
+  return;
+  const submenu = group.querySelector(':scope > .report-submenu');
+  if (!submenu) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  submenu.style.setProperty('max-height', submenu.scrollHeight + 'px', 'important');
+  group.classList.add('menu-closing');
+  requestAnimationFrame(() => submenu.style.setProperty('max-height', '0px', 'important'));
+  const name = trigger.textContent.trim().toLocaleLowerCase('tr-TR');
+  setTimeout(() => {
+    group.classList.remove('menu-closing', 'open');
+    submenu.style.removeProperty('max-height');
+    trigger.setAttribute('aria-expanded', 'false');
+    if (name.includes('stok')) sessionStorage.setItem('vox.stockMenuOpen', '0');
+    if (name.includes('kurulum')) sessionStorage.setItem('vox.setupMenuOpen', '0');
+    if (name.includes('listeler')) sessionStorage.setItem('vox.listsMenuOpen', '0');
+  }, 250);
+}, true);
+// Vuexy menu.js _toggleAnimation davranışı: grup yüksekliği başlık ile alt menü arasında geçiş yapar.
+const vuexyMenuAnimationStyle = document.createElement('style');
+vuexyMenuAnimationStyle.textContent = '.patient-nav .report-menu-group.menu-item-animating{overflow:hidden!important;transition:height .3s ease!important}';
+document.head.append(vuexyMenuAnimationStyle);
+const updateAccordionSession = (trigger, open) => {
+  const name = trigger.textContent.trim().toLocaleLowerCase('tr-TR');
+  if (name.includes('stok')) sessionStorage.setItem('vox.stockMenuOpen', open ? '1' : '0');
+  if (name.includes('kurulum')) sessionStorage.setItem('vox.setupMenuOpen', open ? '1' : '0');
+  if (name.includes('listeler')) sessionStorage.setItem('vox.listsMenuOpen', open ? '1' : '0');
+};
+const vuexyToggleGroup = (group, open) => {
+  const trigger = group.querySelector(':scope > a');
+  const submenu = group.querySelector(':scope > .report-submenu');
+  if (!trigger || !submenu || group.dataset.menuAnimating === '1') return;
+  const linkHeight = Math.round(trigger.getBoundingClientRect().height);
+  group.dataset.menuAnimating = '1';
+  group.style.height = open ? linkHeight + 'px' : linkHeight + Math.round(submenu.getBoundingClientRect().height) + 'px';
+  group.classList.add('menu-item-animating');
+  if (open) group.classList.add('open');
+  trigger.setAttribute('aria-expanded', String(open));
+  updateAccordionSession(trigger, open);
+  const clear = () => {
+    group.removeEventListener('transitionend', onEnd);
+    if (!open) group.classList.remove('open');
+    group.classList.remove('menu-item-animating');
+    group.style.height = '';
+    group.dataset.menuAnimating = '';
+  };
+  const onEnd = event => { if (event.target === group && event.propertyName === 'height') clear(); };
+  group.addEventListener('transitionend', onEnd);
+  setTimeout(() => {
+    group.style.height = (open ? linkHeight + Math.round(submenu.getBoundingClientRect().height) : linkHeight) + 'px';
+  }, 50);
+  setTimeout(clear, 400);
+};
+document.querySelector('.patient-nav')?.addEventListener('click', event => {
+  const trigger = event.target.closest('.report-menu-group > a');
+  const group = trigger?.parentElement;
+  if (!trigger || !group?.classList.contains('report-menu-group')) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const willOpen = !group.classList.contains('open');
+  if (willOpen) [...document.querySelectorAll('.patient-nav > .report-menu-group.open')].forEach(other => { if (other !== group) vuexyToggleGroup(other, false); });
+  vuexyToggleGroup(group, willOpen);
+}, true);
 </script>
 <script>
 const root=document.documentElement,theme=document.getElementById('theme-toggle');

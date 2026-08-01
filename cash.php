@@ -9,6 +9,9 @@ require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
 $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+$cashRegister = (string)($_GET['cash_register'] ?? '') === 'pre' ? 'pre' : 'main';
+$isPreCash = $cashRegister === 'pre';
+$cashPage = $isPreCash ? 'cash-pre.php' : 'cash.php';
 
 if ($driver === 'sqlite') {
     $pdo->exec("CREATE TABLE IF NOT EXISTS cash_settings (
@@ -121,6 +124,7 @@ function cash_paid_term_total(?string $schedule): float
     foreach ($items as $item) {
         if (!is_array($item) || empty($item['paid'])) continue;
         $amount = preg_replace('/[^0-9,.-]/u', '', (string)($item['amount'] ?? ''));
+        if (str_contains($amount, ',')) $amount = str_replace('.', '', $amount);
         $total += (float)str_replace(',', '.', $amount);
     }
     return $total;
@@ -156,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $currentAccountId = (int)($_POST['current_account_id'] ?? 0);
             $categoryId = (int)($_POST['category_id'] ?? 0);
             $sourceUrl = trim((string)($_POST['source_url'] ?? ''));
+            $transactionRegister = $sourceUrl !== '' ? 'pre' : $cashRegister;
             $termSchedule = null;
             if ($paymentType === 'term') {
                 $termSchedule = [];
@@ -163,14 +168,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $termSchedule = json_encode($termSchedule, JSON_UNESCAPED_UNICODE);
             }
             if ($paymentType === 'term' && trim((string)($_POST['term_schedule_json'] ?? '')) !== '') $termSchedule = (string)$_POST['term_schedule_json'];
+            if ($paymentType === 'term' && $installmentCount > 1 && trim((string)$termSchedule) === '') throw new RuntimeException('Vade planındaki tüm aylık ödeme alanlarını doldurun ve yeniden kaydedin.');
             $cashRecordedAmount = $paymentType === 'term' ? cash_paid_term_total($termSchedule) : $amount;
             $extraPaymentPosted = trim((string)($_POST['extra_payment_type'] ?? ''));
             $primaryValid = $date !== '' && $description !== '' && in_array($type, ['income', 'expense'], true) && $amount > 0 && in_array($paymentType, ['cash', 'credit_card', 'mail_order', 'term'], true);
             if (!$primaryValid && $extraPaymentPosted === '') throw new RuntimeException('İşlem bilgilerini eksiksiz ve geçerli olarak girin.');
             if ($primaryValid) {
                 if ($paymentType === 'mail_order' && !$currentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
-                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                    ->execute([$date, $description, $type, $cashRecordedAmount, $paymentType, $installmentCount, $bankName ?: null, $commissionRate ?: null, $currentAccountId ?: null, $termSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
+                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by,cash_register) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$date, $description, $type, $cashRecordedAmount, $paymentType, $installmentCount, $bankName ?: null, $commissionRate ?: null, $currentAccountId ?: null, $termSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0), $transactionRegister]);
             }
             $extraAmountRaw = trim((string)($_POST['extra_amount'] ?? ''));
             if ($extraAmountRaw !== '') {
@@ -203,8 +209,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('İkinci gelir kaydının bilgilerini eksiksiz ve geçerli olarak girin.');
                 }
                 if ($extraPaymentType === 'mail_order' && !$extraCurrentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
-                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                    ->execute([$extraDate, $extraDescription, $type, $extraAmount, $extraPaymentType, $extraInstallmentCount, $extraBankName ?: null, $extraCommissionRate ?: null, $extraCurrentAccountId ?: null, $extraTermSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
+                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by,cash_register) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$extraDate, $extraDescription, $type, $extraAmount, $extraPaymentType, $extraInstallmentCount, $extraBankName ?: null, $extraCommissionRate ?: null, $extraCurrentAccountId ?: null, $extraTermSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0), $transactionRegister]);
             }
             $message = 'Kasa işlemi kaydedildi.';
             $activeTab = 'transactions';
@@ -235,7 +241,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Kasa işlemi güncellendi.';
             $activeTab = 'transactions';
         } elseif ($action === 'delete_transaction') {
-            $pdo->prepare('DELETE FROM cash_transactions WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+            $delete = $isPreCash ? $pdo->prepare("DELETE FROM cash_transactions WHERE id=? AND cash_register='pre'") : $pdo->prepare('DELETE FROM cash_transactions WHERE id=?');
+            $delete->execute([(int)($_POST['id'] ?? 0)]);
             $message = 'Kasa işlemi silindi.';
             $activeTab = 'transactions';
         } elseif ($action === 'save_category') {
@@ -290,13 +297,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $returnUrl);
             exit;
         }
-        redirect('cash.php?tab=' . urlencode($activeTab));
+        redirect($cashPage . '?tab=' . urlencode($activeTab));
     }
 }
 
 $openingBalance = (float)$pdo->query('SELECT opening_balance FROM cash_settings WHERE id=1')->fetchColumn();
 $totals = ['income' => 0.0, 'expense' => 0.0, 'cash_total' => 0.0, 'card_total' => 0.0];
-foreach ($pdo->query('SELECT transaction_type,payment_type,amount,term_schedule FROM cash_transactions')->fetchAll() as $transaction) {
+// Ön Kasa kendi hareketlerine ek olarak hasta/hizmet kartından oluşan kasa hareketlerini görür.
+$preCashPatientScope = "(cash_register='pre' OR source_url LIKE '%patient-followup.php?id=%')";
+foreach (($isPreCash ? $pdo->query("SELECT transaction_type,payment_type,amount,term_schedule FROM cash_transactions WHERE $preCashPatientScope") : $pdo->query('SELECT transaction_type,payment_type,amount,term_schedule FROM cash_transactions'))->fetchAll() as $transaction) {
     $amount = $transaction['payment_type'] === 'term' ? cash_paid_term_total($transaction['term_schedule'] ?? null) : (float)$transaction['amount'];
     $direction = $transaction['transaction_type'] === 'income' ? 1 : -1;
     if ($direction > 0) {
@@ -313,11 +322,11 @@ $netBalance = $openingBalance + $income - $expense;
 $categories = $pdo->query('SELECT c.*,p.name parent_name FROM cash_categories c LEFT JOIN cash_categories p ON p.id=c.parent_id ORDER BY active DESC,COALESCE(c.parent_id,c.id),c.parent_id IS NOT NULL,c.name')->fetchAll();
 $activeCategories = array_values(array_filter($categories, static fn(array $category): bool => (bool)$category['active']));
 if ($sourceUrlFilter !== '') {
-    $transactionStatement = $pdo->prepare("SELECT t.*,c.name category_name,a.code current_account_code,a.short_name current_account_short_name,a.title current_account_title FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id LEFT JOIN current_accounts a ON a.id=t.current_account_id WHERE t.source_url=? AND NOT (t.payment_type='term' AND t.amount<=0) ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500");
+    $transactionStatement = $pdo->prepare("SELECT t.*,c.name category_name,a.code current_account_code,a.short_name current_account_short_name,a.title current_account_title FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id LEFT JOIN current_accounts a ON a.id=t.current_account_id WHERE t.source_url=? AND " . ($isPreCash ? "(t.cash_register='pre' OR t.source_url LIKE '%patient-followup.php?id=%') AND " : '') . "NOT (t.payment_type='term' AND t.amount<=0) ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500");
     $transactionStatement->execute([$sourceUrlFilter]);
     $transactions = $transactionStatement->fetchAll();
 } else {
-    $transactions = $pdo->query("SELECT t.*,c.name category_name,a.code current_account_code,a.short_name current_account_short_name,a.title current_account_title FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id LEFT JOIN current_accounts a ON a.id=t.current_account_id WHERE NOT (t.payment_type='term' AND t.amount<=0) ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500")->fetchAll();
+    $transactions = $pdo->query("SELECT t.*,c.name category_name,a.code current_account_code,a.short_name current_account_short_name,a.title current_account_title FROM cash_transactions t LEFT JOIN cash_categories c ON c.id=t.category_id LEFT JOIN current_accounts a ON a.id=t.current_account_id WHERE " . ($isPreCash ? "(t.cash_register='pre' OR t.source_url LIKE '%patient-followup.php?id=%') AND " : '') . "NOT (t.payment_type='term' AND t.amount<=0) ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500")->fetchAll();
 }
 $transactions = array_values(array_filter(array_map(static function (array $transaction): array {
     if ($transaction['payment_type'] === 'term') $transaction['amount'] = cash_paid_term_total($transaction['term_schedule'] ?? null);
@@ -326,26 +335,45 @@ $transactions = array_values(array_filter(array_map(static function (array $tran
 foreach ($transactions as &$transaction) {
     $transaction['invoice_no'] = '';
     $transaction['related_person'] = '';
+    $transaction['installment_tooltip'] = '';
+    if ($transaction['payment_type'] === 'term') {
+        $plan = json_decode((string)($transaction['term_schedule'] ?? ''), true);
+        if (is_array($plan)) {
+            $paidInstallments = [];
+            foreach ($plan as $index => $installment) if (is_array($installment) && !empty($installment['paid'])) $paidInstallments[] = ($index + 1) . '. Vade';
+            $transaction['installment_tooltip'] = implode(', ', $paidInstallments);
+        }
+    }
     $sourceQuery = [];
     parse_str((string)parse_url((string)($transaction['source_url'] ?? ''), PHP_URL_QUERY), $sourceQuery);
     $patientId = (int)($sourceQuery['id'] ?? 0);
-    if (!$patientId) continue;
+    $serviceId = (int)($sourceQuery['service_id'] ?? 0);
+    if (!$patientId && !$serviceId) continue;
     try {
+        if ($serviceId) {
+            $invoiceStatement = $pdo->prepare('SELECT sales_details,contact_person FROM patient_services WHERE id=? LIMIT 1');
+            $invoiceStatement->execute([$serviceId]);
+            $salesService = $invoiceStatement->fetch();
+            $salesDetails = json_decode((string)($salesService['sales_details'] ?? ''), true);
+            if (is_array($salesDetails)) $transaction['invoice_no'] = trim((string)($salesDetails['sales_invoice_no'] ?? ''));
+            $transaction['related_person'] = trim((string)($salesService['contact_person'] ?? ''));
+        } else {
         $invoiceStatement = $pdo->prepare("SELECT sales_details,contact_person FROM patient_services WHERE patient_id=? AND service_name='Satış' ORDER BY id DESC LIMIT 1");
         $invoiceStatement->execute([$patientId]);
         $salesService = $invoiceStatement->fetch();
         $salesDetails = json_decode((string)($salesService['sales_details'] ?? ''), true);
         if (is_array($salesDetails)) $transaction['invoice_no'] = trim((string)($salesDetails['sales_invoice_no'] ?? ''));
         $transaction['related_person'] = trim((string)($salesService['contact_person'] ?? ''));
+        }
     } catch (Throwable $e) {}
 }
 unset($transaction);
 $closings = $pdo->query('SELECT * FROM cash_closings ORDER BY closing_date DESC,id DESC LIMIT 365')->fetchAll();
 
-patient_header('Kasa', 'cash');
+patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
 ?>
 <main class="patient-container cash-page">
-  <div class="cash-page-head"><div><h1>Kasa</h1><p>Gelir, gider, bakiye ve günlük kapanış işlemlerini yönetin.</p></div></div>
+  <div class="cash-page-head"><div><h1><?=$isPreCash ? 'Ön Kasa' : 'Kasa'?></h1><p>Gelir, gider, bakiye ve günlük kapanış işlemlerini yönetin.</p></div></div>
   <?php if ($message): ?><div class="cash-notice success"><?=e($message)?></div><?php endif ?>
   <?php if ($error): ?><div class="cash-notice error"><?=e($error)?></div><?php endif ?>
 
@@ -357,8 +385,8 @@ patient_header('Kasa', 'cash');
   </section>
 
   <nav class="cash-tabs">
-    <a class="<?=$activeTab === 'transactions' ? 'active' : ''?>" href="<?=url('cash.php?tab=transactions')?>">Gelir / Gider</a>
-    <a class="<?=$activeTab === 'closing' ? 'active' : ''?>" href="<?=url('cash.php?tab=closing')?>">Günlük Kapanış</a>
+    <a class="<?=$activeTab === 'transactions' ? 'active' : ''?>" href="<?=url($cashPage . '?tab=transactions')?>">Gelir / Gider</a>
+    <a class="<?=$activeTab === 'closing' ? 'active' : ''?>" href="<?=url($cashPage . '?tab=closing')?>">Günlük Kapanış</a>
   </nav>
 
   <?php if ($activeTab === 'transactions'): ?>
@@ -379,12 +407,11 @@ patient_header('Kasa', 'cash');
       <header><div><h2>Kasa Hareketleri</h2><p><?=count($transactions)?> kayıt<?=$sourceUrlFilter !== '' ? ' · Bu hizmet kartına ait hareketler' : ''?></p></div>
         <form class="opening-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_opening"><label>Devreden Kasa<input type="number" step="0.01" name="opening_balance" value="<?=number_format($openingBalance,2,'.','')?>"></label><button>Kaydet</button></form>
       </header>
-      <div class="cash-table-wrap"><table><thead><tr><th>Tarih</th><th>Fatura No</th><th>İlgili</th><th>Ödeme</th><th>Giren</th><th>Çıkan</th><th>İşlemler</th></tr></thead><tbody>
+      <div class="cash-table-wrap"><table><thead><tr><th>Tarih</th><th>Kasa</th><th>Fatura No</th><th>İlgili</th><th>Ödeme</th><th>Giren</th><th>Çıkan</th></tr></thead><tbody>
       <?php foreach ($transactions as $transaction): ?><tr class="<?=!empty($transaction['source_url']) ? 'cash-source-row' : ''?>" data-source-url="<?=e((string)($transaction['source_url'] ?? ''))?>">
-        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><span title="<?=e($transaction['description'])?>"><?=e($transaction['invoice_no'] ?: '—')?></span></td><td><?=e($transaction['related_person'] ?: '—')?></td><td><?=e(['cash'=>'Nakit','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?></td>
-        <td class="money income"><?=$transaction['transaction_type'] === 'income' ? cash_money((float)$transaction['amount']) : '—'?></td>
+        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=($transaction['cash_register'] ?? 'main') === 'pre' ? 'Ön Kasa' : 'Kasa'?></td><td><span title="<?=e($transaction['description'])?>"><?=e($transaction['invoice_no'] ?: '—')?></span></td><td><?=e($transaction['related_person'] ?: '—')?></td><td><?=e(['cash'=>'Nakit','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?></td>
+        <td class="money income"><?=$transaction['transaction_type'] === 'income' ? (!empty($transaction['installment_tooltip']) ? '<span title="'.e($transaction['installment_tooltip']).'">'.cash_money((float)$transaction['amount']).'</span>' : cash_money((float)$transaction['amount'])) : '—'?></td>
         <td class="money expense"><?php if ($transaction['transaction_type'] === 'expense' || ($transaction['transaction_type'] === 'income' && $transaction['payment_type'] === 'mail_order')): ?><?php if ($transaction['payment_type'] === 'mail_order' && !empty($transaction['current_account_code'])): ?><span title="<?=e($transaction['current_account_code'] . ' — ' . ($transaction['current_account_short_name'] ?: $transaction['current_account_title']))?>"><?=cash_money((float)$transaction['amount'])?></span><?php else: ?><?=cash_money((float)$transaction['amount'])?><?php endif ?><?php else: ?>—<?php endif ?></td>
-        <td><form method="post" onsubmit="return confirm('Bu kasa işlemi silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete_transaction"><input type="hidden" name="id" value="<?=(int)$transaction['id']?>"><button class="cash-delete" title="Sil" aria-label="Kasa işlemini sil"><i class="ti tabler-trash"></i></button></form></td>
       </tr><?php endforeach ?>
       <?php if (!$transactions): ?><tr><td colspan="7" class="empty">Henüz kasa hareketi bulunmuyor.</td></tr><?php endif ?>
       </tbody></table></div>

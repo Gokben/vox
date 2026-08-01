@@ -15,6 +15,14 @@ function format_phone_tr(?string $phone): string
     return trim((string)$phone);
 }
 
+function next_current_account_code(PDO $pdo): string
+{
+    $lastCode = (string)$pdo->query('SELECT code FROM current_accounts ORDER BY id DESC LIMIT 1')->fetchColumn();
+    if (!preg_match('/^(.*?)(\d+)$/u', $lastCode, $matches)) return 'CR-01';
+
+    return $matches[1] . str_pad((string)((int)$matches[2] + 1), max(2, strlen($matches[2])), '0', STR_PAD_LEFT);
+}
+
 $pdo = db();
 if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
     $pdo->exec('CREATE TABLE IF NOT EXISTS current_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, title TEXT NOT NULL, tax_office TEXT, tax_number TEXT, account_type TEXT NOT NULL, currency TEXT NOT NULL DEFAULT "TRY", phone TEXT, email TEXT, contact_person TEXT, billing_address TEXT, shipping_address TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)');
@@ -38,6 +46,7 @@ if ($editId > 0) {
     $statement->execute([$editId]);
     $editingAccount = $statement->fetch() ?: null;
 }
+$displayAccountCode = $editingAccount['code'] ?? next_current_account_code($pdo);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = (string)($_POST['action'] ?? 'save');
@@ -56,16 +65,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
     $data['phone'] = format_phone_tr($data['phone']);
     if ($action === 'update') {
+        $accountId = (int)($_POST['id'] ?? 0);
+        $codeStatement = $pdo->prepare('SELECT code FROM current_accounts WHERE id=?');
+        $codeStatement->execute([$accountId]);
+        $data['code'] = (string)$codeStatement->fetchColumn();
         if ($data['code'] === '' || $data['title'] === '' || !in_array($data['account_type'], ['customer','supplier','both'], true)) {
             header('Location: ' . url('current-accounts.php?edit=' . (int)($_POST['id'] ?? 0)));
             exit;
         }
-        $data[] = (int)($_POST['id'] ?? 0);
+        $data[] = $accountId;
         $pdo->prepare('UPDATE current_accounts SET code=?,title=?,short_name=?,tax_office=?,tax_number=?,account_type=?,currency=?,phone=?,email=?,website=?,contact_person=?,billing_address=?,shipping_address=? WHERE id=?')->execute(array_values($data));
         header('Location: ' . url('current-accounts.php?updated=1'));
         exit;
     }
     try {
+        $data['code'] = next_current_account_code($pdo);
         if ($data['code'] === '' || $data['title'] === '' || !in_array($data['account_type'], ['customer','supplier','both'], true)) throw new RuntimeException('Cari kodu, cari unvanı ve cari tipi zorunludur.');
         if (!in_array($data['currency'], ['TRY','USD','EUR'], true)) throw new RuntimeException('Geçerli bir para birimi seçin.');
         $pdo->prepare('INSERT INTO current_accounts(code,title,short_name,tax_office,tax_number,account_type,currency,phone,email,website,contact_person,billing_address,shipping_address) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')->execute(array_values($data));
@@ -86,4 +100,5 @@ patient_header('Cari Kartlar', 'cash');
 <script>(()=>{const note=document.querySelector('textarea[name="shipping_address"]')?.closest('label');if(note&&note.firstChild)note.firstChild.nodeValue='Firma Detayı';const title=document.querySelector('input[name="title"]');if(title&&!document.querySelector('input[name="short_name"]')){const label=document.createElement('label'),input=document.createElement('input');label.append('Kısa Ad');input.name='short_name';input.maxLength=190;input.value=<?=json_encode($editingAccount['short_name'] ?? '')?>;label.append(input);title.closest('label')?.after(label)}const email=document.querySelector('input[name="email"]');if(email&&!document.querySelector('input[name="website"]')){const label=document.createElement('label'),input=document.createElement('input');label.append('Web Sitesi');input.type='url';input.name='website';input.maxLength=190;input.placeholder='https://www.ornek.com';input.value=<?=json_encode($editingAccount['website'] ?? '')?>;label.append(input);email.closest('label')?.after(label)}})();</script>
 <script>(()=>{const shortNames=<?=json_encode(array_values(array_map(static fn($account) => (string)($account['short_name'] ?? ''), $accounts)))?>;const header=document.querySelector('.table-wrap thead th:nth-child(2)');if(header)header.textContent='KISA AD';document.querySelectorAll('.table-wrap tbody tr').forEach((row,index)=>{const cell=row.children[1];if(cell&&shortNames[index]!==undefined)cell.textContent=shortNames[index]})})();</script>
 <script>(()=>{const contacts=<?=json_encode(array_values(array_map(static fn($account) => (string)($account['contact_person'] ?? ''), $accounts)))?>;const shortNameHeader=document.querySelector('.table-wrap thead th:nth-child(2)');if(shortNameHeader){const header=document.createElement('th');header.textContent='İLGİLİ KİŞİ';shortNameHeader.after(header)}document.querySelectorAll('.table-wrap tbody tr').forEach((row,index)=>{if(contacts[index]===undefined)return;const cell=document.createElement('td');cell.textContent=contacts[index];row.children[1]?.after(cell)})})();</script>
+<script>(()=>{const code=document.querySelector('input[name="code"]');if(!code)return;code.value=<?=json_encode($displayAccountCode)?>;code.readOnly=true;code.required=false;code.title='Cari kodu sistem tarafından otomatik oluşturulur.';code.setAttribute('aria-readonly','true');})();</script>
 <?php patient_footer(); ?>
