@@ -393,6 +393,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('patient-followup.php?id=' . $id);
     }
     $postedServiceName = trim((string)($_POST['service_name'] ?? ''));
+    // Satış penceresinin Kaydet düğmesi bu işareti gönderir; hizmet türü
+    // tarayıcıdaki seçim durumundan bağımsız olarak Satış olarak korunur.
+    if (isset($_POST['return_to_sales_details'])) $postedServiceName = 'Satış';
+    $postedSalesDetails = json_decode((string)($_POST['sales_details'] ?? ''), true);
+    if ($postedServiceName !== 'Satış' && is_array($postedSalesDetails)) {
+        foreach ($postedSalesDetails as $key => $value) {
+            if (!preg_match('/^sales_(?:brand|model|device_(?:serial|[2-4]_(?:brand|model|serial))|charger_(?:brand|model|serial)|consumable_stock_id|payment_type)$/', (string)$key)) continue;
+            if (trim((string)$value) !== '') {
+                $postedServiceName = 'Satış';
+                break;
+            }
+        }
+    }
     if ($postedEditId) {
         if ($savedServiceName === 'Satış' && $hasCompletedCashTransaction()) {
             $postedServiceName = $savedServiceName;
