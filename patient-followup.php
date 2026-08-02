@@ -136,6 +136,28 @@ $hearingDeviceStocks = $hearingDeviceStatement->fetchAll();
 $chargerDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price,(SELECT m.serial_numbers FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.movement_date DESC,m.id DESC LIMIT 1) AS serial_numbers FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type=? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]')) ORDER BY s.brand,s.model,s.id");
 $chargerDeviceStatement->execute(['Şarj Cihazı']);
 $chargerDeviceStocks = $chargerDeviceStatement->fetchAll();
+$serialMovementStatement = $pdo->prepare("SELECT m.stock_id,m.movement_type,m.serial_numbers FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE s.stock_type IN (?,?) AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.id");
+$serialMovementStatement->execute(['İşitme Cihazı','Şarj Cihazı']);
+$availableSerials = [];
+foreach ($serialMovementStatement as $serialMovement) {
+    $serialNumbers = json_decode((string)$serialMovement['serial_numbers'], true);
+    if (!is_array($serialNumbers)) continue;
+    $stockId = (int)$serialMovement['stock_id'];
+    $availableSerials[$stockId] ??= [];
+    foreach ($serialNumbers as $serialNumber) {
+        $serialNumber = trim((string)$serialNumber);
+        if ($serialNumber === '') continue;
+        if ((string)$serialMovement['movement_type'] === 'Giriş') {
+            if (!in_array($serialNumber, $availableSerials[$stockId], true)) $availableSerials[$stockId][] = $serialNumber;
+        } else {
+            $availableSerials[$stockId] = array_values(array_filter($availableSerials[$stockId], static fn(string $value): bool => $value !== $serialNumber));
+        }
+    }
+}
+foreach ($hearingDeviceStocks as &$deviceStock) $deviceStock['serial_numbers'] = json_encode($availableSerials[(int)$deviceStock['id']] ?? [], JSON_UNESCAPED_UNICODE);
+unset($deviceStock);
+foreach ($chargerDeviceStocks as &$deviceStock) $deviceStock['serial_numbers'] = json_encode($availableSerials[(int)$deviceStock['id']] ?? [], JSON_UNESCAPED_UNICODE);
+unset($deviceStock);
 $consumableStatement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type IN (?,?) ORDER BY s.stock_type,s.stock_name,s.stock_code");
 $consumableStatement->execute(['Sarf Malzeme','Pil']);
 $consumableStocks = $consumableStatement->fetchAll();
