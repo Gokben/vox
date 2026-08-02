@@ -399,6 +399,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // tarayıcıdaki seçim durumundan bağımsız olarak Satış olarak korunur.
     if (isset($_POST['return_to_sales_details']) || isset($_POST['save_sales_details'])) $postedServiceName = 'Satış';
     $postedSalesDetails = json_decode((string)($_POST['sales_details'] ?? ''), true);
+    if (!is_array($postedSalesDetails)) $postedSalesDetails = [];
+    foreach ($_POST as $key => $value) {
+        if ($key === 'sales_details' || !str_starts_with((string)$key, 'sales_')) continue;
+        $postedSalesDetails[(string)$key] = is_scalar($value) ? (string)$value : '';
+    }
+    $postedSalesDetailsJson = json_encode($postedSalesDetails, JSON_UNESCAPED_UNICODE);
     if ($postedServiceName !== 'Satış' && is_array($postedSalesDetails)) {
         foreach ($postedSalesDetails as $key => $value) {
             if (!preg_match('/^sales_(?:brand|model|device_(?:serial|[2-4]_(?:brand|model|serial))|charger_(?:brand|model|serial)|consumable_stock_id|payment_type)$/', (string)$key)) continue;
@@ -429,7 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'appointment_status'=>trim((string)($_POST['appointment_status'] ?? '')), 'complaint'=>trim((string)($_POST['complaint'] ?? '')),
         'observation'=>trim((string)($_POST['observation'] ?? '')), 'service_name'=>$postedServiceName, 'stock_id'=>$postedServiceName === 'Satış' && $postedStockId > 0 ? $postedStockId : null,
         'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
-        'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>(string)($_POST['repair_details'] ?? ''), 'sales_details'=>$postedServiceName === 'Satış' ? (string)($_POST['sales_details'] ?? '') : null, 'description'=>trim((string)($_POST['description'] ?? '')),
+        'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>(string)($_POST['repair_details'] ?? ''), 'sales_details'=>$postedServiceName === 'Satış' ? $postedSalesDetailsJson : null, 'description'=>trim((string)($_POST['description'] ?? '')),
     ];
     if ($saleProductDeleteLocked && $postedEditId && $postedServiceName === 'Satış') {
         $savedSalesDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
