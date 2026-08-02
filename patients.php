@@ -30,8 +30,8 @@ start_patient_staff_ui_link($staffNames, [], $staffOrders);
 
 $q = trim($_GET['q'] ?? '');
 $showAll = ($_GET['all'] ?? '') === '1';
-$year = (int)($_GET['year'] ?? 2026);
-if (!in_array($year, [2023, 2024, 2025, 2026], true)) $year = 2026;
+$year = (int)($_GET['year'] ?? 2023);
+if (!in_array($year, [2023, 2024, 2025, 2026], true)) $year = 2023;
 $dateSort = $_GET['sort'] ?? '';
 if (!in_array($dateSort, ['date_asc', 'date_desc'], true)) $dateSort = '';
 $perPage = (int)($_GET['length'] ?? 100);
