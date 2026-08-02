@@ -738,6 +738,7 @@ document.addEventListener('click',async event=>{
   event.stopImmediatePropagation();
   const data=new FormData(form),salesDetails={};
   modal.querySelectorAll('[name]').forEach(field=>salesDetails[field.name]=field.value);
+  data.set('sales_invoice_no',salesDetails.sales_invoice_no||'');
   data.set('service_name','Satış');
   data.set('save_sales_details','1');
   data.set('return_to_sales_details','1');
