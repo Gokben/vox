@@ -181,6 +181,29 @@ if ($editId) {
     $editStatement->execute([$editId, $id]);
     $serviceCard = $editStatement->fetch() ?: [];
     if (!$serviceCard) { http_response_code(404); exit('Hizmet kartı bulunamadı.'); }
+    // Eski satış kayıtlarında fatura no boş kalmışsa, aynı satışın stok çıkışındaki
+    // seri no ile eşleşen fatura noyu ekranda geri yükle.
+    if (trim((string)($serviceCard['service_name'] ?? '')) === 'Satış') {
+        $savedDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
+        if (is_array($savedDetails) && trim((string)($savedDetails['sales_invoice_no'] ?? '')) === '') {
+            $serials = [];
+            foreach ($savedDetails as $key => $savedValue) {
+                if (preg_match('/^sales_(?:device(?:_[2-4])?_serial|charger_serial)$/', (string)$key) && trim((string)$savedValue) !== '') $serials[] = trim((string)$savedValue);
+            }
+            if ($serials) {
+                $movementStatement = $pdo->prepare("SELECT invoice_no,serial_numbers FROM stock_movements WHERE movement_type='Çıkış' AND description=? AND COALESCE(invoice_no,'')<>'' ORDER BY id DESC");
+                $movementStatement->execute(['Hizmet kartı satışı: ' . trim((string)$serviceCard['record_no'])]);
+                foreach ($movementStatement as $movement) {
+                    $movementSerials = json_decode((string)$movement['serial_numbers'], true);
+                    if (is_array($movementSerials) && array_intersect($serials, array_map('strval', $movementSerials))) {
+                        $savedDetails['sales_invoice_no'] = (string)$movement['invoice_no'];
+                        $serviceCard['sales_details'] = json_encode($savedDetails, JSON_UNESCAPED_UNICODE);
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Stok çıkışı oluşmuş satıştaki ürünler, iade/iptal işlemi olmadan değiştirilemez.
