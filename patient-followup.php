@@ -1007,6 +1007,7 @@ if('requestIdleCallback' in window)window.requestIdleCallback(initializeSalesScr
 <script>
 document.addEventListener('DOMContentLoaded',()=>{const salesSave=document.getElementById('sales-details-save');if(!salesSave)return;salesSave.addEventListener('click',()=>{const nativeAlert=window.alert;let restored=false;window.alert=message=>{if(message==='Kaydedildi'){if(!restored){window.alert=nativeAlert;restored=true;}return;}return nativeAlert(message);};setTimeout(()=>{if(!restored){window.alert=nativeAlert;restored=true;}},15000);},true);});
 </script>
+<style>#sales-details-link[hidden]{display:none!important}</style>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   const salesSave=document.getElementById('sales-details-save'),detailsModal=document.getElementById('sales-details-modal'),form=document.getElementById('service-card-form'),service=form?.querySelector('[name="service_name"]');
