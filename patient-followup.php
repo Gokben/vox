@@ -216,7 +216,7 @@ $showIncomeRecordButton = $editId > 0
     && trim((string)($serviceCard['service_name'] ?? '')) === 'Satış'
     && $hasSelectedSalesPaymentType
     && count($savedCashRecords) === 0;
-$showSalesDetailsButton = $editId > 0 && trim((string)($serviceCard['service_name'] ?? '')) === 'Satış';
+$showSalesDetailsButton = $showForm;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
