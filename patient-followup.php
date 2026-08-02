@@ -1011,53 +1011,6 @@ document.addEventListener('DOMContentLoaded',()=>{const salesSave=document.getEl
 </script>
 <style>#sales-details-link[hidden]{display:none!important}</style>
 <script>
-document.addEventListener('DOMContentLoaded',()=>{
-  const salesSave=document.getElementById('sales-details-save'),detailsModal=document.getElementById('sales-details-modal'),form=document.getElementById('service-card-form'),service=form?.querySelector('[name="service_name"]');
-  if(!salesSave||!detailsModal||!form||!service)return;
-  const hasSelectedProduct=()=>[...detailsModal.querySelectorAll('[name]')].some(field=>/^(sales_brand|sales_model|sales_device_(?:serial|net_price)|sales_charger_(?:brand|model|price)|sales_consumable_(?:stock_id|quantity|price)|sales_device_[2-4]_.+)$/.test(field.name)&&String(field.value||'').trim()!=='');
-  const closeChoice=()=>document.getElementById('sales-product-choice')?.remove();
-  const cancelSale=async()=>{
-    closeChoice();
-    salesSave.disabled=true;
-    service.value='';
-    const stockId=form.querySelector('[name="stock_id"]');
-    if(stockId)stockId.value='';
-    const salesDetails=form.querySelector('[name="sales_details"]');
-    if(salesDetails)salesDetails.value='';
-    try{
-      const response=await fetch(form.action||location.href,{method:'POST',body:new FormData(form),credentials:'same-origin'});
-      if(!response.ok)throw new Error('Kayıt işlemi tamamlanamadı.');
-      detailsModal.hidden=true;
-      detailsModal.setAttribute('aria-hidden','true');
-      document.getElementById('sales-details-link')?.remove();
-      document.querySelector('.sales-income-link')?.remove();
-      service.dispatchEvent(new Event('change',{bubbles:true}));
-    }catch(error){alert(error.message||'Kayıt işlemi tamamlanamadı.');}
-    finally{salesSave.disabled=false;}
-  };
-  const showChoice=()=>{
-    if(document.getElementById('sales-product-choice'))return;
-    const dialog=document.createElement('div');
-    dialog.id='sales-product-choice';
-    dialog.setAttribute('role','dialog');
-    dialog.setAttribute('aria-modal','true');
-    dialog.style.cssText='position:fixed;inset:0;z-index:10050;display:grid;place-items:center;background:rgba(0,0,0,.45);padding:16px';
-    dialog.innerHTML='<div style="width:min(430px,100%);background:#fff;border-radius:10px;padding:24px;box-shadow:0 16px 38px rgba(0,0,0,.25);color:#2f2b3d"><strong style="display:block;font-size:17px;margin-bottom:10px">Satış kaydı</strong><p style="margin:0 0 20px;line-height:1.5">Satış kartında ürün ve ödeme şekli bulunmuyor. Ürün seçmeye devam etmek ister misiniz?</p><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" data-choice="cancel" style="border:0;border-radius:6px;padding:9px 16px;cursor:pointer;background:#e6525d;color:#fff">İptal</button><button type="button" data-choice="select" style="border:0;border-radius:6px;padding:9px 16px;cursor:pointer;background:#19a94b;color:#fff">Ürün seç</button></div></div>';
-    dialog.querySelector('[data-choice="select"]')?.addEventListener('click',closeChoice);
-    dialog.querySelector('[data-choice="cancel"]')?.addEventListener('click',cancelSale);
-    document.body.append(dialog);
-  };
-  const hasPaymentType=()=>String(detailsModal.querySelector('[name="sales_payment_type"]')?.value||'').trim()!=='';
-  salesSave.addEventListener('click',event=>{
-    if(hasSelectedProduct())return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if(hasPaymentType()){alert('Satış kaydı için en az bir ürün seçmelisiniz.');return;}
-    showChoice();
-  },true);
-});
-</script>
-<script>
 document.addEventListener('DOMContentLoaded',()=>{const service=document.querySelector('#service-card-form [name="service_name"]'),removeSaleActions=()=>{if(service?.value.trim()==='Satış')return;document.getElementById('sales-details-link')?.remove();document.querySelector('.sales-income-link')?.remove();};removeSaleActions();service?.addEventListener('change',removeSaleActions);const pageUrl=new URL(location.href);if(pageUrl.searchParams.has('open_sales_details')){setTimeout(()=>{removeSaleActions();document.getElementById('sales-details-modal')?.setAttribute('hidden','');pageUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',pageUrl.pathname+(pageUrl.search||''));},0);}});
 </script>
 <script>
