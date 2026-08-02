@@ -20,6 +20,11 @@ foreach ($pdo->query("SELECT m.stock_id, m.quantity, s.stock_type, s.brand, s.mo
     $key = implode('|', [(string)$saleMovement['stock_type'], trim((string)$saleMovement['brand']) ?: '#' . $saleMovement['stock_id'], trim((string)$saleMovement['model']) ?: '#' . $saleMovement['stock_id']]);
     $totalSalesByProduct[$key] = ($totalSalesByProduct[$key] ?? 0) + (int)$saleMovement['quantity'];
 }
+$totalEntriesByProduct = [];
+foreach ($pdo->query("SELECT m.stock_id, m.quantity, s.stock_type, s.brand, s.model FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE m.movement_type='GiriÅŸ'") as $entryMovement) {
+    $key = implode('|', [(string)$entryMovement['stock_type'], trim((string)$entryMovement['brand']) ?: '#' . $entryMovement['stock_id'], trim((string)$entryMovement['model']) ?: '#' . $entryMovement['stock_id']]);
+    $totalEntriesByProduct[$key] = ($totalEntriesByProduct[$key] ?? 0) + (int)$entryMovement['quantity'];
+}
 $salesByRecordNo = [];
 foreach ($pdo->query("SELECT ps.id, ps.patient_id, ps.record_no, ps.sales_details, p.full_name AS patient_name FROM patient_services ps LEFT JOIN patients p ON p.id=ps.patient_id WHERE COALESCE(ps.record_no, '') <> ''") as $sale) {
     $details = json_decode((string)($sale['sales_details'] ?? ''), true);
@@ -69,7 +74,7 @@ patient_header('Stok Çıkış', 'stock');
             <td><?=e($invoiceNo ?: '—')?></td>
             <td><?=e((string)$movement['quantity'])?></td>
             <td><?=e((string)($stockBalances[(int)$movement['stock_id']] ?? 0))?></td>
-            <td><?=e((string)($totalSalesByProduct[$productKey] ?? 0))?></td>
+            <td><?=e((string)($totalEntriesByProduct[$productKey] ?? 0))?></td>
           </tr>
         <?php endforeach; if (!$movements): ?>
           <tr><td class="stock-exit-empty" colspan="8">Henüz stok çıkışı bulunmuyor.</td></tr>
@@ -83,6 +88,6 @@ patient_header('Stok Çıkış', 'stock');
 .stock-exit-page{width:100%!important;max-width:1800px!important;min-height:100vh;margin:0 auto!important;padding:46px 20px 48px!important}.stock-exit-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.stock-exit-card>header{padding:22px 24px;border-bottom:1px solid #e1e2e8}.stock-exit-card h1{margin:0 0 5px;color:#2f2b3d;font-size:21px}.stock-exit-card p{margin:0;color:#7b7b8d}.stock-exit-search{display:flex;align-items:center;gap:9px;padding:16px 24px;border-bottom:1px solid #e1e2e8;color:#6f7180}.stock-exit-search input{width:min(440px,100%);padding:10px 12px;border:1px solid #d7d9e2;border-radius:6px;font:inherit}.stock-exit-table-wrap{overflow:auto}.stock-exit-card table{width:100%;min-width:850px;border-collapse:collapse}.stock-exit-card th,.stock-exit-card td{padding:14px 18px;border-bottom:1px solid #e1e2e8;text-align:left;white-space:nowrap}.stock-exit-card th{font-size:12px;color:#5d5b6d}.stock-exit-card tbody tr:hover{background:#f8fcf9}.stock-exit-sale-row{cursor:pointer}.stock-exit-empty{text-align:center;color:#7b7b8d}@media(max-width:720px){.stock-exit-page{padding:92px 14px 30px!important}}
 </style>
 <script>
-(()=>{const search=document.getElementById('stock-exit-search');if(!search)return;const normalize=value=>String(value||'').toLocaleLowerCase('tr-TR');search.addEventListener('input',()=>{const query=normalize(search.value.trim());document.querySelectorAll('.stock-exit-table-wrap tbody tr').forEach(row=>{if(row.querySelector('.stock-exit-empty'))return;row.hidden=!!query&&!normalize(row.textContent).includes(query)})})})();
+(()=>{const search=document.getElementById('stock-exit-search');document.querySelector('.stock-exit-table-wrap thead tr th:last-child').textContent='GİRİŞ';if(!search)return;const normalize=value=>String(value||'').toLocaleLowerCase('tr-TR');search.addEventListener('input',()=>{const query=normalize(search.value.trim());document.querySelectorAll('.stock-exit-table-wrap tbody tr').forEach(row=>{if(row.querySelector('.stock-exit-empty'))return;row.hidden=!!query&&!normalize(row.textContent).includes(query)})})})();
 </script>
 <?php patient_footer(); ?>
