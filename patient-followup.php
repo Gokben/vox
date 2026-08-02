@@ -717,13 +717,25 @@ if ($currentContactPerson !== '') {
 <div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Bilgileri</h2><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Toplam Tutar<input inputmode="decimal" name="sales_payment_amount" autocomplete="off" readonly></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer></section></div>
 <?php endif; ?>
 <script>
-document.addEventListener('click',event=>{
+document.addEventListener('click',async event=>{
   const saveButton=event.target.closest('#sales-details-save');
   if(!saveButton)return;
-  const form=document.getElementById('service-card-form'),modal=document.getElementById('sales-details-modal'),service=form?.querySelector('[name="service_name"]');
+  const form=document.getElementById('service-card-form'),modal=document.getElementById('sales-details-modal');
   if(!form||!modal)return;
-  modal.querySelectorAll('[name]').forEach(field=>field.setAttribute('form','service-card-form'));
-  if(service)service.value='Satış';
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const data=new FormData(form),salesDetails={};
+  modal.querySelectorAll('[name]').forEach(field=>salesDetails[field.name]=field.value);
+  data.set('service_name','Satış');
+  data.set('save_sales_details','1');
+  data.set('return_to_sales_details','1');
+  data.set('sales_details',JSON.stringify(salesDetails));
+  saveButton.disabled=true;
+  try{
+    const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'});
+    if(!response.ok)throw new Error('Satış bilgileri kaydedilemedi.');
+    location.assign(response.url);
+  }catch(error){alert(error.message||'Satış bilgileri kaydedilemedi.');saveButton.disabled=false;}
 },true);
 </script>
 <script>
