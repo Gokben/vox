@@ -1266,6 +1266,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
   const sync=()=>{const value=button();if(value)value.hidden=service.value.trim()!=='Satış';};
   document.addEventListener('click',event=>{const value=event.target.closest('#sales-details-link');if(!value||service.value.trim()!=='Satış')return;event.preventDefault();const modal=document.getElementById('sales-details-modal');if(modal){modal.hidden=false;modal.setAttribute('aria-hidden','false');}},true);
+  document.addEventListener('click',event=>{if(!event.target.closest('[data-sales-details-close]'))return;event.preventDefault();const modal=document.getElementById('sales-details-modal');if(modal){modal.hidden=true;modal.setAttribute('aria-hidden','true');}},true);
   service.addEventListener('change',sync,true);
   sync();
 });
