@@ -443,7 +443,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $salesDetails['sales_invoice_no'] = trim((string)$_POST['sales_invoice_no']);
         $values['sales_details'] = json_encode($salesDetails, JSON_UNESCAPED_UNICODE);
     }
-    if ($postedServiceName === 'Satış') {
+    // Satış kaydı, ürün veya ödeme ayrıntısı henüz girilmemiş olsa da korunur.
+    if (false && $postedServiceName === 'Satış') {
         $salesDetails = json_decode((string)$values['sales_details'], true);
         if (!is_array($salesDetails)) $salesDetails = [];
         // Sadece yarım kalmış alanlar (ör. tek başına marka seçimi) satış
