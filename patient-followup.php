@@ -724,7 +724,6 @@ document.addEventListener('click',event=>{
   if(!form||!modal)return;
   modal.querySelectorAll('[name]').forEach(field=>field.setAttribute('form','service-card-form'));
   if(service)service.value='Satış';
-  event.stopImmediatePropagation();
 },true);
 </script>
 <script>
