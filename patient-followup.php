@@ -718,6 +718,18 @@ if ($currentContactPerson !== '') {
 <?php endif; ?>
 <script>
 document.addEventListener('click',async event=>{
+  const removeButton=event.target.closest('.sales-product-cancel');
+  if(removeButton){
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const modal=document.getElementById('sales-details-modal'),row=removeButton.closest('.sales-device-details, #charger-device-details, #consumable-details'),products=[...modal?.querySelectorAll('.sales-device-details:not([hidden]),#charger-device-details:not([hidden]),#consumable-details:not([hidden])')||[]];
+    if(!row)return;
+    if(products.length<=1){alert('Son ürün kalemi silinemez.');return;}
+    row.querySelectorAll('[name]').forEach(field=>field.value='');
+    row.remove();
+    setTimeout(()=>modal?.querySelector('[name="sales_device_sgk"]')?.dispatchEvent(new Event('input',{bubbles:true})),0);
+    return;
+  }
   const saveButton=event.target.closest('#sales-details-save');
   if(!saveButton)return;
   const form=document.getElementById('service-card-form'),modal=document.getElementById('sales-details-modal');
