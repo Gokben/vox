@@ -25,6 +25,12 @@ foreach ($pdo->query("SELECT m.stock_id, m.quantity, s.stock_type, s.brand, s.mo
     $key = implode('|', [(string)$entryMovement['stock_type'], trim((string)$entryMovement['brand']) ?: '#' . $entryMovement['stock_id'], trim((string)$entryMovement['model']) ?: '#' . $entryMovement['stock_id']]);
     $totalEntriesByProduct[$key] = ($totalEntriesByProduct[$key] ?? 0) + (int)$entryMovement['quantity'];
 }
+$totalEntriesByProduct = $totalSalesByProduct;
+foreach ($pdo->query('SELECT id,stock_type,brand,model FROM stock_cards') as $stockCard) {
+    $stockId = (int)$stockCard['id'];
+    $key = implode('|', [(string)$stockCard['stock_type'], trim((string)$stockCard['brand']) ?: '#' . $stockId, trim((string)$stockCard['model']) ?: '#' . $stockId]);
+    $totalEntriesByProduct[$key] = ($totalEntriesByProduct[$key] ?? 0) + (int)($stockBalances[$stockId] ?? 0);
+}
 $salesByRecordNo = [];
 foreach ($pdo->query("SELECT ps.id, ps.patient_id, ps.record_no, ps.sales_details, p.full_name AS patient_name FROM patient_services ps LEFT JOIN patients p ON p.id=ps.patient_id WHERE COALESCE(ps.record_no, '') <> ''") as $sale) {
     $details = json_decode((string)($sale['sales_details'] ?? ''), true);
