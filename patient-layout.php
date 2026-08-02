@@ -210,14 +210,24 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   const listPages = ['result-list.php', 'patient-results.php', 'hearing-devices.php', 'sales.php', 'sgk-list.php'];
   const shouldOpenListsMenu = listPages.includes(location.pathname.split('/').pop()) || sessionStorage.getItem('vox.listsMenuOpen') === '1';
   if (shouldOpenListsMenu) {
-    resultListLink.classList.add('active');
-    reportMenuLink.classList.add('active');
     reportGroup.classList.add('open');
   }
+  if (listPages.includes(location.pathname.split('/').pop())) reportMenuLink.classList.add('active');
+  if (location.pathname.endsWith('/result-list.php') || location.pathname.endsWith('/patient-results.php')) resultListLink.classList.add('active');
   if (location.pathname.endsWith('/hearing-devices.php')) { resultListLink.classList.remove('active'); followUpMenuLink.classList.add('active'); }
   if (location.pathname.endsWith('/sales.php')) { resultListLink.classList.remove('active'); salesMenuLink.classList.add('active'); }
   if (location.pathname.endsWith('/sgk-list.php')) { resultListLink.classList.remove('active'); sgkListLink.classList.add('active'); }
   reportSubmenu.append(followUpMenuLink, salesMenuLink, resultListLink, sgkListLink);
+  const activeReportLink = [...reportSubmenu.querySelectorAll('a')].find(link => {
+    try { return new URL(link.href, location.href).pathname === location.pathname; }
+    catch (_) { return false; }
+  });
+  if (activeReportLink) {
+    activeReportLink.classList.add('active');
+    activeReportLink.style.setProperty('background', '#eef9f1', 'important');
+    activeReportLink.style.setProperty('color', '#168c3d', 'important');
+    activeReportLink.style.setProperty('font-weight', '700', 'important');
+  }
   reportMenuLink.setAttribute('aria-haspopup', 'true');
   reportMenuLink.setAttribute('aria-expanded', 'false');
   if (shouldOpenListsMenu) reportMenuLink.setAttribute('aria-expanded', 'true');
@@ -240,7 +250,33 @@ if (calendarMenuLink) {
   const calendarIcon = calendarMenuLink.querySelector(':scope > span');
   if (calendarIcon) calendarIcon.innerHTML = '<i class="icon-base ti tabler-calendar"></i>';
   if (calendarMenuLink.lastChild?.nodeType === Node.TEXT_NODE) calendarMenuLink.lastChild.textContent = ' Takvim';
-  if (location.pathname.endsWith('/calendar.php')) calendarMenuLink.classList.add('active');
+  const appointmentListLink = document.createElement('a');
+  appointmentListLink.href = <?= json_encode(url('appointment-list.php')) ?>;
+  appointmentListLink.textContent = 'Randevu Listesi';
+  const dailyEventsListLink = document.createElement('a');
+  dailyEventsListLink.href = <?= json_encode(url('daily-events-list.php')) ?>;
+  dailyEventsListLink.textContent = 'Günlük Aksiyon';
+  const calendarSubmenu = document.createElement('div');
+  calendarSubmenu.className = 'calendar-menu-submenu';
+  const onCalendarPage = location.pathname.endsWith('/calendar.php');
+  const onAppointmentListPage = location.pathname.endsWith('/appointment-list.php');
+  const onDailyEventsListPage = location.pathname.endsWith('/daily-events-list.php');
+  if (onCalendarPage) calendarMenuLink.classList.add('active');
+  if (onAppointmentListPage) { calendarMenuLink.classList.add('active'); appointmentListLink.classList.add('active'); }
+  if (onDailyEventsListPage) { calendarMenuLink.classList.add('active'); dailyEventsListLink.classList.add('active'); }
+  calendarSubmenu.append(appointmentListLink, dailyEventsListLink);
+  calendarMenuLink.after(calendarSubmenu);
+  const taskMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.getAttribute('href')?.includes('kanban.php'));
+  if (taskMenuLink) {
+    taskMenuLink.querySelector(':scope > span')?.remove();
+    if (taskMenuLink.lastChild?.nodeType === Node.TEXT_NODE) taskMenuLink.lastChild.textContent = ' Görev Takip';
+    dailyEventsListLink.after(taskMenuLink);
+    if (location.pathname.endsWith('/kanban.php')) calendarMenuLink.classList.add('active');
+  }
+  const calendarMenuStyle = document.createElement('style');
+  calendarMenuStyle.textContent = '.patient-nav .calendar-menu-submenu{display:grid!important;gap:1px!important;margin:3px 12px 7px 20px!important;padding:0!important}.patient-nav .calendar-menu-submenu>a{position:relative!important;display:flex!important;justify-content:flex-start!important;align-items:center!important;width:100%!important;min-height:38px!important;margin:0!important;padding:9px 10px 9px 34px!important;border-radius:6px!important;background:transparent!important;color:var(--text)!important;text-align:left!important;text-decoration:none!important;font-size:14px!important;line-height:1.35!important}.patient-nav .calendar-menu-submenu>a::before{position:absolute!important;top:50%!important;left:12px!important;width:8px!important;height:8px!important;border:1.5px solid currentColor!important;border-radius:50%!important;content:""!important;opacity:.9!important;transform:translateY(-50%)!important}.patient-nav .calendar-menu-submenu a.active{background:#eef9f1!important;color:#168c3d!important;font-weight:600!important}';
+  calendarMenuStyle.textContent = '.patient-nav .calendar-menu-submenu,.patient-nav .report-submenu{display:grid!important;gap:1px!important;margin:3px 12px 7px 20px!important;padding:0!important}.patient-nav .calendar-menu-submenu>a,.patient-nav .report-submenu>a{position:relative!important;display:flex!important;justify-content:flex-start!important;align-items:center!important;width:100%!important;min-height:38px!important;margin:0!important;padding:9px 10px 9px 34px!important;border-radius:6px!important;background:transparent!important;color:var(--text)!important;text-align:left!important;text-decoration:none!important;font-size:14px!important;line-height:1.35!important}.patient-nav .calendar-menu-submenu>a::before,.patient-nav .report-submenu>a::before{position:absolute!important;top:50%!important;left:12px!important;width:8px!important;height:8px!important;border:1.5px solid currentColor!important;border-radius:50%!important;content:""!important;opacity:.9!important;transform:translateY(-50%)!important}.patient-nav .calendar-menu-submenu a.active,.patient-nav .report-submenu a.active{background:#eef9f1!important;color:#168c3d!important;font-weight:700!important}.patient-nav>a.active,.patient-nav>.report-menu-group>a.active{font-weight:700!important}body.menu-collapsed .patient-nav .calendar-menu-submenu,body.layout-menu-collapsed .patient-nav .calendar-menu-submenu{display:none!important}body.menu-collapsed .patient-nav:hover .calendar-menu-submenu,body.layout-menu-collapsed .patient-nav:hover .calendar-menu-submenu{display:grid!important}body.menu-collapsed .patient-nav:hover .report-menu-group.open .report-submenu,body.layout-menu-collapsed .patient-nav:hover .report-menu-group.open .report-submenu{display:grid!important}body.menu-collapsed .patient-nav:hover .calendar-menu-submenu>a,body.menu-collapsed .patient-nav:hover .report-submenu>a,body.layout-menu-collapsed .patient-nav:hover .calendar-menu-submenu>a,body.layout-menu-collapsed .patient-nav:hover .report-submenu>a{display:flex!important;justify-content:flex-start!important;font-size:14px!important;padding-left:34px!important}';
+  document.head.append(calendarMenuStyle);
 }
 // Vuexy dikey menüdeki gibi: tek açık grup, kayarak açılan alt menü ve dönen ok.
 const menuAccordionStyle = document.createElement('style');
@@ -479,6 +515,70 @@ if(settingsPages[currentSettingsPage]){
   document.head.appendChild(style);
 })();
  </script>
+<script>
+(() => {
+  const currentPath = location.pathname.split('/').pop();
+  const nav = document.querySelector('.patient-nav');
+  if (!nav || !currentPath) return;
+  nav.querySelectorAll('a.active').forEach(link => link.classList.remove('active'));
+  const currentLink = [...nav.querySelectorAll('a')].find(link => {
+    try { return new URL(link.href, location.href).pathname.endsWith('/' + currentPath); }
+    catch (_) { return false; }
+  });
+  if (!currentLink) return;
+  currentLink.classList.add('active');
+  if (currentLink.closest('.report-submenu, .calendar-menu-submenu')) {
+    currentLink.style.setProperty('background', '#eef9f1', 'important');
+    currentLink.style.setProperty('color', '#168c3d', 'important');
+    currentLink.style.setProperty('font-weight', '700', 'important');
+  }
+  const groupedParent = currentLink.closest('.report-menu-group')?.querySelector(':scope > a');
+  const calendarParent = currentLink.closest('.calendar-menu-submenu')?.previousElementSibling;
+  (groupedParent || calendarParent)?.classList.add('active');
+})();
+</script>
+<script>
+(() => {
+  const applyActiveSubmenuStyle = () => {
+    const nav = document.querySelector('.patient-nav');
+    if (!nav) return;
+    nav.querySelectorAll('a.active').forEach(link => {
+      link.classList.remove('active');
+      link.style.removeProperty('background');
+      link.style.removeProperty('color');
+      link.style.removeProperty('font-weight');
+    });
+    const activeSubmenu = [...nav.querySelectorAll('.report-submenu a,.calendar-menu-submenu a')].find(link => {
+      try { return new URL(link.href, location.href).pathname === location.pathname; }
+      catch (_) { return false; }
+    });
+    const directMenu = [...nav.querySelectorAll(':scope > a')].find(link => {
+      try { return new URL(link.href, location.href).pathname === location.pathname; }
+      catch (_) { return false; }
+    });
+    const currentLink = activeSubmenu || directMenu;
+    if (!currentLink) return;
+    currentLink.classList.add('active');
+    if (activeSubmenu) {
+      activeSubmenu.style.setProperty('background', '#eef9f1', 'important');
+      activeSubmenu.style.setProperty('color', '#168c3d', 'important');
+      activeSubmenu.style.setProperty('font-weight', '700', 'important');
+    }
+    const groupedParent = currentLink.closest('.report-menu-group')?.querySelector(':scope > a');
+    const calendarParent = currentLink.closest('.calendar-menu-submenu')?.previousElementSibling;
+    const parentLink = groupedParent || calendarParent;
+    if (parentLink) {
+      parentLink.classList.add('active');
+      parentLink.style.setProperty('background', '#2eaf3b', 'important');
+      parentLink.style.setProperty('color', '#fff', 'important');
+      parentLink.style.setProperty('font-weight', '700', 'important');
+    }
+  };
+  applyActiveSubmenuStyle();
+  setTimeout(applyActiveSubmenuStyle, 0);
+  window.addEventListener('load', applyActiveSubmenuStyle, {once:true});
+})();
+</script>
 <script>
 (()=>{
   const notificationKey='vox-save-notification';
