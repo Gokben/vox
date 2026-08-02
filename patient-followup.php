@@ -770,7 +770,11 @@ document.addEventListener('click',async event=>{
   try{
     const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'});
     if(!response.ok)throw new Error('Satış bilgileri kaydedilemedi.');
-    location.assign(response.url);
+    const responseUrl=new URL(response.url),savedEditId=responseUrl.searchParams.get('edit');
+    if(savedEditId){const editInput=form.querySelector('[name="edit_id"]');if(editInput)editInput.value=savedEditId;}
+    history.replaceState(null,'',responseUrl.pathname+(responseUrl.search||''));
+    const detailsInput=document.getElementById('sales_details');if(detailsInput)detailsInput.value=JSON.stringify(salesDetails);
+    alert('Kaydedildi');
   }catch(error){alert(error.message||'Satış bilgileri kaydedilemedi.');saveButton.disabled=false;}
 },true);
 </script>
