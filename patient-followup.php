@@ -1359,6 +1359,7 @@ window.addEventListener('click',async event=>{
   finally{button.disabled=false;}
 },true);
 </script>
+<style>#vox-alert-message{text-align:center}</style>
 <?php if ($fromSgkList): ?>
 <style>#sales-details-modal input[name$="_sgk"]{border:2px solid #e04f55!important;box-shadow:0 0 0 2px rgba(224,79,85,.12)}</style>
 <?php endif; ?>
