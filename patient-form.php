@@ -78,7 +78,7 @@ try {
 
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
-if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
+if (!preg_match('/^(patients|patient-results|company-patients)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
 $fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_company_id','source_detail','notes'];
 $patient = array_fill_keys($fields, '');
 $patient['patient_status'] = 'active';
