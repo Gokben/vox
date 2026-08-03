@@ -76,7 +76,7 @@ patient_header('Takvim', 'calendar');
       <header class="calendar-toolbar">
         <div class="calendar-nav"><a href="<?=url('calendar.php?month='.$previousMonth->format('Y-m'))?>">‹</a><a href="<?=url('calendar.php?month='.$todayMonth)?>">Bugün</a><a href="<?=url('calendar.php?month='.$nextMonth->format('Y-m'))?>">›</a></div>
         <h1><?=$monthTitle?></h1>
-        <div class="calendar-view-tabs" role="tablist" aria-label="Takvim görünümü"><button type="button" class="active" data-calendar-view="month">Month</button><button type="button" data-calendar-view="week">Week</button><button type="button" data-calendar-view="day">Day</button><button type="button" data-calendar-view="list">List</button></div>
+        <div class="calendar-view-tabs" role="tablist" aria-label="Takvim görünümü"><button type="button" class="active" data-calendar-view="month">Ay</button><button type="button" data-calendar-view="week">Hafta</button><button type="button" data-calendar-view="day">Gün</button><button type="button" data-calendar-view="list">Liste</button></div>
       </header>
       <div class="calendar-grid">
         <?php foreach(['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'] as $weekDay):?><div class="calendar-weekday"><?=$weekDay?></div><?php endforeach; ?>
