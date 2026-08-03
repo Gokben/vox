@@ -57,6 +57,7 @@ if (!$hasActiveColumn) {
         ? 'ALTER TABLE kanban_tasks ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1'
         : 'ALTER TABLE kanban_tasks ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1');
 }
+$pdo->exec('UPDATE kanban_tasks SET is_active=1 WHERE is_active IS NULL');
 $columns = ['todo' => 'Yapılacak', 'progress' => 'Devam Ediyor', 'review' => 'Kontrol', 'done' => 'Tamamlandı'];
 $priorities = ['low' => 'Düşük', 'medium' => 'Orta', 'high' => 'Yüksek'];
 
@@ -69,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $priority = (string)($_POST['priority'] ?? 'medium');
         if ($title !== '' && isset($columns[$status]) && isset($priorities[$priority])) {
             $color = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($_POST['color'] ?? '')) ? (string)$_POST['color'] : null;
-            $stmt = db()->prepare('INSERT INTO kanban_tasks(title,description,status,priority,color,due_date,created_by) VALUES(?,?,?,?,?,?,?)');
+            $stmt = db()->prepare('INSERT INTO kanban_tasks(title,description,status,priority,color,due_date,created_by,is_active) VALUES(?,?,?,?,?,?,?,1)');
             $stmt->execute([$title, trim((string)($_POST['description'] ?? '')), $status, $priority, $color, $_POST['due_date'] ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
         }
     } elseif ($action === 'edit') {
@@ -102,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $tasksByColumn = array_fill_keys(array_keys($columns), []);
-foreach (db()->query('SELECT * FROM kanban_tasks WHERE is_active=1 ORDER BY CASE priority WHEN "high" THEN 1 WHEN "medium" THEN 2 ELSE 3 END, due_date IS NULL, due_date, id DESC')->fetchAll() as $task) {
+foreach (db()->query('SELECT * FROM kanban_tasks WHERE COALESCE(is_active,1)=1 ORDER BY CASE priority WHEN "high" THEN 1 WHEN "medium" THEN 2 ELSE 3 END, due_date IS NULL, due_date, id DESC')->fetchAll() as $task) {
     if (isset($tasksByColumn[$task['status']])) $tasksByColumn[$task['status']][] = $task;
 }
 

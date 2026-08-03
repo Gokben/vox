@@ -15,13 +15,21 @@ function ensure_task_form_schema(): void
 }
 
 ensure_task_form_schema();
+$taskPdo = db();
+$taskDriver = $taskPdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+$taskColumns = $taskDriver === 'sqlite'
+    ? array_column($taskPdo->query('PRAGMA table_info(kanban_tasks)')->fetchAll(), 'name')
+    : $taskPdo->query('SHOW COLUMNS FROM kanban_tasks')->fetchAll(PDO::FETCH_COLUMN);
+if (!in_array('color', $taskColumns, true)) $taskPdo->exec('ALTER TABLE kanban_tasks ADD COLUMN color VARCHAR(20) NULL');
+if (!in_array('is_active', $taskColumns, true)) $taskPdo->exec($taskDriver === 'sqlite' ? 'ALTER TABLE kanban_tasks ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1' : 'ALTER TABLE kanban_tasks ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1');
+$taskPdo->exec('UPDATE kanban_tasks SET is_active=1 WHERE is_active IS NULL');
 $columns = ['todo' => 'Yapılacak', 'progress' => 'Devam Ediyor', 'review' => 'Kontrol', 'done' => 'Tamamlandı'];
 $priorities = ['low' => 'Düşük', 'medium' => 'Orta', 'high' => 'Yüksek'];
 $taskId = (int)($_GET['id'] ?? 0);
 $form = ['title' => '', 'description' => '', 'status' => (string)($_GET['status'] ?? 'todo'), 'priority' => 'medium', 'color' => '#20a447', 'due_date' => ''];
 if (!isset($columns[$form['status']])) $form['status'] = 'todo';
 if ($taskId > 0) {
-    $stmt = db()->prepare('SELECT * FROM kanban_tasks WHERE id=? AND is_active=1');
+    $stmt = db()->prepare('SELECT * FROM kanban_tasks WHERE id=? AND COALESCE(is_active,1)=1');
     $stmt->execute([$taskId]);
     if ($task = $stmt->fetch()) foreach (array_keys($form) as $field) $form[$field] = (string)($task[$field] ?? $form[$field]);
     else $taskId = 0;
@@ -35,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     else {
         $color = preg_match('/^#[0-9a-fA-F]{6}$/', $form['color']) ? $form['color'] : '#20a447';
         if ($taskId > 0) db()->prepare('UPDATE kanban_tasks SET title=?,description=?,status=?,priority=?,color=?,due_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$form['title'], $form['description'], $form['status'], $form['priority'], $color, $form['due_date'] ?: null, $taskId]);
-        else db()->prepare('INSERT INTO kanban_tasks(title,description,status,priority,color,due_date,created_by) VALUES(?,?,?,?,?,?,?)')->execute([$form['title'], $form['description'], $form['status'], $form['priority'], $color, $form['due_date'] ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
+        else db()->prepare('INSERT INTO kanban_tasks(title,description,status,priority,color,due_date,created_by,is_active) VALUES(?,?,?,?,?,?,?,1)')->execute([$form['title'], $form['description'], $form['status'], $form['priority'], $color, $form['due_date'] ?: null, (int)($_SESSION['user']['id'] ?? 0)]);
         redirect('kanban.php');
     }
 }
