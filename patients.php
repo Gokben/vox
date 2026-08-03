@@ -30,6 +30,16 @@ start_patient_staff_ui_link($staffNames, [], $staffOrders);
 
 $q = trim($_GET['q'] ?? '');
 $showAll = ($_GET['all'] ?? '') === '1';
+$companyId = max(0, (int)($_GET['company_id'] ?? 0));
+$companyName = '';
+if ($companyId) {
+    try {
+        $companyStatement = db()->prepare('SELECT company_name FROM companies WHERE id=?');
+        $companyStatement->execute([$companyId]);
+        $companyName = (string)($companyStatement->fetchColumn() ?: '');
+        if ($companyName === '') $companyId = 0;
+    } catch (Throwable $exception) { $companyId = 0; }
+}
 $year = (int)($_GET['year'] ?? 2023);
 if (!in_array($year, [2023, 2024, 2025, 2026], true)) $year = 2023;
 $dateSort = $_GET['sort'] ?? '';
@@ -44,6 +54,10 @@ $activeSearchColumns = $hasSearchColumnSelection ? $requestedSearchColumns : $se
 $searchColumnsParam = implode(',', $activeSearchColumns);
 $where = [];
 $args = [];
+if ($companyId) {
+    $where[] = 'patients.source_company_id=?';
+    $args[] = $companyId;
+}
 // Arama da kayıt seçimindeki kapsamda yapılır: seçili yıl veya Tüm Kayıtlar.
 if (!$showAll) $where[] = $year === 2025 ? "(record_date LIKE '2025%' OR record_date IS NULL OR record_date='')" : "record_date LIKE '".$year."%'";
 if ($q !== '') {
@@ -132,9 +146,10 @@ $patientListReturn = 'patients.php?' . http_build_query([
     'search_columns' => $searchColumnsParam,
     'length' => $perPage,
     'page' => $page,
+    'company_id' => $companyId ?: '',
 ]);
-function patient_page_url(int $target, string $q, int $length): string { global $year,$showAll,$dateSort,$searchColumnsParam; return url('patients.php?' . http_build_query(['year'=>$year,'q'=>$q,'all'=>$showAll?'1':'','sort'=>$dateSort,'search_columns'=>$searchColumnsParam,'length'=>$length,'page'=>$target])); }
-function patient_date_sort_url(): string { global $year,$showAll,$dateSort,$q,$perPage,$searchColumnsParam; return url('patients.php?' . http_build_query(['year'=>$year,'q'=>$q,'all'=>$showAll?'1':'','sort'=>$dateSort==='date_asc'?'date_desc':'date_asc','search_columns'=>$searchColumnsParam,'length'=>$perPage,'page'=>1])); }
+function patient_page_url(int $target, string $q, int $length): string { global $year,$showAll,$dateSort,$searchColumnsParam,$companyId; return url('patients.php?' . http_build_query(['year'=>$year,'q'=>$q,'all'=>$showAll?'1':'','sort'=>$dateSort,'search_columns'=>$searchColumnsParam,'length'=>$length,'page'=>$target,'company_id'=>$companyId?:''])); }
+function patient_date_sort_url(): string { global $year,$showAll,$dateSort,$q,$perPage,$searchColumnsParam,$companyId; return url('patients.php?' . http_build_query(['year'=>$year,'q'=>$q,'all'=>$showAll?'1':'','sort'=>$dateSort==='date_asc'?'date_desc':'date_asc','search_columns'=>$searchColumnsParam,'length'=>$perPage,'page'=>1,'company_id'=>$companyId?:''])); }
 patient_header('Hasta Kartları');
 ?>
 <style>
@@ -188,4 +203,17 @@ document.addEventListener('click', event => {
 }, true);
 </script>
 <style>.patient-delete-alert{margin:0 0 14px;padding:13px 16px;border:1px solid #f2b8b8;border-radius:7px;background:#fff0f0;color:#b42318}</style>
+<script>
+(() => {
+  const companyId = new URLSearchParams(location.search).get('company_id');
+  if (!companyId) return;
+  const form = document.getElementById('patient-table-filter');
+  if (form && !form.querySelector('[name="company_id"]')) {
+    const input = document.createElement('input');
+    input.type = 'hidden'; input.name = 'company_id'; input.value = companyId; form.append(input);
+  }
+  const heading = document.querySelector('.vuexy-dt-title h2');
+  if (heading) heading.textContent = <?=json_encode($companyName)?> + ' — Hasta Kartları';
+})();
+</script>
 <?php patient_footer();

@@ -71,4 +71,21 @@ patient_header($editId ? 'Kurum/Firma Düzenle' : ($showForm ? 'Yeni Kurum/Firma
   document.querySelectorAll('.company-list tbody tr[data-edit-url]').forEach(row=>row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;}));
 })();
 </script>
+<script>
+(() => {
+  const title = document.querySelector('.company-list-head h2');
+  if (title) title.textContent = 'Kurumlar/Firmalar';
+  document.querySelectorAll('.company-actions').forEach(actions => {
+    const editLink = actions.querySelector('a[href*="companies.php?edit="]');
+    const match = editLink?.href.match(/[?&]edit=(\d+)/);
+    if (!match) return;
+    const patientsLink = document.createElement('a');
+    patientsLink.href = <?=json_encode(url('patients.php'))?> + '?company_id=' + match[1] + '&all=1';
+    patientsLink.title = 'Hastalar';
+    patientsLink.setAttribute('aria-label', 'Hastalar');
+    patientsLink.innerHTML = '<i class="icon-base ti tabler-users"></i>';
+    actions.insertBefore(patientsLink, editLink);
+  });
+})();
+</script>
 <?php patient_footer(); ?>
