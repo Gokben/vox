@@ -70,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                 $statement = $pdo->prepare('INSERT INTO current_account_movement_discounts(movement_id,discount_rate) VALUES(?,?) ON DUPLICATE KEY UPDATE discount_rate=VALUES(discount_rate)');
             }
             $statement->execute([$movementId, $discountRate]);
+            $statement = $pdo->prepare('UPDATE stock_movements SET discount_rate=? WHERE id=? AND current_account_id=?');
+            $statement->execute([$discountRate, $movementId, $id]);
         }
         $pdo->commit();
         } catch (Throwable $e) {
@@ -91,6 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
             $statement = $pdo->prepare('INSERT INTO current_account_movement_discounts(movement_id,discount_rate) VALUES(?,?) ON DUPLICATE KEY UPDATE discount_rate=VALUES(discount_rate)');
         }
         $statement->execute([$movementId, max(0, min(100, $discountRate))]);
+        $statement = $pdo->prepare('UPDATE stock_movements SET discount_rate=? WHERE id=? AND current_account_id=?');
+        $statement->execute([max(0, min(100, $discountRate)), $movementId, $id]);
         }
     }
     $q=$pdo->prepare('SELECT m.*,s.stock_code,s.stock_name FROM stock_movements m JOIN stock_cards s ON s.id=m.stock_id WHERE m.current_account_id=? ORDER BY m.movement_date DESC,m.id DESC');
@@ -116,6 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
                     $statement = $pdo->prepare('INSERT INTO current_account_movement_discounts(movement_id,discount_rate) VALUES(?,?) ON DUPLICATE KEY UPDATE discount_rate=VALUES(discount_rate)');
                 }
                 $statement->execute([$movementId, $discountRate]);
+                $statement = $pdo->prepare('UPDATE stock_movements SET discount_rate=? WHERE id=? AND current_account_id=?');
+                $statement->execute([$discountRate, $movementId, $id]);
             }
             $pdo->commit();
         } catch (Throwable $e) {
@@ -126,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
 $grossStatement = $pdo->prepare('SELECT invoice_no,gross_amount FROM current_account_invoice_totals WHERE current_account_id=?');
 $grossStatement->execute([$id]);
 $invoiceGrossAmounts = $grossStatement->fetchAll(PDO::FETCH_KEY_PAIR);
-$discountStatement = $pdo->prepare('SELECT d.movement_id,d.discount_rate FROM current_account_movement_discounts d JOIN stock_movements m ON m.id=d.movement_id WHERE m.current_account_id=?');
+$discountStatement = $pdo->prepare('SELECT m.id AS movement_id,COALESCE(NULLIF(d.discount_rate,0),m.discount_rate,0) AS discount_rate FROM stock_movements m LEFT JOIN current_account_movement_discounts d ON d.movement_id=m.id WHERE m.current_account_id=?');
 $discountStatement->execute([$id]);
 $itemDiscountRates = $discountStatement->fetchAll(PDO::FETCH_KEY_PAIR);
 $groupedRows = [];
