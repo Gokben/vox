@@ -34,6 +34,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (count($serials) !== count(array_unique($serials))) {
         $error = 'Seri numaraları birbirinden farklı olmalıdır.';
     } else {
+        $invoiceNo = trim($form['invoice_no']);
+        if ($invoiceNo !== '') {
+            $invoiceDateStatement = $pdo->prepare('SELECT DISTINCT movement_date FROM stock_movements WHERE movement_type=? AND LOWER(TRIM(invoice_no))=LOWER(?) AND id<>? ORDER BY movement_date ASC');
+            $invoiceDateStatement->execute(['Giriş', $invoiceNo, $editId]);
+            $invoiceDates = array_values(array_filter($invoiceDateStatement->fetchAll(PDO::FETCH_COLUMN)));
+            if ($invoiceDates && !in_array($form['movement_date'], $invoiceDates, true)) {
+                $error = 'Bu fatura numarası daha önce ' . format_date_tr((string)$invoiceDates[0]) . ' giriş tarihiyle kaydedildi. Aynı fatura için farklı giriş tarihi kullanılamaz.';
+            }
+        }
+        if ($error === '') {
         $check = $pdo->prepare('SELECT 1 FROM stock_cards WHERE id=? AND stock_type=? AND brand=?');
         $check->execute([$stockId, $form['stock_type'], $form['brand']]);
         $accountCheck = $pdo->prepare('SELECT 1 FROM current_accounts WHERE id=?');
@@ -53,10 +63,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . url('stock-entry.php?saved=1'));
             exit;
         }
+        }
     }
 }
 $accountShortNames = $pdo->query('SELECT id,short_name,title FROM current_accounts')->fetchAll();
 $lastSavedEntry = $pdo->query('SELECT m.current_account_id,m.invoice_no,m.movement_date,s.stock_type,s.brand FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE m.movement_type="Giriş" ORDER BY m.movement_date DESC,m.id DESC LIMIT 1')->fetch() ?: null;
+$invoiceDateRows = $pdo->prepare('SELECT LOWER(TRIM(invoice_no)) AS invoice_key, MIN(movement_date) AS movement_date FROM stock_movements WHERE movement_type=? AND TRIM(COALESCE(invoice_no, ""))<>"" GROUP BY LOWER(TRIM(invoice_no))');
+$invoiceDateRows->execute(['Giriş']);
+$invoiceDatesByNumber = array_column($invoiceDateRows->fetchAll(), 'movement_date', 'invoice_key');
 if (isset($_GET['copy_last']) && $lastSavedEntry) {
     $form['stock_type'] = (string)$lastSavedEntry['stock_type'];
     $form['brand'] = (string)$lastSavedEntry['brand'];
@@ -98,6 +112,7 @@ patient_header('Stok Girişi','stock');
 <script>(()=>document.querySelector('.entry-copy-last')?.addEventListener('click',()=>{const purchase=document.querySelector('input[name="purchase_price"]'),unitCost=document.querySelector('input[name="unit_cost"]');if(purchase)purchase.value='';if(unitCost)unitCost.value=''})})();</script>
 <script>(()=>document.querySelector('.entry-copy-last')?.addEventListener('click',()=>window.location.assign(<?=json_encode(url('stock-entry.php?new=1&copy_last=1'))?>)))();</script>
 <script>(()=>document.querySelector('.stock-entry-card footer a')?.addEventListener('click',event=>{event.preventDefault();window.history.back()})()</script>
+<script>(()=>{const dates=<?=json_encode($invoiceDatesByNumber,JSON_UNESCAPED_UNICODE)?>,invoice=document.querySelector('input[name="invoice_no"]'),date=document.querySelector('input[name="movement_date"]');if(!invoice||!date)return;const key=value=>String(value||'').trim().toLocaleLowerCase('tr-TR');const knownDate=()=>dates[key(invoice.value)]||'';const applyInvoiceDate=()=>{const value=knownDate();if(value)date.value=value};invoice.addEventListener('input',applyInvoiceDate);invoice.addEventListener('blur',applyInvoiceDate);date.addEventListener('change',()=>{const value=knownDate();if(value&&date.value!==value){alert('Bu fatura numarası için giriş tarihi '+new Intl.DateTimeFormat('tr-TR').format(new Date(value+'T00:00:00'))+' olmalıdır.');date.value=value;}});applyInvoiceDate()})();</script>
 <script>(()=>{const priceItems=<?=json_encode($priceListItems,JSON_UNESCAPED_UNICODE)?>,stock=document.querySelector('select[name="stock_id"]'),date=document.querySelector('input[name="movement_date"]'),price=document.querySelector('input[name="sale_price"]');if(!stock||!date||!price)return;price.readOnly=true;price.setAttribute('aria-readonly','true');price.title='Giriş tarihine göre geçerli liste fiyatı otomatik belirlenir.';const format=value=>new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0)),updatePrice=()=>{const stockId=String(stock.value||''),entryDate=date.value||'',item=priceItems.find(row=>String(row.stock_id)===stockId&&row.valid_from<=entryDate&&row.valid_until>=entryDate);price.value=item?format(item.list_price):'';};stock.addEventListener('change',updatePrice);date.addEventListener('change',updatePrice);date.addEventListener('input',updatePrice);updatePrice()})();</script>
 <script>(()=>{const input=document.querySelector('input[name="unit_cost"]');if(!input||!input.value.trim())return;const value=input.value.trim(),amount=Number(value.includes(',')?value.replaceAll('.','').replace(',','.'):value);if(Number.isFinite(amount))input.value=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)})();</script>
 <script>(()=>{const grid=document.querySelector('.entry-prices-grid'),unit=document.querySelector('input[name="unit_cost"]')?.closest('label'),purchase=document.querySelector('input[name="purchase_price"]')?.closest('label');if(!grid||!unit||!purchase)return;grid.prepend(unit);grid.append(purchase)})();</script>
