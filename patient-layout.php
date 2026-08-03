@@ -438,6 +438,10 @@ if(settingsPages[currentSettingsPage]){
   }
 }
 </script>
+<style>
+/* Sol menüde alt menü genişlikleri, iç boşluklar dahil hesaplanır; yatay kaydırma oluşmaz. */
+.patient-nav,.patient-nav .report-menu-group,.patient-nav .report-submenu,.patient-nav .calendar-menu-submenu{box-sizing:border-box!important;max-width:100%!important;overflow-x:hidden!important}.patient-nav .report-submenu>a,.patient-nav .calendar-menu-submenu>a{box-sizing:border-box!important;max-width:100%!important}
+</style>
 <script>
 (()=>{
   const setupNewRecordAccordion=card=>{
@@ -598,6 +602,45 @@ if(settingsPages[currentSettingsPage]){
   const style=document.createElement('style');
   style.textContent='.vox-save-notification{position:fixed;z-index:3000;right:24px;bottom:24px;padding:12px 18px;border-radius:7px;background:#19a94b;color:#fff;font-weight:700;box-shadow:0 8px 22px rgba(25,169,75,.28);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s}.vox-save-notification.visible{opacity:1;transform:translateY(0)}';
   document.head.append(style);
+})();
+</script>
+<style>
+/* Vuexy dikey menü açılış/kapanış geçişi. */
+.patient-nav .report-menu-group{transition:height .35s ease!important;will-change:height}.patient-nav .report-menu-group.vox-menu-animating{overflow:hidden!important}.patient-nav .report-menu-group.vox-menu-animating>.report-submenu{display:grid!important}.patient-nav .report-menu-group.vox-menu-animating>.report-submenu,.patient-nav .report-menu-group.menu-closing>.report-submenu{animation:voxMenuFade .35s ease both}@keyframes voxMenuFade{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+</style>
+<script>
+/* Vuexy Menu._toggleAnimation ile aynı yükseklik geçişi: önce başlık yüksekliği, sonra alt menü yüksekliği. */
+(() => {
+  const groups = () => [...document.querySelectorAll('.patient-nav > .report-menu-group')].filter(group => group.querySelector(':scope > .report-submenu'));
+  const animate = (group, open) => {
+    const trigger = group.querySelector(':scope > a'), submenu = group.querySelector(':scope > .report-submenu');
+    if (!trigger || !submenu || group.classList.contains('vox-menu-animating')) return;
+    const triggerHeight = Math.round(trigger.getBoundingClientRect().height);
+    const finish = () => { group.classList.remove('vox-menu-animating','menu-closing'); group.style.removeProperty('height'); group.style.removeProperty('overflow'); };
+    group.classList.add('vox-menu-animating');
+    if (open) {
+      group.style.height = triggerHeight + 'px';
+      group.style.overflow = 'hidden';
+      group.classList.add('open');
+      requestAnimationFrame(() => requestAnimationFrame(() => group.style.height = (triggerHeight + submenu.scrollHeight) + 'px'));
+      group.addEventListener('transitionend', event => { if (event.propertyName === 'height') finish(); }, {once:true});
+    } else {
+      group.style.height = (triggerHeight + submenu.scrollHeight) + 'px';
+      group.style.overflow = 'hidden';
+      group.classList.add('menu-closing');
+      requestAnimationFrame(() => requestAnimationFrame(() => group.style.height = triggerHeight + 'px'));
+      group.addEventListener('transitionend', event => { if (event.propertyName === 'height') { group.classList.remove('open'); finish(); } }, {once:true});
+    }
+  };
+  document.addEventListener('click', event => {
+    const trigger = event.target.closest('.patient-nav > .report-menu-group > a');
+    const group = trigger?.parentElement;
+    if (!trigger || !group) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    const opening = !group.classList.contains('open');
+    if (opening) groups().filter(item => item !== group && item.classList.contains('open')).forEach(item => animate(item, false));
+    animate(group, opening);
+  }, true);
 })();
 </script></body></html>
 <?php

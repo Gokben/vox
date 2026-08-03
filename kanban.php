@@ -114,7 +114,7 @@ patient_header('Görev Takip', 'kanban');
 <main class="kanban-page">
   <div class="kanban-page-head">
     <div><h1>Görev Takip</h1><p>Görevlerinizi sürükleyerek süreçte ilerletin.</p></div>
-    <button class="button kanban-new-button" type="button" id="kanban-open-new">+ Yeni görev</button>
+    <a class="button kanban-new-button" href="<?=e(url('task-form.php'))?>">+ Yeni görev</a>
   </div>
   <section class="kanban-board" aria-label="Görev panosu">
     <?php foreach ($columns as $key => $label): $tasks = $tasksByColumn[$key]; ?>
@@ -130,7 +130,7 @@ patient_header('Görev Takip', 'kanban');
             </article>
           <?php endforeach; ?>
         </div>
-        <button class="kanban-add-inline" type="button" data-status="<?=e($key)?>">+ Görev ekle</button>
+        <a class="kanban-add-inline" href="<?=e(url('task-form.php?status='.$key))?>">+ Görev ekle</a>
       </div>
     <?php endforeach; ?>
     <div class="kanban-column kanban-archive-column" data-status="archive">
@@ -147,14 +147,14 @@ patient_header('Görev Takip', 'kanban');
   const idInput=document.createElement('input');idInput.type='hidden';idInput.name='id';form.appendChild(idInput);
   const colorLabel=document.createElement('label');colorLabel.className='kanban-color-control';colorLabel.textContent='Kart rengi';const color=document.createElement('input');color.type='color';color.name='color';color.value='#20a447';colorLabel.appendChild(color);form.querySelector('.kanban-form-grid').after(colorLabel);
   const show=(value, task)=>{form.reset();status.value=value||'todo';action.value=task?'edit':'add';idInput.value=task?.id||'';color.value=task?.color||'#20a447';dialog.querySelector('h2').textContent=task?'Görevi düzenle':'Yeni görev';form.querySelector('[type="submit"]').textContent=task?'Kaydet':'Görevi ekle';if(task){title.value=task.title||'';description.value=task.description||'';status.value=task.status||'todo';priority.value=task.priority||'medium';dueDate.value=task.due_date||''}dialog.showModal()};
-  open.addEventListener('click',()=>show()); document.querySelectorAll('.kanban-add-inline').forEach(btn=>btn.addEventListener('click',()=>show(btn.dataset.status)));
+  if(open) open.addEventListener('click',()=>show());
   ['kanban-close','kanban-cancel'].forEach(id=>document.getElementById(id).addEventListener('click',()=>dialog.close()));
   const csrf=<?=json_encode(csrf())?>,taskColors=<?=json_encode(db()->query('SELECT id,color FROM kanban_tasks')->fetchAll(PDO::FETCH_KEY_PAIR))?>;
   document.querySelectorAll('.kanban-task').forEach(card=>{
     card.style.setProperty('--task-color',taskColors[card.dataset.id]||'#20a447');
     card.addEventListener('dragstart',()=>card.classList.add('dragging'));
     card.addEventListener('dragend',()=>card.classList.remove('dragging'));
-    card.addEventListener('dblclick',event=>{if(event.target.closest('button,form'))return;const task=JSON.parse(card.dataset.task||'{}');task.color=taskColors[card.dataset.id]||'#20a447';show('',task)});
+    card.addEventListener('dblclick',event=>{if(event.target.closest('button,form'))return;location.href=<?=json_encode(url('task-form.php?id='))?>+encodeURIComponent(card.dataset.id)});
   });
   document.querySelectorAll('.kanban-task-list').forEach(list=>{
     list.addEventListener('dragover',event=>{event.preventDefault();list.closest('.kanban-column').classList.add('drag-over')});
