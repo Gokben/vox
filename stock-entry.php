@@ -12,6 +12,9 @@ $pdo->exec($sqlite?'CREATE TABLE IF NOT EXISTS stock_movements (id INTEGER PRIMA
 function stock_entry_column(PDO $pdo,string $column):bool{$driver=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);if($driver==='sqlite'){foreach($pdo->query('PRAGMA table_info(stock_movements)')->fetchAll() as $item)if($item['name']===$column)return true;return false;}$q=$pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name="stock_movements" AND column_name=?');$q->execute([$column]);return(bool)$q->fetchColumn();}
 function stock_entry_parse_amount(string $value): float { $value=trim(str_replace(' ','',$value)); if(str_contains($value,','))$value=str_replace(',', '.', str_replace('.', '', $value)); return (float)$value; }
 foreach(['current_account_id'=>'INTEGER NULL','invoice_no'=>'VARCHAR(100) NULL','serial_numbers'=>'TEXT NULL','uts_lot_no'=>'VARCHAR(190) NULL','warranty_start'=>'DATE NULL','warranty_end'=>'DATE NULL','purchase_price'=>'DECIMAL(12,2) NULL','sale_price'=>'DECIMAL(12,2) NULL','vat_rate'=>'DECIMAL(5,2) NULL','unit_cost'=>'DECIMAL(12,2) NULL'] as $column=>$definition)if(!stock_entry_column($pdo,$column))$pdo->exec('ALTER TABLE stock_movements ADD COLUMN '.$column.' '.$definition);
+$vatNormalization = 'CASE WHEN COALESCE(vat_rate,0)>=15 THEN 20 WHEN COALESCE(vat_rate,0)>=5 THEN 10 ELSE 0 END';
+$pdo->exec('UPDATE stock_movements SET vat_rate='.$vatNormalization.' WHERE vat_rate IS NULL OR vat_rate NOT IN (0,10,20)');
+$pdo->exec('UPDATE stock_cards SET vat_rate='.$vatNormalization.' WHERE vat_rate IS NULL OR vat_rate NOT IN (0,10,20)');
 $pdo->exec($sqlite?'CREATE TABLE IF NOT EXISTS stock_price_lists (id INTEGER PRIMARY KEY AUTOINCREMENT, brand VARCHAR(190) NOT NULL, valid_from DATE NOT NULL, valid_until DATE NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)':'CREATE TABLE IF NOT EXISTS stock_price_lists (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, brand VARCHAR(190) NOT NULL, valid_from DATE NOT NULL, valid_until DATE NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 $pdo->exec($sqlite?'CREATE TABLE IF NOT EXISTS stock_price_list_items (price_list_id INTEGER NOT NULL, stock_id INTEGER NOT NULL, list_price DECIMAL(12,2) NOT NULL DEFAULT 0, PRIMARY KEY(price_list_id,stock_id))':'CREATE TABLE IF NOT EXISTS stock_price_list_items (price_list_id INT UNSIGNED NOT NULL, stock_id INT UNSIGNED NOT NULL, list_price DECIMAL(12,2) NOT NULL DEFAULT 0, PRIMARY KEY(price_list_id,stock_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 $stocks=$pdo->query('SELECT id,stock_code,stock_name,brand,serial_no,COALESCE(stock_type,"") AS stock_type,purchase_price,sale_price,vat_rate,unit_cost FROM stock_cards ORDER BY brand,stock_name,stock_code')->fetchAll();$brands=$pdo->query('SELECT DISTINCT brand FROM stock_cards WHERE brand IS NOT NULL AND brand != "" ORDER BY brand')->fetchAll(PDO::FETCH_COLUMN);$accounts=$pdo->query("SELECT id,code,title,short_name FROM current_accounts WHERE account_type IN ('supplier','both') ORDER BY title")->fetchAll();$form=['stock_type'=>'','brand'=>'','stock_id'=>'','current_account_id'=>'','invoice_no'=>'','quantity'=>'','movement_date'=>date('Y-m-d'),'purchase_price'=>'','sale_price'=>'','vat_rate'=>'20','unit_cost'=>'','uts_lot_no'=>'','warranty_start'=>'','warranty_end'=>'','description'=>''];$serials=[];$error='';$editId=filter_input(INPUT_GET,'edit',FILTER_VALIDATE_INT)?:0;
@@ -24,14 +27,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($form as $field => $value) $form[$field] = trim((string)($_POST[$field] ?? $value));
     foreach (['purchase_price', 'sale_price', 'unit_cost'] as $field) $form[$field] = stock_entry_parse_amount($form[$field]);
     $vatRateInput = $form['vat_rate'];
-    $form['vat_rate'] = preg_match('/^\d{1,2}$/', $vatRateInput) ? (int)$vatRateInput : -1;
+    $form['vat_rate'] = in_array($vatRateInput, ['0', '10', '20'], true) ? (int)$vatRateInput : -1;
     $stockId = filter_var($form['stock_id'], FILTER_VALIDATE_INT);
     $accountId = filter_var($form['current_account_id'], FILTER_VALIDATE_INT);
     $quantity = filter_var($form['quantity'], FILTER_VALIDATE_INT);
     $serials = array_values(array_filter(array_map('trim', (array)($_POST['serial_numbers'] ?? [])), static fn($serial) => $serial !== ''));
 
-    if ($form['vat_rate'] < 0 || $form['vat_rate'] > 99) {
-        $error = 'KDV oranı 0 ile 99 arasında, en fazla iki basamaklı tam sayı olmalıdır.';
+    if (!in_array($form['vat_rate'], [0, 10, 20], true)) {
+        $error = 'KDV oranı yalnız %0, %10 veya %20 olabilir.';
     } elseif (!in_array($form['stock_type'], ['İşitme Cihazı', 'Sarf Malzeme', 'Pil', 'Şarj Cihazı'], true) || $form['brand'] === '' || !$stockId || !$accountId || !$quantity || $quantity < 1) {
         $error = 'Stok tipi, marka, stok, cari ve giriş miktarı zorunludur.';
     } elseif (count($serials) !== count(array_unique($serials))) {
@@ -101,7 +104,38 @@ patient_header('Stok Girişi','stock');
 <script>(()=>{const quantity=document.getElementById('entry-quantity'),box=document.getElementById('serial-fields'),type=document.getElementById('entry-stock-type'),stock=document.getElementById('entry-stock-card'),tracking=document.getElementById('entry-tracking'),old=<?=json_encode($serials)?>;const filterStocks=()=>{[...stock.options].forEach(option=>{if(!option.dataset.stockType)return;option.hidden=option.dataset.stockType!==type.value});if(stock.selectedOptions[0]?.hidden)stock.value=''};const render=()=>{const n=type.value==='Kulaklık'?Math.max(0,parseInt(quantity.value||0,10)):0;const values=[...box.querySelectorAll('input')].map(i=>i.value);box.innerHTML='';for(let i=0;i<n;i++){const input=document.createElement('input');input.name='serial_numbers[]';input.placeholder='Seri No '+(i+1);input.required=true;input.value=values[i]??old[i]??'';box.append(input)}};const toggleTracking=()=>{tracking.hidden=type.value!=='Kulaklık';render()};type.addEventListener('change',()=>{stock.value='';filterStocks();toggleTracking()});quantity.addEventListener('input',render);filterStocks();toggleTracking()})();</script>
 <script>(()=>{const type=document.getElementById('entry-stock-type'),stock=document.getElementById('entry-stock-card');if(!type||!stock)return;const brandByStock=<?=json_encode(array_column($stocks,'brand','id'),JSON_UNESCAPED_UNICODE)?>,brands=<?=json_encode($brands,JSON_UNESCAPED_UNICODE)?>,selectedBrand=<?=json_encode($form['brand'],JSON_UNESCAPED_UNICODE)?>;const label=document.createElement('label'),brand=document.createElement('select');label.textContent='Marka *';brand.id='entry-brand';brand.name='brand';brand.required=true;brand.innerHTML='<option value="">Önce stok tipi seçiniz</option>'+brands.map(item=>'<option value="'+item.replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'">'+item+'</option>').join('');label.append(brand);type.closest('label').after(label);brand.value=selectedBrand;const filter=()=>{[...stock.options].forEach(option=>{if(!option.dataset.stockType)return;option.hidden=option.dataset.stockType!==type.value||brandByStock[option.value]!==brand.value});if(stock.selectedOptions[0]?.hidden)stock.value=''};type.addEventListener('change',()=>{brand.value='';filter()});brand.addEventListener('change',()=>{stock.value='';filter()});filter()})();</script>
 <script>(()=>{const type=document.getElementById('entry-stock-type'),brand=document.getElementById('entry-brand'),stock=document.getElementById('entry-stock-card');if(!type||!brand||!stock)return;const cards=<?=json_encode($stocks,JSON_UNESCAPED_UNICODE)?>;const filterBrands=()=>{const available=new Set(cards.filter(card=>card.stock_type===type.value).map(card=>card.brand));[...brand.options].forEach(option=>{if(!option.value)return;option.hidden=!available.has(option.value)});if(brand.selectedOptions[0]?.hidden)brand.value=''};type.addEventListener('change',filterBrands);filterBrands()})();</script>
-<script>(()=>{const quantity=document.getElementById('entry-quantity');if(!quantity)return;const values=<?=json_encode(['purchase_price'=>$form['purchase_price'],'sale_price'=>$form['sale_price'],'vat_rate'=>$form['vat_rate'],'unit_cost'=>$form['unit_cost']],JSON_UNESCAPED_UNICODE)?>,fields=[['purchase_price','Alış Fiyatı'],['sale_price','Satış Fiyatı'],['vat_rate','KDV Oranı (%)'],['unit_cost','Birim Maliyet']],format=value=>value===''||value===null?'':new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0));const section=document.createElement('section');section.className='stock-entry-wide entry-prices';section.innerHTML='<h2>Finansal Bilgiler</h2><div class="entry-prices-grid"></div>';const grid=section.querySelector('div');fields.forEach(([name,label])=>{const wrapper=document.createElement('label'),input=document.createElement('input');wrapper.textContent=label;input.type=name==='vat_rate'?'number':'text';if(name==='vat_rate'){input.min='0';input.max='99';input.step='1';input.inputMode='numeric';input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,2)});}else input.inputMode='decimal';input.name=name;input.value=name==='vat_rate'?(values[name]??''):format(values[name]);wrapper.append(input);grid.append(wrapper)});quantity.closest('label').after(section)})();</script>
+<script>
+(() => {
+  const quantity = document.getElementById('entry-quantity');
+  if (!quantity) return;
+  const values = <?=json_encode(['purchase_price'=>$form['purchase_price'],'sale_price'=>$form['sale_price'],'vat_rate'=>$form['vat_rate'],'unit_cost'=>$form['unit_cost']],JSON_UNESCAPED_UNICODE)?>;
+  const fields = [['purchase_price','Alış Fiyatı'],['sale_price','Satış Fiyatı'],['vat_rate','KDV Oranı'],['unit_cost','Birim Maliyet']];
+  const format = value => value === '' || value === null ? '' : new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value || 0));
+  const section = document.createElement('section');
+  section.className = 'stock-entry-wide entry-prices';
+  section.innerHTML = '<h2>Finansal Bilgiler</h2><div class="entry-prices-grid"></div>';
+  const grid = section.querySelector('div');
+  fields.forEach(([name,label]) => {
+    const wrapper = document.createElement('label');
+    wrapper.textContent = label;
+    const field = document.createElement(name === 'vat_rate' ? 'select' : 'input');
+    field.name = name;
+    if (name === 'vat_rate') {
+      [['0','%0'],['10','%10'],['20','%20']].forEach(([value,text]) => {
+        const option = new Option(text, value);
+        if (String(values[name] ?? '0') === value) option.selected = true;
+        field.add(option);
+      });
+    } else {
+      field.type = 'text';
+      field.inputMode = 'decimal';
+      field.value = format(values[name]);
+    }
+    wrapper.append(field); grid.append(wrapper);
+  });
+  quantity.closest('label').after(section);
+})();
+</script>
 <script>(()=>{const type=document.getElementById('entry-stock-type'),quantity=document.getElementById('entry-quantity'),tracking=document.getElementById('entry-tracking'),box=document.getElementById('serial-fields'),stored=<?=json_encode($form['stock_type'],JSON_UNESCAPED_UNICODE)?>,old=<?=json_encode($serials,JSON_UNESCAPED_UNICODE)?>;if(!type)return;const legacy=type.querySelector('option[value="Kulaklık"]');if(legacy){legacy.value='İşitme Cihazı';legacy.textContent='İşitme Cihazı'}if(![...type.options].some(option=>option.value==='Pil')){const option=document.createElement('option');option.value='Pil';option.textContent='Pil';type.append(option)}const renderTracking=()=>{if(!tracking||!box||!quantity||type.value!=='İşitme Cihazı')return;tracking.hidden=false;const n=Math.max(0,parseInt(quantity.value||0,10)),values=[...box.querySelectorAll('input')].map(input=>input.value);box.innerHTML='';for(let i=0;i<n;i++){const input=document.createElement('input');input.name='serial_numbers[]';input.placeholder='Seri No '+(i+1);input.required=true;input.value=values[i]??old[i]??'';box.append(input)}};type.addEventListener('change',renderTracking);quantity?.addEventListener('input',renderTracking);if(stored){type.value=stored;type.dispatchEvent(new Event('change'))}})();</script>
 <script>(()=>{const type=document.getElementById('entry-stock-type');if(!type)return;const legacy=[...type.options].find(option=>option.value==='Kulaklık'||option.textContent.trim()==='Kulaklık');if(legacy){legacy.value='İşitme Cihazı';legacy.textContent='İşitme Cihazı'}if(![...type.options].some(option=>option.value==='Pil')){const option=new Option('Pil','Pil');type.add(option)}})();</script>
 <script>(()=>{const stock=document.getElementById('entry-stock-card');if(stock?.options[0])stock.options[0].textContent='Seçim yapınız';})();</script>
