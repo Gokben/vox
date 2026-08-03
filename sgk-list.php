@@ -52,8 +52,8 @@ $sales = $salesStatement->fetchAll();
 
 $money = static function (mixed $value): float {
     $text = preg_replace('/[^0-9,.-]/u', '', (string)$value);
-    if (str_contains($text, ',')) $text = str_replace('.', '', $text);
-    return (float)str_replace(',', '.', $text);
+    if (str_contains($text, ',')) return (float)str_replace(',', '.', str_replace('.', '', $text));
+    return (float)str_replace('.', '', $text);
 };
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'toggle_sgk_collection') {
     header('Content-Type: application/json; charset=utf-8');

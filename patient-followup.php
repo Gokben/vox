@@ -12,6 +12,13 @@ require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/employee-patient-link.php';
 require __DIR__ . '/patient-layout.php';
 
+function patient_parse_money(mixed $value): float
+{
+    $text = preg_replace('/[^0-9,.-]/u', '', (string)$value) ?? '';
+    if (str_contains($text, ',')) return (float)str_replace(',', '.', str_replace('.', '', $text));
+    return (float)str_replace('.', '', $text);
+}
+
 $pdo = db();
 ensure_cash_schema($pdo);
 $bankDefinitions = array_values(array_filter(bank_definitions(), static fn(array $bank): bool => (int)$bank['active'] === 1));
@@ -313,11 +320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $saleTotalStatement->execute([$postedEditId, $id]);
         $saleTotalDetails = json_decode((string)$saleTotalStatement->fetchColumn(), true);
         if (!is_array($saleTotalDetails)) $saleTotalDetails = [];
-        $moneyValue = static function (mixed $value): float {
-            $text = preg_replace('/[^0-9,.-]/u', '', (string)$value);
-            if (str_contains($text, ',')) $text = str_replace('.', '', $text);
-            return (float)str_replace(',', '.', $text);
-        };
+        $moneyValue = static fn(mixed $value): float => patient_parse_money($value);
         $scheduleTotal = static function (string $schedule) use ($moneyValue): float {
             $total = 0.0;
             foreach ((array)json_decode($schedule, true) as $installment) $total += $moneyValue($installment['amount'] ?? 0);
@@ -349,7 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($cashUpdateId) {
         $cashUpdateDate = trim((string)($_POST['cash_update_date'] ?? ''));
         $cashUpdateDescription = trim((string)($_POST['cash_update_description'] ?? ''));
-        $cashUpdateAmount = (float)str_replace(',', '.', (string)($_POST['cash_update_amount'] ?? '0'));
+        $cashUpdateAmount = patient_parse_money($_POST['cash_update_amount'] ?? '0');
         $cashUpdatePayment = (string)($_POST['cash_update_payment_type'] ?? '');
         $cashUpdateInstallments = max(1, (int)($_POST['cash_update_installment_count'] ?? 1));
         $cashUpdateBank = trim((string)($_POST['cash_update_bank_name'] ?? ''));
@@ -361,7 +364,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cashUpdateAmount = 0.0;
             foreach ((array)json_decode($cashUpdateTermSchedule, true) as $installment) {
                 if (!is_array($installment) || empty($installment['paid'])) continue;
-                $cashUpdateAmount += (float)str_replace(',', '.', preg_replace('/[^0-9,.-]/u', '', (string)($installment['amount'] ?? '')));
+                $cashUpdateAmount += patient_parse_money($installment['amount'] ?? '');
             }
         }
         if ($cashUpdateDate !== '' && $cashUpdateDescription !== '' && ($cashUpdateAmount > 0 || $cashUpdatePayment === 'term') && in_array($cashUpdatePayment, ['cash','credit_card','mail_order','term'], true)) {
@@ -377,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cashUpdateExtraId = (int)($_POST['cash_update_extra_id'] ?? 0);
     if ($cashUpdateExtraId) {
         $cashUpdateExtraDescription = trim((string)($_POST['cash_update_extra_description'] ?? ''));
-        $cashUpdateExtraAmount = (float)str_replace(',', '.', (string)($_POST['cash_update_extra_amount'] ?? '0'));
+        $cashUpdateExtraAmount = patient_parse_money($_POST['cash_update_extra_amount'] ?? '0');
         $cashUpdateExtraPayment = (string)($_POST['cash_update_extra_payment_type'] ?? '');
         $cashUpdateExtraInstallments = max(1, (int)($_POST['cash_update_extra_installment_count'] ?? 1));
         $cashUpdateExtraBank = trim((string)($_POST['cash_update_extra_bank_name'] ?? ''));
@@ -391,9 +394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cashUpdateExtraValidationAmount = 0.0;
             $cashUpdateExtraAmount = 0.0;
             foreach (is_array($cashUpdateExtraPlan) ? $cashUpdateExtraPlan : [] as $installment) {
-                $installmentAmountText = preg_replace('/[^0-9,.-]/u', '', (string)($installment['amount'] ?? '0'));
-                if (str_contains($installmentAmountText, ',')) $installmentAmountText = str_replace('.', '', $installmentAmountText);
-                $installmentAmount = (float)str_replace(',', '.', $installmentAmountText);
+                $installmentAmount = patient_parse_money($installment['amount'] ?? '0');
                 $cashUpdateExtraValidationAmount += $installmentAmount;
                 if (!empty($installment['paid'])) $cashUpdateExtraAmount += $installmentAmount;
             }
@@ -404,7 +405,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif (trim((string)($_POST['cash_update_extra_payment_type'] ?? '')) !== '') {
         $cashUpdateExtraDescription = trim((string)($_POST['cash_update_extra_description'] ?? ''));
-        $cashUpdateExtraAmount = (float)str_replace(',', '.', (string)($_POST['cash_update_extra_amount'] ?? '0'));
+        $cashUpdateExtraAmount = patient_parse_money($_POST['cash_update_extra_amount'] ?? '0');
         $cashUpdateExtraPayment = (string)($_POST['cash_update_extra_payment_type'] ?? '');
         $cashUpdateExtraInstallments = max(1, (int)($_POST['cash_update_extra_installment_count'] ?? 1));
         $cashUpdateExtraBank = trim((string)($_POST['cash_update_extra_bank_name'] ?? ''));

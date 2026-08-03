@@ -99,6 +99,13 @@ function cash_money(float $value): string
     return number_format($value, 2, ',', '.') . ' ₺';
 }
 
+function cash_parse_amount(string $value): float
+{
+    $value = preg_replace('/[^0-9,.-]/u', '', $value) ?? '';
+    if (str_contains($value, ',')) return (float)str_replace(',', '.', str_replace('.', '', $value));
+    return (float)str_replace('.', '', $value);
+}
+
 function cash_balance_until(PDO $pdo, string $date): float
 {
     $opening = (float)$pdo->query('SELECT opening_balance FROM cash_settings WHERE id=1')->fetchColumn();
@@ -123,9 +130,7 @@ function cash_paid_term_total(?string $schedule): float
     $total = 0.0;
     foreach ($items as $item) {
         if (!is_array($item) || empty($item['paid'])) continue;
-        $amount = preg_replace('/[^0-9,.-]/u', '', (string)($item['amount'] ?? ''));
-        if (str_contains($amount, ',')) $amount = str_replace('.', '', $amount);
-        $total += (float)str_replace(',', '.', $amount);
+        $total += cash_parse_amount((string)($item['amount'] ?? ''));
     }
     return $total;
 }
@@ -144,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($action === 'save_opening') {
-            $openingBalance = (float)str_replace(',', '.', (string)($_POST['opening_balance'] ?? '0'));
+            $openingBalance = cash_parse_amount((string)($_POST['opening_balance'] ?? '0'));
             $pdo->prepare('UPDATE cash_settings SET opening_balance=? WHERE id=1')->execute([$openingBalance]);
             $message = 'Devreden kasa güncellendi.';
             $activeTab = 'transactions';
@@ -152,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $date = trim((string)($_POST['transaction_date'] ?? ''));
             $description = trim((string)($_POST['description'] ?? ''));
             $type = (string)($_POST['transaction_type'] ?? '');
-            $amount = (float)str_replace(',', '.', (string)($_POST['amount'] ?? '0'));
+            $amount = cash_parse_amount((string)($_POST['amount'] ?? '0'));
             $paymentType = (string)($_POST['payment_type'] ?? '');
             $installmentCount = max(1, (int)($_POST['installment_count'] ?? 1));
             $bankName = trim((string)($_POST['bank_name'] ?? ''));
@@ -182,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($extraAmountRaw !== '') {
                 $extraDate = $date;
                 $extraDescription = trim((string)($_POST['extra_description'] ?? ''));
-                $extraAmount = (float)str_replace(',', '.', $extraAmountRaw);
+                $extraAmount = cash_parse_amount($extraAmountRaw);
                 $extraPaymentType = (string)($_POST['extra_payment_type'] ?? $paymentType);
                 $extraInstallmentCount = max(1, (int)($_POST['extra_installment_count'] ?? 1));
                 $extraBankName = trim((string)($_POST['extra_bank_name'] ?? ''));
@@ -197,9 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     foreach ((array)($_POST['extra_term_amount'] ?? []) as $index => $termAmount) {
                         $isPaid = isset(($_POST['extra_term_paid'] ?? [])[$index]);
                         $extraPlan[] = ['date'=>(string)(($_POST['extra_term_date'] ?? [])[$index] ?? ''),'amount'=>(string)$termAmount,'paid'=>$isPaid];
-                        $termValue = preg_replace('/[^0-9,.-]/u', '', (string)$termAmount);
-                        if (str_contains($termValue, ',')) $termValue = str_replace('.', '', $termValue);
-                        $termAmountValue = (float)str_replace(',', '.', $termValue);
+                        $termAmountValue = cash_parse_amount((string)$termAmount);
                         $extraScheduledAmount += $termAmountValue;
                         if ($isPaid) $extraAmount += $termAmountValue;
                     }
@@ -218,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $transactionId = (int)($_POST['id'] ?? 0);
             $date = trim((string)($_POST['transaction_date'] ?? ''));
             $description = trim((string)($_POST['description'] ?? ''));
-            $amount = (float)str_replace(',', '.', (string)($_POST['amount'] ?? '0'));
+            $amount = cash_parse_amount((string)($_POST['amount'] ?? '0'));
             $paymentType = (string)($_POST['payment_type'] ?? '');
             $installmentCount = max(1, (int)($_POST['installment_count'] ?? 1));
             $bankName = trim((string)($_POST['bank_name'] ?? ''));
@@ -265,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $activeTab = 'categories';
         } elseif ($action === 'save_closing') {
             $date = trim((string)($_POST['closing_date'] ?? ''));
-            $counted = (float)str_replace(',', '.', (string)($_POST['counted_balance'] ?? '0'));
+            $counted = cash_parse_amount((string)($_POST['counted_balance'] ?? '0'));
             $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255);
             if ($date === '') throw new RuntimeException('Kapanış tarihi zorunludur.');
             $expected = cash_balance_until($pdo, $date);
