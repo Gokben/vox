@@ -642,6 +642,45 @@ if(settingsPages[currentSettingsPage]){
     animate(group, opening);
   }, true);
 })();
+</script>
+<script>
+/* Parasal girişleri yazarken Türkçe binlik ayıracıyla gösterir. */
+(() => {
+  const moneyName = /(price|amount|cost|tutar|sgk|payment|gross|unit_price|purchase)/i;
+  const excludedName = /(quantity|vat|rate|oran|discount)/i;
+  const isMoneyField = field => field instanceof HTMLInputElement
+    && field.type !== 'hidden' && field.type !== 'date' && field.type !== 'time'
+    && !excludedName.test(field.name || '')
+    && (moneyName.test(field.name || '') || field.classList.contains('bulk-money') || field.dataset.money === 'true');
+  const formatMoney = value => {
+    const raw = String(value ?? '').replace(/[^0-9,\.]/g, '');
+    if (raw === '') return '';
+    const comma = raw.indexOf(',');
+    const integerPart = (comma === -1 ? raw : raw.slice(0, comma)).replace(/\./g, '');
+    const fractionPart = comma === -1 ? '' : raw.slice(comma + 1).replace(/[^0-9]/g, '');
+    const integer = (integerPart.replace(/^0+(?=\d)/, '') || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return comma === -1 ? integer : integer + ',' + fractionPart;
+  };
+  const prepare = field => {
+    if (!isMoneyField(field) || field.dataset.moneyFormatReady === '1') return;
+    field.dataset.moneyFormatReady = '1';
+    if (field.type === 'number') field.type = 'text';
+    field.inputMode = 'decimal';
+    field.value = formatMoney(field.value);
+    field.addEventListener('input', () => {
+      const formatted = formatMoney(field.value);
+      if (field.value !== formatted) field.value = formatted;
+    });
+    field.addEventListener('blur', () => { field.value = formatMoney(field.value); });
+  };
+  const prepareAll = root => root.querySelectorAll?.('input').forEach(prepare);
+  prepareAll(document);
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (!(node instanceof Element)) return;
+    if (node.matches?.('input')) prepare(node);
+    prepareAll(node);
+  }))).observe(document.documentElement, {childList:true, subtree:true});
+})();
 </script></body></html>
 <?php
 }
