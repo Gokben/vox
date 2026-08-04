@@ -12,7 +12,7 @@ $pdo->exec($sqlite
     : 'CREATE TABLE IF NOT EXISTS units (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(190) NOT NULL, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
 $extraColumns = [
-    'record_date TEXT NULL', 'company_id INTEGER NULL', 'company_name VARCHAR(190) NULL', 'show_company INTEGER NOT NULL DEFAULT 0', 'show_name INTEGER NOT NULL DEFAULT 0', 'show_last_name INTEGER NOT NULL DEFAULT 0', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
+    'record_date TEXT NULL', 'company_id INTEGER NULL', 'company_name VARCHAR(190) NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
     'marriage_date TEXT NULL', 'title VARCHAR(150) NULL', 'branch VARCHAR(150) NULL', 'rating INTEGER NULL',
     'email VARCHAR(190) NULL', 'phone1 VARCHAR(50) NULL', 'phone2 VARCHAR(50) NULL', 'gender VARCHAR(20) NULL',
     'special_day TEXT NULL', 'action_name VARCHAR(150) NULL', 'action_date TEXT NULL', 'city VARCHAR(100) NULL',
@@ -52,16 +52,13 @@ try {
     error_log('units.php code migration: ' . $exception->getMessage());
 }
 
-$fields = ['record_date', 'company_name', 'show_company', 'unit_no', 'name', 'show_name', 'last_name', 'show_last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
+$fields = ['record_date', 'company_name', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
 $editId = (int)($_GET['edit'] ?? 0);
 $showForm = $editId > 0 || isset($_GET['new']);
 $unit = array_fill_keys($fields, '');
 $unit['record_date'] = date('Y-m-d');
 $unit['rating'] = 0;
 $unit['gender'] = '';
-$unit['show_company'] = 0;
-$unit['show_name'] = 1;
-$unit['show_last_name'] = 1;
 $message = '';
 $error = '';
 
@@ -86,7 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('units.php');
         }
         foreach ($fields as $field) $unit[$field] = trim((string)($_POST[$field] ?? ''));
-        foreach (['show_company', 'show_name', 'show_last_name'] as $field) $unit[$field] = isset($_POST[$field]) ? 1 : 0;
         $unit['rating'] = max(0, min(5, (int)$unit['rating']));
         if ($unit['name'] === '') throw new RuntimeException('Ad alanı zorunludur.');
 
@@ -119,13 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (isset($_GET['saved'])) $message = 'Ünite kaydedildi.';
-function unit_list_display(array $unit): string {
-    $parts = [];
-    if (!empty($unit['show_company']) && !empty($unit['company_name'])) $parts[] = (string)$unit['company_name'];
-    if (!empty($unit['show_name']) && !empty($unit['name'])) $parts[] = (string)$unit['name'];
-    if (!empty($unit['show_last_name']) && !empty($unit['last_name'])) $parts[] = (string)$unit['last_name'];
-    return trim(implode(' ', $parts)) ?: trim((string)($unit['name'] ?? '') . ' ' . (string)($unit['last_name'] ?? ''));
-}
 $units = $pdo->query('SELECT * FROM units ORDER BY name, last_name')->fetchAll();
 patient_header($editId ? 'Ünite Düzenle' : ($showForm ? 'Yeni Ünite' : 'Üniteler'), 'cash');
 ?>
@@ -148,7 +137,6 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
 .unit-list{position:relative!important;width:100%!important;max-width:none!important;margin:0!important;overflow:hidden!important}.unit-list-toolbar{display:block!important;min-height:0!important;padding:22px 24px!important;border-bottom:1px solid #e1e2e8!important}.unit-list-toolbar h2{margin:0!important;color:#2f2b3d!important;font-size:21px!important;line-height:1.25!important;font-weight:600!important}.unit-list-toolbar .button{position:absolute!important;right:24px!important;top:14px!important;min-height:40px!important}
 .unit-list th,.unit-list td{padding:14px 18px!important;border-bottom:1px solid #e1e2e8!important}.unit-list th{font-size:12px!important;color:#5d5b6d!important}.unit-list tbody tr:last-child td{border-bottom:0!important}
 @media(max-width:720px){.unit-form-page,.unit-list-page{max-width:none!important;padding:92px 14px 30px!important}.unit-list-toolbar{padding-right:155px!important}.unit-list-toolbar .button{right:16px!important}.unit-list{overflow:auto!important}.unit-list table{min-width:620px!important}}
-.unit-list-default{display:flex!important;align-items:center!important;gap:6px!important;flex:0 0 auto!important;white-space:nowrap!important;margin:0 0 0 10px!important;padding-top:10px!important;font-size:13px!important;color:#5d5b6d!important}.unit-list-default input{width:16px!important;height:16px!important;margin:0!important;accent-color:#20a447!important}@media(max-width:720px){.unit-list-default{margin:7px 0 0!important;padding-top:0!important}}
 </style>
 <?php if ($showForm): ?><main class="patient-container unit-form-page"><section class="vuexy-form-card"><header class="vuexy-form-header"><h2><?=$editId ? 'Ünite Düzenle' : 'Yeni Ünite Kaydı'?></h2><a class="cancel-link" href="<?=e(url('units.php'))?>">Listeye dön</a></header><?php if($error):?><div class="form-alert"><?=e($error)?></div><?php endif?><form class="vuexy-icon-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="<?=$editId?'update':'save'?>"><?php if($editId):?><input type="hidden" name="id" value="<?=$editId?>"><?php endif?>
 <h3 class="form-section-title">Temel Bilgiler</h3>
@@ -162,7 +150,7 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
 <?php unit_field('Özel Gün', 'special_day', $unit, 'tabler-calendar-heart', 'date'); unit_field('Aksiyon', 'action_name', $unit, 'tabler-bolt', 'text'); unit_field('Aksiyon Tarihi', 'action_date', $unit, 'tabler-calendar-event', 'date'); unit_field('Şehir', 'city', $unit, 'tabler-building-community', 'text'); unit_field('İlçe', 'district', $unit, 'tabler-map-pin', 'text'); unit_field('İlişkili Kartlar', 'related_cards', $unit, 'tabler-cards', 'text'); ?>
 <div class="unit-edit-row"><label class="unit-edit-label" for="unit_address">Adres</label><div class="unit-edit-control"><span class="merged-icon"><i class="icon-base ti tabler-map-pin"></i></span><textarea id="unit_address" name="address"><?=e((string)$unit['address'])?></textarea></div></div><div class="unit-edit-row"><label class="unit-edit-label" for="unit_note">Not</label><div class="unit-edit-control"><span class="merged-icon"><i class="icon-base ti tabler-notes"></i></span><textarea id="unit_note" name="note"><?=e((string)$unit['note'])?></textarea></div></div>
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url('units.php'))?>">İptal</a></div></form></section></main><?php endif; ?>
-<?php if (!$showForm): ?><main class="patient-container unit-list-page"><section class="unit-list"><div class="unit-list-toolbar"><h2>Ünite Listesi</h2><a class="button" href="<?=e(url('units.php?new=1'))?>">+ Yeni Ünite</a></div><table><thead><tr><th>KAYIT NO</th><th>AD SOYAD</th><th>TELEFON</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach($units as $row):?><tr><td><?=e($row['code'])?></td><td><?=e(unit_list_display($row))?></td><td><?=e($row['phone1']??'')?></td><td><div class="unit-actions"><a href="<?=e(url('units.php?edit='.(int)$row['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ünite silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$row['id']?>"><button title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$units):?><tr><td colspan="4" class="empty">Henüz ünite bulunmuyor.</td></tr><?php endif?></tbody></table></section></main><?php endif; ?>
+<?php if (!$showForm): ?><main class="patient-container unit-list-page"><section class="unit-list"><div class="unit-list-toolbar"><h2>Ünite Listesi</h2><a class="button" href="<?=e(url('units.php?new=1'))?>">+ Yeni Ünite</a></div><table><thead><tr><th>KAYIT NO</th><th>ÜNİTE NO</th><th>AD SOYAD</th><th>TELEFON</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach($units as $row):?><tr><td><?=e($row['code'])?></td><td><?=e($row['unit_no']??'')?></td><td><?=e(trim($row['name'].' '.($row['last_name']??'')))?></td><td><?=e($row['phone1']??'')?></td><td><div class="unit-actions"><a href="<?=e(url('units.php?edit='.(int)$row['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ünite silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$row['id']?>"><button title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$units):?><tr><td colspan="5" class="empty">Henüz ünite bulunmuyor.</td></tr><?php endif?></tbody></table></section></main><?php endif; ?>
 <script>
 (() => {
   const recordDate = document.querySelector('input[name="record_date"]');
@@ -185,20 +173,6 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
   control.append(input);
   row.append(label, control);
   recordDate.closest('.unit-edit-row')?.after(row);
-})();
-(() => {
-  const selected = { company_name: <?=json_encode(!empty($unit['show_company']))?>, name: <?=json_encode(!empty($unit['show_name']))?>, last_name: <?=json_encode(!empty($unit['show_last_name']))?> };
-  ['company_name', 'name', 'last_name'].forEach(field => {
-    const input = document.querySelector('[name="' + field + '"]');
-    const row = input?.closest('.unit-edit-row');
-    const suffix = field === 'company_name' ? 'company' : field === 'name' ? 'name' : 'last_name';
-    if (!input || !row || row.querySelector('[name="show_' + suffix + '"]')) return;
-    const option = document.createElement('label');
-    option.className = 'unit-list-default';
-    option.innerHTML = '<input type="checkbox" name="show_' + suffix + '" value="1"> Listede göster';
-    option.querySelector('input').checked = !!selected[field];
-    row.append(option);
-  });
 })();
 document.querySelectorAll('.unit-edit-row').forEach(row=>{const label=row.querySelector('.unit-edit-label'),control=row.querySelector('.unit-edit-control,.unit-rating');row.style.setProperty('display','flex','important');row.style.setProperty('width','100%','important');row.style.setProperty('align-items','flex-start','important');if(label){label.style.setProperty('display','block','important');label.style.setProperty('flex','0 0 150px','important');label.style.setProperty('width','150px','important')}if(control){control.style.setProperty('display','flex','important');control.style.setProperty('flex','1 1 auto','important');control.style.setProperty('min-width','0','important');control.querySelectorAll('input:not([type=radio]),select,textarea').forEach(field=>{field.style.setProperty('display','block','important');field.style.setProperty('position','static','important');field.style.setProperty('width','100%','important');field.style.setProperty('height',field.tagName==='TEXTAREA'?'76px':'38px','important');field.style.setProperty('opacity','1','important');field.style.setProperty('visibility','visible','important')})}});
 document.querySelectorAll('.unit-rating input').forEach(input=>input.addEventListener('change',()=>document.querySelectorAll('.unit-rating label').forEach((label,index)=>label.classList.toggle('is-selected',index<Number(input.value)))));
