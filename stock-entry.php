@@ -159,4 +159,22 @@ patient_header('Stok Girişi','stock');
 <style>.stock-entry-page{max-width:900px!important;margin:0 auto!important;padding:28px 20px 48px!important}.stock-entry-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.stock-entry-card .form-card-title{padding:22px 24px;border-bottom:1px solid #e1e2e8}.stock-entry-card h1{margin:0 0 5px;font-size:21px}.stock-entry-card p{margin:0;color:#7b7b8d}.stock-entry-card form{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:24px}.stock-entry-card label,.serial-area{display:flex;flex-direction:column;gap:7px}.stock-entry-card input,.stock-entry-card select,.stock-entry-card textarea{border:1px solid #d5d3de;border-radius:6px;padding:10px 12px;font:inherit}.stock-entry-card input,.stock-entry-card select{height:42px}.stock-entry-wide,.stock-entry-card footer{grid-column:1/-1}.entry-prices{border-top:1px solid #e1e2e8;padding-top:18px}.entry-prices h2{margin:0 0 14px;color:#19a94b;font-size:14px}.entry-prices-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.entry-prices-grid label{display:flex;flex-direction:column;gap:7px}.entry-tracking{border-top:1px solid #e1e2e8;padding-top:18px}.entry-tracking h2{margin:0 0 14px;color:#19a94b;font-size:14px}.tracking-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.serial-area{grid-column:1/-1}.serial-area strong{font-size:14px}.serial-area #serial-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stock-entry-card footer{display:flex;justify-content:flex-end;align-items:center;gap:14px}.stock-entry-card footer a{text-decoration:none;color:#7b7b8d}.stock-entry-error{margin:16px 24px;padding:12px;background:#ffe3e3;color:#a21d1d;border-radius:7px}@media(max-width:720px){.stock-entry-page{padding:20px 12px 36px!important}.stock-entry-card form,.entry-prices-grid,.tracking-grid,.serial-area #serial-fields{grid-template-columns:1fr}}</style>
 <style>.stock-entry-card footer .entry-copy-last{display:inline-grid;place-items:center;width:43px;height:43px;padding:0;border:1px solid #f5a33b;border-radius:7px;background:#f5a33b;color:#000;cursor:pointer}.stock-entry-card footer .entry-copy-last:hover{background:#e98d18}</style>
 <style>.entry-prices input[name="sale_price"][readonly]{background:#f3f4f7;color:#5d5b6d;cursor:not-allowed}</style>
+<style>
+[data-theme=dark] .stock-entry-page{background:transparent}
+[data-theme=dark] .stock-entry-card{background:#30334d;border-color:#464968;box-shadow:0 3px 14px rgba(0,0,0,.24)}
+[data-theme=dark] .stock-entry-card .form-card-title,[data-theme=dark] .entry-prices,[data-theme=dark] .entry-tracking{border-color:#464968}
+[data-theme=dark] .stock-entry-card h1,[data-theme=dark] .stock-entry-card h2,[data-theme=dark] .stock-entry-card label,[data-theme=dark] .serial-area strong{color:#f1f1f7}
+[data-theme=dark] .stock-entry-card p,[data-theme=dark] .stock-entry-card footer a{color:#b8b8c7}
+[data-theme=dark] .stock-entry-card input,[data-theme=dark] .stock-entry-card select,[data-theme=dark] .stock-entry-card textarea{background:#3c3f5f;border-color:#565a7d;color:#f4f4f8}
+[data-theme=dark] .stock-entry-card input::placeholder,[data-theme=dark] .stock-entry-card textarea::placeholder{color:#afb0c0}
+[data-theme=dark] .stock-entry-card select option{background:#3c3f5f;color:#f4f4f8}
+[data-theme=dark] .entry-prices input[name="sale_price"][readonly]{background:#292c45;color:#c5c6d3}
+[data-theme=dark] .stock-entry-error{background:#5a3038;color:#ffd8dc}
+[data-theme=dark] .technical-card{background:#30334d;border-color:#464968}
+[data-theme=dark] .technical-card>header,[data-theme=dark] .stock-entry-search,[data-theme=dark] .technical-card th,[data-theme=dark] .technical-card td{border-color:#464968}
+[data-theme=dark] .technical-card h1,[data-theme=dark] .technical-card th{color:#f1f1f7}
+[data-theme=dark] .technical-card p,[data-theme=dark] .stock-entry-search,[data-theme=dark] .empty{color:#b8b8c7}
+[data-theme=dark] .stock-entry-search input{background:#3c3f5f;border-color:#565a7d;color:#f4f4f8}
+[data-theme=dark] .technical-card tbody tr:hover{background:#393c59}
+</style>
 <?php patient_footer(); ?>
