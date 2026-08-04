@@ -5,11 +5,24 @@ require __DIR__ . '/config.php';
 require_login();
 require __DIR__ . '/patient-layout.php';
 
+function unit_visit_parse_money(string $value): float
+{
+    $value = trim(str_replace(' ', '', $value));
+    if ($value === '') return 0.0;
+    return str_contains($value, ',')
+        ? (float)str_replace(',', '.', str_replace('.', '', $value))
+        : (float)str_replace('.', '', $value);
+}
+
 $pdo = db();
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 $pdo->exec($sqlite
-    ? 'CREATE TABLE IF NOT EXISTS unit_visits (id INTEGER PRIMARY KEY AUTOINCREMENT, unit_id INTEGER NOT NULL, visit_date TEXT NOT NULL, description TEXT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
-    : 'CREATE TABLE IF NOT EXISTS unit_visits (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, unit_id INT UNSIGNED NOT NULL, visit_date DATE NOT NULL, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_unit_visits_unit_date (unit_id, visit_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    ? 'CREATE TABLE IF NOT EXISTS unit_visits (id INTEGER PRIMARY KEY AUTOINCREMENT, unit_id INTEGER NOT NULL, visit_date TEXT NOT NULL, payment_amount REAL NOT NULL DEFAULT 0, description TEXT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+    : 'CREATE TABLE IF NOT EXISTS unit_visits (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, unit_id INT UNSIGNED NOT NULL, visit_date DATE NOT NULL, payment_amount DECIMAL(12,2) NOT NULL DEFAULT 0, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_unit_visits_unit_date (unit_id, visit_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+$hasPaymentAmount = $sqlite
+    ? in_array('payment_amount', array_column($pdo->query('PRAGMA table_info(unit_visits)')->fetchAll(), 'name'), true)
+    : (function () use ($pdo): bool { $statement = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='unit_visits' AND column_name='payment_amount'"); $statement->execute(); return (bool)$statement->fetchColumn(); })();
+if (!$hasPaymentAmount) $pdo->exec($sqlite ? 'ALTER TABLE unit_visits ADD COLUMN payment_amount REAL NOT NULL DEFAULT 0' : 'ALTER TABLE unit_visits ADD COLUMN payment_amount DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER visit_date');
 
 $unitId = (int)($_GET['unit_id'] ?? $_POST['unit_id'] ?? 0);
 $editVisitId = (int)($_GET['edit'] ?? $_POST['visit_id'] ?? 0);
@@ -23,9 +36,9 @@ if (!$unit) {
 }
 
 $error = '';
-$visit = ['visit_date' => date('Y-m-d'), 'description' => ''];
+$visit = ['visit_date' => date('Y-m-d'), 'payment_amount' => 0, 'description' => ''];
 if ($editVisitId > 0) {
-    $visitStatement = $pdo->prepare('SELECT id, visit_date, description FROM unit_visits WHERE id=? AND unit_id=?');
+    $visitStatement = $pdo->prepare('SELECT id, visit_date, payment_amount, description FROM unit_visits WHERE id=? AND unit_id=?');
     $visitStatement->execute([$editVisitId, $unitId]);
     $visit = $visitStatement->fetch() ?: $visit;
     if (empty($visit['id'])) { http_response_code(404); exit('Ziyaret kaydı bulunamadı.'); }
@@ -38,22 +51,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('unit-visits.php?unit_id=' . $unitId . '&deleted=1');
     }
     $visitDate = trim((string)($_POST['visit_date'] ?? ''));
+    $paymentAmount = max(0, unit_visit_parse_money((string)($_POST['payment_amount'] ?? '')));
     $description = trim((string)($_POST['description'] ?? ''));
     if ($visitDate === '') {
         $error = 'Tarih alanı zorunludur.';
     } else {
         if ($editVisitId > 0) {
-            $update = $pdo->prepare('UPDATE unit_visits SET visit_date=?, description=? WHERE id=? AND unit_id=?');
-            $update->execute([$visitDate, $description, $editVisitId, $unitId]);
+            $update = $pdo->prepare('UPDATE unit_visits SET visit_date=?, payment_amount=?, description=? WHERE id=? AND unit_id=?');
+            $update->execute([$visitDate, $paymentAmount, $description, $editVisitId, $unitId]);
         } else {
-            $insert = $pdo->prepare('INSERT INTO unit_visits (unit_id, visit_date, description) VALUES (?, ?, ?)');
-            $insert->execute([$unitId, $visitDate, $description]);
+            $insert = $pdo->prepare('INSERT INTO unit_visits (unit_id, visit_date, payment_amount, description) VALUES (?, ?, ?, ?)');
+            $insert->execute([$unitId, $visitDate, $paymentAmount, $description]);
         }
         redirect('unit-visits.php?unit_id=' . $unitId . '&saved=1');
     }
 }
 
-$visitsStatement = $pdo->prepare('SELECT id, visit_date, description FROM unit_visits WHERE unit_id=? ORDER BY visit_date DESC, id DESC');
+$visitsStatement = $pdo->prepare('SELECT id, visit_date, payment_amount, description FROM unit_visits WHERE unit_id=? ORDER BY visit_date DESC, id DESC');
 $visitsStatement->execute([$unitId]);
 $visits = $visitsStatement->fetchAll();
 $unitName = trim((string)$unit['name'] . ' ' . (string)($unit['last_name'] ?? ''));
@@ -79,11 +93,12 @@ patient_header('Ziyaret', 'cash');
       <input type="hidden" name="csrf" value="<?=csrf()?>">
       <input type="hidden" name="unit_id" value="<?=$unitId?>"><input type="hidden" name="visit_id" value="<?=$editVisitId?>"><input type="hidden" name="action" value="<?=$editVisitId ? 'update' : 'save'?>">
       <label for="visit_date">Tarih</label><input id="visit_date" type="date" name="visit_date" value="<?=e((string)($_POST['visit_date'] ?? $visit['visit_date']))?>" required>
+      <label for="payment_amount">Ödeme</label><input id="payment_amount" type="text" name="payment_amount" data-money="true" inputmode="decimal" value="<?=e((float)($_POST['payment_amount'] ?? $visit['payment_amount']) > 0 ? number_format((float)($_POST['payment_amount'] ?? $visit['payment_amount']), 2, ',', '.') : '')?>" placeholder="0,00 TL">
       <label for="description">Açıklama</label><textarea id="description" name="description"><?=e((string)($_POST['description'] ?? $visit['description']))?></textarea>
       <div class="unit-visits-actions"><button class="button">Kaydet</button></div>
     </form><?php endif; ?>
     <?php if (!$showForm && $visits): ?>
-      <table class="unit-visits-table"><thead><tr><th>TARİH</th><th>AÇIKLAMA</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach ($visits as $visit): ?><tr><td><?=e(date('d.m.Y', strtotime((string)$visit['visit_date'])))?></td><td><?=nl2br(e((string)$visit['description']))?></td><td><div class="unit-visits-table-actions"><a class="unit-visit-edit" href="<?=e(url('unit-visits.php?unit_id=' . $unitId . '&edit=' . (int)$visit['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ziyaret silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="unit_id" value="<?=$unitId?>"><input type="hidden" name="visit_id" value="<?=(int)$visit['id']?>"><input type="hidden" name="action" value="delete"><button class="unit-visit-delete" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach; ?></tbody></table>
+      <table class="unit-visits-table"><thead><tr><th>TARİH</th><th>AÇIKLAMA</th><th>ÖDENEN</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach ($visits as $visit): ?><tr><td><?=e(date('d.m.Y', strtotime((string)$visit['visit_date'])))?></td><td><?=nl2br(e((string)$visit['description']))?></td><td><?=((float)$visit['payment_amount'] > 0) ? e(number_format((float)$visit['payment_amount'], 2, ',', '.')) . ' TL' : '—'?></td><td><div class="unit-visits-table-actions"><a class="unit-visit-edit" href="<?=e(url('unit-visits.php?unit_id=' . $unitId . '&edit=' . (int)$visit['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ziyaret silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="unit_id" value="<?=$unitId?>"><input type="hidden" name="visit_id" value="<?=(int)$visit['id']?>"><input type="hidden" name="action" value="delete"><button class="unit-visit-delete" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach; ?></tbody></table>
     <?php elseif (!$showForm): ?><div class="unit-visits-empty">Henüz ziyaret kaydı bulunmuyor.</div><?php endif; ?>
   </section>
 </main>
