@@ -37,13 +37,13 @@ foreach ($extraColumns as $definition) {
 /* Eski rastgele UNIT kodlarını, ünite kayıt sırasını koruyarak VOX formatına dönüştür. */
 try {
     $unitCodes = $pdo->query('SELECT id, code FROM units ORDER BY id')->fetchAll();
-    $legacyUnits = array_values(array_filter($unitCodes, static fn(array $row): bool => str_starts_with((string)$row['code'], 'UNIT-')));
-    if ($legacyUnits) {
+    $hasLegacyCode = (bool)array_filter($unitCodes, static fn(array $row): bool => !preg_match('/^VOX-\d+$/', (string)$row['code']));
+    if ($hasLegacyCode) {
         $pdo->beginTransaction();
         $temporary = $pdo->prepare('UPDATE units SET code=? WHERE id=?');
-        foreach ($legacyUnits as $row) $temporary->execute(['__VOX_UNIT_TMP_' . (int)$row['id'], (int)$row['id']]);
-        foreach ($legacyUnits as $row) {
-            $temporary->execute(['VOX-' . (125 + (int)$row['id']), (int)$row['id']]);
+        foreach ($unitCodes as $row) $temporary->execute(['__VOX_UNIT_TMP_' . (int)$row['id'], (int)$row['id']]);
+        foreach ($unitCodes as $index => $row) {
+            $temporary->execute(['VOX-' . (127 + $index), (int)$row['id']]);
         }
         $pdo->commit();
     }
