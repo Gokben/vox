@@ -12,7 +12,7 @@ $pdo->exec($sqlite
     : 'CREATE TABLE IF NOT EXISTS units (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(190) NOT NULL, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
 $extraColumns = [
-    'record_date TEXT NULL', 'company_id INTEGER NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
+    'record_date TEXT NULL', 'company_id INTEGER NULL', 'company_name VARCHAR(190) NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
     'marriage_date TEXT NULL', 'title VARCHAR(150) NULL', 'branch VARCHAR(150) NULL', 'rating INTEGER NULL',
     'email VARCHAR(190) NULL', 'phone1 VARCHAR(50) NULL', 'phone2 VARCHAR(50) NULL', 'gender VARCHAR(20) NULL',
     'special_day TEXT NULL', 'action_name VARCHAR(150) NULL', 'action_date TEXT NULL', 'city VARCHAR(100) NULL',
@@ -34,7 +34,7 @@ foreach ($extraColumns as $definition) {
     }
 }
 
-$fields = ['record_date', 'company_id', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
+$fields = ['record_date', 'company_name', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
 $editId = (int)($_GET['edit'] ?? 0);
 $showForm = $editId > 0 || isset($_GET['new']);
 $unit = array_fill_keys($fields, '');
@@ -43,12 +43,6 @@ $unit['rating'] = 0;
 $unit['gender'] = '';
 $message = '';
 $error = '';
-$companies = [];
-try {
-    $companies = $pdo->query('SELECT id, company_name FROM companies ORDER BY company_name')->fetchAll();
-} catch (Throwable $exception) {
-    error_log('units.php companies: ' . $exception->getMessage());
-}
 
 if ($editId) {
     $statement = $pdo->prepare('SELECT * FROM units WHERE id=?');
@@ -131,25 +125,23 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
 <script>
 (() => {
   const recordDate = document.querySelector('input[name="record_date"]');
-  if (!recordDate || document.querySelector('#unit_company_id')) return;
-  const companies = <?=json_encode($companies, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)?>;
-  const selectedCompanyId = <?=json_encode((string)($unit['company_id'] ?? ''))?>;
+  if (!recordDate || document.querySelector('#unit_company_name')) return;
   const row = document.createElement('div');
   row.className = 'unit-edit-row';
   const label = document.createElement('label');
   label.className = 'unit-edit-label';
-  label.htmlFor = 'unit_company_id';
+  label.htmlFor = 'unit_company_name';
   label.textContent = 'Firma';
   const control = document.createElement('div');
   control.className = 'unit-edit-control';
   control.innerHTML = '<span class="merged-icon" aria-hidden="true"><i class="icon-base ti tabler-building-community"></i></span>';
-  const select = document.createElement('select');
-  select.id = 'unit_company_id';
-  select.name = 'company_id';
-  const placeholder = new Option('Firma seçiniz', '');
-  select.add(placeholder);
-  companies.forEach(company => select.add(new Option(company.company_name, String(company.id), false, String(company.id) === selectedCompanyId)));
-  control.append(select);
+  const input = document.createElement('input');
+  input.id = 'unit_company_name';
+  input.name = 'company_name';
+  input.type = 'text';
+  input.value = <?=json_encode((string)($unit['company_name'] ?? ''))?>;
+  input.placeholder = 'Firma adı giriniz';
+  control.append(input);
   row.append(label, control);
   recordDate.closest('.unit-edit-row')?.after(row);
 })();
