@@ -82,9 +82,9 @@ patient_header('Ziyaret', 'cash');
       <label for="description">Açıklama</label><textarea id="description" name="description"><?=e((string)($_POST['description'] ?? $visit['description']))?></textarea>
       <div class="unit-visits-actions"><button class="button">Kaydet</button></div>
     </form><?php endif; ?>
-    <?php if ($visits): ?>
+    <?php if (!$showForm && $visits): ?>
       <table class="unit-visits-table"><thead><tr><th>TARİH</th><th>AÇIKLAMA</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach ($visits as $visit): ?><tr><td><?=e(date('d.m.Y', strtotime((string)$visit['visit_date'])))?></td><td><?=nl2br(e((string)$visit['description']))?></td><td><div class="unit-visits-table-actions"><a class="unit-visit-edit" href="<?=e(url('unit-visits.php?unit_id=' . $unitId . '&edit=' . (int)$visit['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ziyaret silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="unit_id" value="<?=$unitId?>"><input type="hidden" name="visit_id" value="<?=(int)$visit['id']?>"><input type="hidden" name="action" value="delete"><button class="unit-visit-delete" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach; ?></tbody></table>
-    <?php else: ?><div class="unit-visits-empty">Henüz ziyaret kaydı bulunmuyor.</div><?php endif; ?>
+    <?php elseif (!$showForm): ?><div class="unit-visits-empty">Henüz ziyaret kaydı bulunmuyor.</div><?php endif; ?>
   </section>
 </main>
 <?php patient_footer(); ?>
