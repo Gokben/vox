@@ -12,7 +12,7 @@ $pdo->exec($sqlite
     : 'CREATE TABLE IF NOT EXISTS units (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(190) NOT NULL, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
 $extraColumns = [
-    'record_date TEXT NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
+    'record_date TEXT NULL', 'company_id INTEGER NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
     'marriage_date TEXT NULL', 'title VARCHAR(150) NULL', 'branch VARCHAR(150) NULL', 'rating INTEGER NULL',
     'email VARCHAR(190) NULL', 'phone1 VARCHAR(50) NULL', 'phone2 VARCHAR(50) NULL', 'gender VARCHAR(20) NULL',
     'special_day TEXT NULL', 'action_name VARCHAR(150) NULL', 'action_date TEXT NULL', 'city VARCHAR(100) NULL',
@@ -34,7 +34,7 @@ foreach ($extraColumns as $definition) {
     }
 }
 
-$fields = ['record_date', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
+$fields = ['record_date', 'company_id', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
 $editId = (int)($_GET['edit'] ?? 0);
 $showForm = $editId > 0 || isset($_GET['new']);
 $unit = array_fill_keys($fields, '');
@@ -43,6 +43,12 @@ $unit['rating'] = 0;
 $unit['gender'] = '';
 $message = '';
 $error = '';
+$companies = [];
+try {
+    $companies = $pdo->query('SELECT id, company_name FROM companies ORDER BY company_name')->fetchAll();
+} catch (Throwable $exception) {
+    error_log('units.php companies: ' . $exception->getMessage());
+}
 
 if ($editId) {
     $statement = $pdo->prepare('SELECT * FROM units WHERE id=?');
@@ -123,6 +129,30 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url('units.php'))?>">İptal</a></div></form></section></main><?php endif; ?>
 <main class="patient-container unit-list-page"><?php if($message):?><p style="color:#16883d"><?=e($message)?></p><?php endif?><section class="unit-list"><div class="unit-list-toolbar"><h2>Ünite Listesi</h2><a class="button" href="<?=e(url('units.php?new=1'))?>">+ Yeni Ünite</a></div><table><thead><tr><th>KAYIT NO</th><th>AD SOYAD</th><th>TELEFON</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach($units as $row):?><tr><td><?=e($row['code'])?></td><td><?=e(trim($row['name'].' '.($row['last_name']??'')))?></td><td><?=e($row['phone1']??'')?></td><td><div class="unit-actions"><a href="<?=e(url('units.php?edit='.(int)$row['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ünite silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$row['id']?>"><button title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$units):?><tr><td colspan="4" class="empty">Henüz ünite bulunmuyor.</td></tr><?php endif?></tbody></table></section></main>
 <script>
+(() => {
+  const recordDate = document.querySelector('input[name="record_date"]');
+  if (!recordDate || document.querySelector('#unit_company_id')) return;
+  const companies = <?=json_encode($companies, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)?>;
+  const selectedCompanyId = <?=json_encode((string)($unit['company_id'] ?? ''))?>;
+  const row = document.createElement('div');
+  row.className = 'unit-edit-row';
+  const label = document.createElement('label');
+  label.className = 'unit-edit-label';
+  label.htmlFor = 'unit_company_id';
+  label.textContent = 'Firma';
+  const control = document.createElement('div');
+  control.className = 'unit-edit-control';
+  control.innerHTML = '<span class="merged-icon" aria-hidden="true"><i class="icon-base ti tabler-building-community"></i></span>';
+  const select = document.createElement('select');
+  select.id = 'unit_company_id';
+  select.name = 'company_id';
+  const placeholder = new Option('Firma seçiniz', '');
+  select.add(placeholder);
+  companies.forEach(company => select.add(new Option(company.company_name, String(company.id), false, String(company.id) === selectedCompanyId)));
+  control.append(select);
+  row.append(label, control);
+  recordDate.closest('.unit-edit-row')?.after(row);
+})();
 document.querySelectorAll('.unit-edit-row').forEach(row=>{const label=row.querySelector('.unit-edit-label'),control=row.querySelector('.unit-edit-control,.unit-rating');row.style.setProperty('display','flex','important');row.style.setProperty('width','100%','important');row.style.setProperty('align-items','flex-start','important');if(label){label.style.setProperty('display','block','important');label.style.setProperty('flex','0 0 150px','important');label.style.setProperty('width','150px','important')}if(control){control.style.setProperty('display','flex','important');control.style.setProperty('flex','1 1 auto','important');control.style.setProperty('min-width','0','important');control.querySelectorAll('input:not([type=radio]),select,textarea').forEach(field=>{field.style.setProperty('display','block','important');field.style.setProperty('position','static','important');field.style.setProperty('width','100%','important');field.style.setProperty('height',field.tagName==='TEXTAREA'?'76px':'38px','important');field.style.setProperty('opacity','1','important');field.style.setProperty('visibility','visible','important')})}});
 document.querySelectorAll('.unit-rating input').forEach(input=>input.addEventListener('change',()=>document.querySelectorAll('.unit-rating label').forEach((label,index)=>label.classList.toggle('is-selected',index<Number(input.value)))));
 document.querySelectorAll('.unit-list tbody tr').forEach(row=>{const editLink=row.querySelector('.unit-actions a[href*="edit="]');if(!editLink)return;row.dataset.editUrl=editLink.href;row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});
