@@ -94,6 +94,21 @@ if ((int)$pdo->query('SELECT COUNT(*) FROM cash_categories')->fetchColumn() === 
 }
 ensure_cash_schema($pdo);
 
+// Ünite ziyaretlerinde girilen ödemeler, kasa ekranı açıldığında da kontrol
+// edilerek kasa çıkış hareketi olarak eksiksiz görünür tutulur.
+try {
+    $unitVisitPayments = $pdo->query('SELECT v.id,v.unit_id,v.visit_date,v.payment_amount,u.code FROM unit_visits v INNER JOIN units u ON u.id=v.unit_id WHERE COALESCE(v.payment_amount,0)>0')->fetchAll();
+    $syncDelete = $pdo->prepare('DELETE FROM cash_transactions WHERE source_url=?');
+    $syncInsert = $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,source_url,created_by,cash_register) VALUES(?,?,?,?,?,?,?,?,?)');
+    foreach ($unitVisitPayments as $visitPayment) {
+        $sourceUrl = 'unit-visits.php?unit_id=' . (int)$visitPayment['unit_id'] . '&visit_id=' . (int)$visitPayment['id'];
+        $syncDelete->execute([$sourceUrl]);
+        $syncInsert->execute([(string)$visitPayment['visit_date'], 'Ünite ' . (string)$visitPayment['code'] . ' ziyaret ödemesi', 'expense', (float)$visitPayment['payment_amount'], 'cash', 1, $sourceUrl, null, 'main']);
+    }
+} catch (Throwable $e) {
+    // Ünite ziyaret altyapısı henüz kurulmamışsa kasa ekranı normal çalışmaya devam eder.
+}
+
 function cash_money(float $value): string
 {
     return number_format($value, 2, ',', '.') . ' ₺';
@@ -351,9 +366,16 @@ foreach ($transactions as &$transaction) {
     parse_str((string)parse_url((string)($transaction['source_url'] ?? ''), PHP_URL_QUERY), $sourceQuery);
     $patientId = (int)($sourceQuery['id'] ?? 0);
     $serviceId = (int)($sourceQuery['service_id'] ?? 0);
-    if (!$patientId && !$serviceId) continue;
+    $unitId = (int)($sourceQuery['unit_id'] ?? 0);
+    if (!$patientId && !$serviceId && !$unitId) continue;
     try {
-        if ($serviceId) {
+        if ($unitId) {
+            $unitStatement = $pdo->prepare('SELECT code FROM units WHERE id=? LIMIT 1');
+            $unitStatement->execute([$unitId]);
+            $unitCode = trim((string)$unitStatement->fetchColumn());
+            $transaction['invoice_no'] = $unitCode;
+            $transaction['related_person'] = $unitCode !== '' ? 'Ünite ' . $unitCode : 'Ünite';
+        } elseif ($serviceId) {
             $invoiceStatement = $pdo->prepare('SELECT sales_details,contact_person FROM patient_services WHERE id=? LIMIT 1');
             $invoiceStatement->execute([$serviceId]);
             $salesService = $invoiceStatement->fetch();
