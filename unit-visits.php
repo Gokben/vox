@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/config.php';
 require_login();
+require __DIR__ . '/cash-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
 
 function unit_visit_parse_money(string $value): float
@@ -12,6 +13,16 @@ function unit_visit_parse_money(string $value): float
     return str_contains($value, ',')
         ? (float)str_replace(',', '.', str_replace('.', '', $value))
         : (float)str_replace('.', '', $value);
+}
+
+function sync_unit_visit_cash(PDO $pdo, int $visitId, int $unitId, string $unitCode, string $visitDate, float $amount): void
+{
+    ensure_cash_schema($pdo);
+    $sourceUrl = 'unit-visits.php?unit_id=' . $unitId . '&visit_id=' . $visitId;
+    $pdo->prepare('DELETE FROM cash_transactions WHERE source_url=?')->execute([$sourceUrl]);
+    if ($amount <= 0) return;
+    $statement = $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,source_url,created_by,cash_register) VALUES(?,?,?,?,?,?,?,?,?)');
+    $statement->execute([$visitDate, 'Ünite ' . $unitCode . ' ziyaret ödemesi', 'expense', $amount, 'cash', 1, $sourceUrl, (int)($_SESSION['user']['id'] ?? 0) ?: null, 'main']);
 }
 
 $pdo = db();
@@ -47,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = (string)($_POST['action'] ?? 'save');
     if ($action === 'delete') {
+        sync_unit_visit_cash($pdo, $editVisitId, $unitId, (string)$unit['code'], '', 0);
         $pdo->prepare('DELETE FROM unit_visits WHERE id=? AND unit_id=?')->execute([$editVisitId, $unitId]);
         redirect('unit-visits.php?unit_id=' . $unitId . '&deleted=1');
     }
@@ -59,14 +71,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($editVisitId > 0) {
             $update = $pdo->prepare('UPDATE unit_visits SET visit_date=?, payment_amount=?, description=? WHERE id=? AND unit_id=?');
             $update->execute([$visitDate, $paymentAmount, $description, $editVisitId, $unitId]);
+            $visitCashId = $editVisitId;
         } else {
             $insert = $pdo->prepare('INSERT INTO unit_visits (unit_id, visit_date, payment_amount, description) VALUES (?, ?, ?, ?)');
             $insert->execute([$unitId, $visitDate, $paymentAmount, $description]);
+            $visitCashId = (int)$pdo->lastInsertId();
         }
+        sync_unit_visit_cash($pdo, $visitCashId, $unitId, (string)$unit['code'], $visitDate, $paymentAmount);
         redirect('unit-visits.php?unit_id=' . $unitId . '&saved=1');
     }
 }
 
+$paidVisitsStatement = $pdo->prepare('SELECT id,visit_date,payment_amount FROM unit_visits WHERE unit_id=? AND COALESCE(payment_amount,0)>0');
+$paidVisitsStatement->execute([$unitId]);
+foreach ($paidVisitsStatement as $paidVisit) {
+    sync_unit_visit_cash($pdo, (int)$paidVisit['id'], $unitId, (string)$unit['code'], (string)$paidVisit['visit_date'], (float)$paidVisit['payment_amount']);
+}
 $visitsStatement = $pdo->prepare('SELECT id, visit_date, payment_amount, description FROM unit_visits WHERE unit_id=? ORDER BY visit_date DESC, id DESC');
 $visitsStatement->execute([$unitId]);
 $visits = $visitsStatement->fetchAll();
