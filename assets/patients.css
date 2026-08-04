@@ -7,7 +7,8 @@
   body .patient-topbar{position:fixed!important;z-index:30!important;top:0!important;left:260px!important;right:0!important;height:64px!important;padding:0 28px!important;background:var(--card)!important;border-bottom:1px solid var(--line)!important;box-shadow:0 2px 8px rgba(30,31,48,.06)!important}
   body .header-tools{margin-left:auto!important}
   body .patient-brand{position:fixed!important;z-index:31!important;top:0!important;left:0!important;width:260px!important;height:64px!important;margin:0!important;padding:0 24px!important;background-color:var(--card)!important;background-position:24px center!important;border-bottom:1px solid var(--line)!important}
-  body .patient-nav{position:fixed!important;z-index:25!important;top:64px!important;bottom:0!important;left:0!important;width:260px!important;height:auto!important;padding:18px 13px 28px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:3px!important;overflow-y:auto!important;background:var(--card)!important;border-right:1px solid var(--line)!important}
+  body .patient-nav{position:fixed!important;z-index:25!important;top:64px!important;bottom:0!important;left:0!important;width:260px!important;height:auto!important;padding:18px 13px 28px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:3px!important;overflow-y:auto!important;scrollbar-width:none!important;-ms-overflow-style:none!important;background:var(--card)!important;border-right:1px solid var(--line)!important}
+  body .patient-nav::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
   body .patient-nav a,body .report-menu-group>a{width:100%!important;min-height:42px!important;padding:10px 13px!important;font-size:14px!important;border-radius:7px!important}
   .patient-nav a span{width:18px;text-align:center;opacity:.8}
   .patient-nav .report-menu-group{width:100%}
