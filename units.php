@@ -34,6 +34,24 @@ foreach ($extraColumns as $definition) {
     }
 }
 
+/* Eski rastgele UNIT kodlarını, ünite kayıt sırasını koruyarak VOX formatına dönüştür. */
+try {
+    $unitCodes = $pdo->query('SELECT id, code FROM units ORDER BY id')->fetchAll();
+    $legacyUnits = array_values(array_filter($unitCodes, static fn(array $row): bool => str_starts_with((string)$row['code'], 'UNIT-')));
+    if ($legacyUnits) {
+        $pdo->beginTransaction();
+        $temporary = $pdo->prepare('UPDATE units SET code=? WHERE id=?');
+        foreach ($legacyUnits as $row) $temporary->execute(['__VOX_UNIT_TMP_' . (int)$row['id'], (int)$row['id']]);
+        foreach ($legacyUnits as $row) {
+            $temporary->execute(['VOX-' . (125 + (int)$row['id']), (int)$row['id']]);
+        }
+        $pdo->commit();
+    }
+} catch (Throwable $exception) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    error_log('units.php code migration: ' . $exception->getMessage());
+}
+
 $fields = ['record_date', 'company_name', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
 $editId = (int)($_GET['edit'] ?? 0);
 $showForm = $editId > 0 || isset($_GET['new']);
@@ -73,8 +91,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('UPDATE units SET ' . $set . ' WHERE id=?')->execute([...array_map(static fn(string $field): mixed => $unit[$field], $fields), $id]);
             redirect('units.php?edit=' . $id . '&saved=1');
         }
+        $existingCodes = $pdo->query("SELECT code FROM units WHERE code LIKE 'VOX-%'")->fetchAll(PDO::FETCH_COLUMN);
+        $lastNumber = 126;
+        foreach ($existingCodes as $existingCode) {
+            if (preg_match('/^VOX-(\d+)$/', (string)$existingCode, $matches)) {
+                $lastNumber = max($lastNumber, (int)$matches[1]);
+            }
+        }
         do {
-            $code = 'UNIT-' . strtoupper(bin2hex(random_bytes(4)));
+            $code = 'VOX-' . (++$lastNumber);
             $check = $pdo->prepare('SELECT 1 FROM units WHERE code=?');
             $check->execute([$code]);
         } while ($check->fetchColumn());
@@ -97,6 +122,7 @@ patient_header($editId ? 'Ünite Düzenle' : ($showForm ? 'Yeni Ünite' : 'Ünit
 .unit-form-page{width:100%!important;max-width:1100px!important;margin:0 auto;padding:28px 20px 48px!important}.vuexy-form-card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1);overflow:hidden}.vuexy-form-header{display:flex;align-items:center;justify-content:space-between;min-height:70px;padding:0 24px;border-bottom:1px solid var(--line)}.vuexy-form-header h2{margin:0;font-size:20px;font-weight:500}.vuexy-icon-form{padding:10px 24px 24px}.form-section-title{margin:16px 0 8px;padding-bottom:10px;border-bottom:1px solid var(--line);font-size:14px;color:#20a447}.unit-edit-row{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:start;margin:14px 0}.unit-edit-label{padding:11px 15px 0 0;color:var(--text);font-size:14px}.required-mark{color:#e44747}.unit-edit-control{display:flex;align-items:stretch;min-height:40px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);overflow:hidden}.unit-edit-control:focus-within{border-color:#20a447;box-shadow:0 0 0 3px rgba(32,164,71,.12)}.merged-icon{display:grid;place-items:center;flex:0 0 46px;color:#686574;font-size:18px}.unit-edit-control input,.unit-edit-control select,.unit-edit-control textarea{width:100%;height:38px;min-height:38px;margin:0;padding:8px 12px 8px 0;border:0;outline:0;background:transparent;color:var(--text);font:inherit}.unit-edit-control textarea{height:76px;resize:vertical;padding-top:10px}.unit-rating{display:flex;align-items:center;gap:5px;min-height:40px}.unit-rating input{position:absolute;opacity:0}.unit-rating label{font-size:29px;line-height:1;color:#d7d6de;cursor:pointer}.unit-rating label.is-selected{color:#f3a64a}.vuexy-form-actions{display:flex;align-items:center;gap:12px;margin:22px 0 0 150px}.vuexy-form-actions .button{min-width:100px}.cancel-link{color:var(--muted);text-decoration:none}.form-alert{margin:18px 24px 0;padding:12px 14px;border-radius:6px;background:#fde8e8;color:#a62c2c}.unit-list{width:calc(100% - 64px);max-width:none;margin:28px 32px 48px;border:1px solid var(--line);border-radius:8px;background:var(--card);overflow:hidden}.unit-list-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;min-height:70px!important;padding:0 24px!important;border-bottom:1px solid var(--line)!important;background:var(--card)!important}.unit-list-toolbar h2{display:block!important;margin:0!important;padding:0!important;border:0!important;font-size:20px!important;color:var(--text)!important}.unit-list-toolbar .button{display:inline-flex!important;min-height:40px!important;padding:0 14px!important}.unit-list table{width:100%;border-collapse:collapse}.unit-list th,.unit-list td{padding:13px 18px;border-bottom:1px solid var(--line);text-align:left}.unit-list th{font-size:12px;color:var(--muted)}.unit-actions{display:flex;gap:8px}.unit-actions a,.unit-actions button{display:inline-grid;place-items:center;width:36px;height:36px;border:0;border-radius:6px;background:#20a447;color:#fff;cursor:pointer}.unit-actions button{background:#e04f55}.empty{text-align:center;color:var(--muted)}
 .unit-field-icon{display:grid!important;place-items:center!important;flex:0 0 46px!important;width:46px!important;min-height:38px!important;border-right:1px solid var(--line)!important;color:#686574!important;font-size:16px!important;line-height:1!important}.unit-list-page{padding-top:96px!important}
 .unit-list tbody tr[data-edit-url]{cursor:pointer}.unit-list tbody tr[data-edit-url]:hover{background:#f7fcf8}
+.unit-actions .unit-visit-action{background:#f3a64a!important}.unit-actions .unit-visit-action:hover{background:#df8f2b!important}
 /* Layout CSS from the admin shell applies broad form rules; lock this form to the patient-form grid. */
 body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!important;max-width:none!important;box-sizing:border-box!important}body .unit-form-page .unit-edit-row{display:flex!important;align-items:flex-start!important;gap:0!important;width:100%!important;min-width:0!important;margin:14px 0!important}body .unit-form-page .unit-edit-label{display:block!important;flex:0 0 150px!important;width:150px!important;min-width:150px!important;max-width:150px!important;padding:11px 15px 0 0!important;white-space:normal!important;overflow:visible!important}body .unit-form-page .unit-edit-control{display:flex!important;flex:1 1 0!important;align-items:stretch!important;width:auto!important;min-width:0!important;min-height:40px!important}body .unit-form-page .unit-edit-control input,body .unit-form-page .unit-edit-control select,body .unit-form-page .unit-edit-control textarea{display:block!important;position:static!important;flex:1 1 auto!important;width:100%!important;min-width:0!important;max-width:none!important;height:38px!important;min-height:38px!important;margin:0!important;opacity:1!important;visibility:visible!important}body .unit-form-page .unit-edit-control textarea{height:76px!important}body .unit-form-page .merged-icon{display:grid!important;position:static!important;flex:0 0 46px!important;width:46px!important;height:auto!important;opacity:1!important}body .unit-form-page .unit-rating{display:flex!important;flex:1 1 0!important;min-width:0!important}body .unit-form-page .vuexy-form-actions{display:flex!important;margin-left:150px!important}@media(max-width:720px){.unit-form-page{padding:20px 12px 30px!important}.vuexy-form-header,.vuexy-icon-form{padding-left:16px;padding-right:16px}body .unit-form-page .unit-edit-row{display:block!important}body .unit-form-page .unit-edit-label{width:auto!important;min-width:0!important;max-width:none!important;padding:0 0 7px!important}body .unit-form-page .vuexy-form-actions{margin-left:0!important}.unit-list{margin:0 12px 30px;width:auto;overflow:auto}.unit-list table{min-width:620px}}
 </style>
@@ -148,6 +174,7 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
 document.querySelectorAll('.unit-edit-row').forEach(row=>{const label=row.querySelector('.unit-edit-label'),control=row.querySelector('.unit-edit-control,.unit-rating');row.style.setProperty('display','flex','important');row.style.setProperty('width','100%','important');row.style.setProperty('align-items','flex-start','important');if(label){label.style.setProperty('display','block','important');label.style.setProperty('flex','0 0 150px','important');label.style.setProperty('width','150px','important')}if(control){control.style.setProperty('display','flex','important');control.style.setProperty('flex','1 1 auto','important');control.style.setProperty('min-width','0','important');control.querySelectorAll('input:not([type=radio]),select,textarea').forEach(field=>{field.style.setProperty('display','block','important');field.style.setProperty('position','static','important');field.style.setProperty('width','100%','important');field.style.setProperty('height',field.tagName==='TEXTAREA'?'76px':'38px','important');field.style.setProperty('opacity','1','important');field.style.setProperty('visibility','visible','important')})}});
 document.querySelectorAll('.unit-rating input').forEach(input=>input.addEventListener('change',()=>document.querySelectorAll('.unit-rating label').forEach((label,index)=>label.classList.toggle('is-selected',index<Number(input.value)))));
 document.querySelectorAll('.unit-list tbody tr').forEach(row=>{const editLink=row.querySelector('.unit-actions a[href*="edit="]');if(!editLink)return;row.dataset.editUrl=editLink.href;row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});
+document.querySelectorAll('.unit-actions').forEach(actions=>{if(actions.querySelector('.unit-visit-action'))return;const editLink=actions.querySelector('a[href*="edit="]'),match=editLink?.href.match(/[?&]edit=(\d+)/);if(!match)return;const visit=document.createElement('a');visit.href=<?=json_encode(url('unit-visits.php'))?>+'?unit_id='+match[1];visit.className='unit-visit-action';visit.title='Ziyaret';visit.setAttribute('aria-label','Ziyaret');visit.innerHTML='<i class="icon-base ti tabler-map-pin"></i>';actions.prepend(visit);});
 (()=>{const format=value=>{let digits=value.replace(/\D/g,'');if(digits.length===10&&digits.startsWith('5'))digits='0'+digits;return [digits.slice(0,4),digits.slice(4,7),digits.slice(7,9),digits.slice(9,11)].filter(Boolean).join(' ')};document.querySelectorAll('input[name="phone1"],input[name="phone2"]').forEach(input=>{input.value=format(input.value);input.addEventListener('input',()=>input.value=format(input.value));});})();
 </script>
 <?php patient_footer(); ?>
