@@ -54,7 +54,7 @@ function patient_footer(): void
 {
     ?>
 <script>
-document.querySelector('.patient-nav a[href*="index.php"]')?.setAttribute('href', <?=json_encode(url('bb'))?>);
+document.querySelector('.patient-nav a[href*="index.php"]')?.setAttribute('href', <?=json_encode(url('index.php'))?>);
 const stockMenuLink = document.createElement('a');
 stockMenuLink.href = <?= json_encode(url('stocks.php')) ?>;
 stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
