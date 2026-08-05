@@ -54,6 +54,7 @@ function patient_footer(): void
 {
     ?>
 <script>
+document.querySelector('.patient-nav a[href*="index.php"]')?.setAttribute('href', <?=json_encode(url('bb'))?>);
 const stockMenuLink = document.createElement('a');
 stockMenuLink.href = <?= json_encode(url('stocks.php')) ?>;
 stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
@@ -256,8 +257,10 @@ if (calendarMenuLink) {
   const dailyEventsListLink = document.createElement('a');
   dailyEventsListLink.href = <?= json_encode(url('daily-events-list.php')) ?>;
   dailyEventsListLink.textContent = 'Günlük Aksiyon';
+  const calendarGroup = document.createElement('div');
+  calendarGroup.className = 'report-menu-group';
   const calendarSubmenu = document.createElement('div');
-  calendarSubmenu.className = 'calendar-menu-submenu';
+  calendarSubmenu.className = 'calendar-menu-submenu report-submenu';
   const onCalendarPage = location.pathname.endsWith('/calendar.php');
   const onAppointmentListPage = location.pathname.endsWith('/appointment-list.php');
   const onDailyEventsListPage = location.pathname.endsWith('/daily-events-list.php');
@@ -265,13 +268,19 @@ if (calendarMenuLink) {
   if (onAppointmentListPage) { calendarMenuLink.classList.add('active'); appointmentListLink.classList.add('active'); }
   if (onDailyEventsListPage) { calendarMenuLink.classList.add('active'); dailyEventsListLink.classList.add('active'); }
   calendarSubmenu.append(appointmentListLink, dailyEventsListLink);
-  calendarMenuLink.after(calendarSubmenu);
+  calendarMenuLink.setAttribute('aria-haspopup', 'true');
+  calendarMenuLink.setAttribute('aria-expanded', 'false');
+  calendarMenuLink.before(calendarGroup);
+  calendarGroup.append(calendarMenuLink, calendarSubmenu);
+  if (onCalendarPage || onAppointmentListPage || onDailyEventsListPage || sessionStorage.getItem('vox.calendarMenuOpen') === '1') {
+    calendarGroup.classList.add('open');
+    calendarMenuLink.setAttribute('aria-expanded', 'true');
+  }
   const taskMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.getAttribute('href')?.includes('kanban.php'));
   if (taskMenuLink) {
-    taskMenuLink.querySelector(':scope > span')?.remove();
     if (taskMenuLink.lastChild?.nodeType === Node.TEXT_NODE) taskMenuLink.lastChild.textContent = ' Görev Takip';
-    dailyEventsListLink.after(taskMenuLink);
-    if (location.pathname.endsWith('/kanban.php')) calendarMenuLink.classList.add('active');
+    calendarGroup.after(taskMenuLink);
+    if (location.pathname.endsWith('/kanban.php')) taskMenuLink.classList.add('active');
   }
   const calendarMenuStyle = document.createElement('style');
   calendarMenuStyle.textContent = '.patient-nav .calendar-menu-submenu{display:grid!important;gap:1px!important;margin:3px 12px 7px 20px!important;padding:0!important}.patient-nav .calendar-menu-submenu>a{position:relative!important;display:flex!important;justify-content:flex-start!important;align-items:center!important;width:100%!important;min-height:38px!important;margin:0!important;padding:9px 10px 9px 34px!important;border-radius:6px!important;background:transparent!important;color:var(--text)!important;text-align:left!important;text-decoration:none!important;font-size:14px!important;line-height:1.35!important}.patient-nav .calendar-menu-submenu>a::before{position:absolute!important;top:50%!important;left:12px!important;width:8px!important;height:8px!important;border:1.5px solid currentColor!important;border-radius:50%!important;content:""!important;opacity:.9!important;transform:translateY(-50%)!important}.patient-nav .calendar-menu-submenu a.active{background:#eef9f1!important;color:#168c3d!important;font-weight:600!important}';
@@ -356,10 +365,11 @@ document.querySelector('.patient-nav')?.addEventListener('click', event => {
 }, true);
 // Vuexy menu.js _toggleAnimation davranışı: grup yüksekliği başlık ile alt menü arasında geçiş yapar.
 const vuexyMenuAnimationStyle = document.createElement('style');
-vuexyMenuAnimationStyle.textContent = '.patient-nav .report-menu-group.menu-item-animating{overflow:hidden!important;transition:height .3s ease!important}';
+vuexyMenuAnimationStyle.textContent = '.patient-nav .report-menu-group.menu-item-animating{overflow:hidden!important;transition:height .3s ease-in-out!important}';
 document.head.append(vuexyMenuAnimationStyle);
 const updateAccordionSession = (trigger, open) => {
   const name = trigger.textContent.trim().toLocaleLowerCase('tr-TR');
+  if (name.includes('takvim')) sessionStorage.setItem('vox.calendarMenuOpen', open ? '1' : '0');
   if (name.includes('stok')) sessionStorage.setItem('vox.stockMenuOpen', open ? '1' : '0');
   if (name.includes('kurulum')) sessionStorage.setItem('vox.setupMenuOpen', open ? '1' : '0');
   if (name.includes('listeler')) sessionStorage.setItem('vox.listsMenuOpen', open ? '1' : '0');
@@ -370,24 +380,39 @@ const vuexyToggleGroup = (group, open) => {
   if (!trigger || !submenu || group.dataset.menuAnimating === '1') return;
   const linkHeight = Math.round(trigger.getBoundingClientRect().height);
   group.dataset.menuAnimating = '1';
-  group.style.height = open ? linkHeight + 'px' : linkHeight + Math.round(submenu.getBoundingClientRect().height) + 'px';
+  group.style.overflow = 'hidden';
   group.classList.add('menu-item-animating');
-  if (open) group.classList.add('open');
   trigger.setAttribute('aria-expanded', String(open));
   updateAccordionSession(trigger, open);
   const clear = () => {
     group.removeEventListener('transitionend', onEnd);
-    if (!open) group.classList.remove('open');
-    group.classList.remove('menu-item-animating');
+    group.classList.remove('menu-item-animating', 'menu-closing');
     group.style.height = '';
+    group.style.overflow = '';
     group.dataset.menuAnimating = '';
   };
-  const onEnd = event => { if (event.target === group && event.propertyName === 'height') clear(); };
+  const onEnd = event => {
+    if (event.target !== group || event.propertyName !== 'height') return;
+    if (!open) group.classList.remove('open');
+    clear();
+  };
   group.addEventListener('transitionend', onEnd);
+  if (open) {
+    group.style.height = linkHeight + 'px';
+    group.classList.add('open');
+    setTimeout(() => {
+      group.style.height = (linkHeight + Math.round(submenu.getBoundingClientRect().height)) + 'px';
+    }, 50);
+  } else {
+    group.style.height = (linkHeight + Math.round(submenu.getBoundingClientRect().height)) + 'px';
+    group.classList.add('menu-closing');
+    setTimeout(() => { group.style.height = linkHeight + 'px'; }, 50);
+  }
   setTimeout(() => {
-    group.style.height = (open ? linkHeight + Math.round(submenu.getBoundingClientRect().height) : linkHeight) + 'px';
-  }, 50);
-  setTimeout(clear, 400);
+    if (group.dataset.menuAnimating !== '1') return;
+    if (!open) group.classList.remove('open');
+    clear();
+  }, 450);
 };
 document.querySelector('.patient-nav')?.addEventListener('click', event => {
   const trigger = event.target.closest('.report-menu-group > a');
@@ -602,45 +627,6 @@ if(settingsPages[currentSettingsPage]){
   const style=document.createElement('style');
   style.textContent='.vox-save-notification{position:fixed;z-index:3000;right:24px;bottom:24px;padding:12px 18px;border-radius:7px;background:#19a94b;color:#fff;font-weight:700;box-shadow:0 8px 22px rgba(25,169,75,.28);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s}.vox-save-notification.visible{opacity:1;transform:translateY(0)}';
   document.head.append(style);
-})();
-</script>
-<style>
-/* Vuexy dikey menü açılış/kapanış geçişi. */
-.patient-nav .report-menu-group{transition:height .35s ease!important;will-change:height}.patient-nav .report-menu-group.vox-menu-animating{overflow:hidden!important}.patient-nav .report-menu-group.vox-menu-animating>.report-submenu{display:grid!important}.patient-nav .report-menu-group.vox-menu-animating>.report-submenu,.patient-nav .report-menu-group.menu-closing>.report-submenu{animation:voxMenuFade .35s ease both}@keyframes voxMenuFade{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
-</style>
-<script>
-/* Vuexy Menu._toggleAnimation ile aynı yükseklik geçişi: önce başlık yüksekliği, sonra alt menü yüksekliği. */
-(() => {
-  const groups = () => [...document.querySelectorAll('.patient-nav > .report-menu-group')].filter(group => group.querySelector(':scope > .report-submenu'));
-  const animate = (group, open) => {
-    const trigger = group.querySelector(':scope > a'), submenu = group.querySelector(':scope > .report-submenu');
-    if (!trigger || !submenu || group.classList.contains('vox-menu-animating')) return;
-    const triggerHeight = Math.round(trigger.getBoundingClientRect().height);
-    const finish = () => { group.classList.remove('vox-menu-animating','menu-closing'); group.style.removeProperty('height'); group.style.removeProperty('overflow'); };
-    group.classList.add('vox-menu-animating');
-    if (open) {
-      group.style.height = triggerHeight + 'px';
-      group.style.overflow = 'hidden';
-      group.classList.add('open');
-      requestAnimationFrame(() => requestAnimationFrame(() => group.style.height = (triggerHeight + submenu.scrollHeight) + 'px'));
-      group.addEventListener('transitionend', event => { if (event.propertyName === 'height') finish(); }, {once:true});
-    } else {
-      group.style.height = (triggerHeight + submenu.scrollHeight) + 'px';
-      group.style.overflow = 'hidden';
-      group.classList.add('menu-closing');
-      requestAnimationFrame(() => requestAnimationFrame(() => group.style.height = triggerHeight + 'px'));
-      group.addEventListener('transitionend', event => { if (event.propertyName === 'height') { group.classList.remove('open'); finish(); } }, {once:true});
-    }
-  };
-  document.addEventListener('click', event => {
-    const trigger = event.target.closest('.patient-nav > .report-menu-group > a');
-    const group = trigger?.parentElement;
-    if (!trigger || !group) return;
-    event.preventDefault(); event.stopImmediatePropagation();
-    const opening = !group.classList.contains('open');
-    if (opening) groups().filter(item => item !== group && item.classList.contains('open')).forEach(item => animate(item, false));
-    animate(group, opening);
-  }, true);
 })();
 </script>
 <script>

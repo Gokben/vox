@@ -32,7 +32,7 @@ if (!$hasPowerUsage) $pdo->exec('ALTER TABLE stock_cards ADD COLUMN power_usage 
 $hasProductColor = $sqlite ? (bool)array_filter($pdo->query('PRAGMA table_info(stock_cards)')->fetchAll(), static fn($column) => $column['name'] === 'product_color') : (function() use ($pdo): bool {$query=$pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name="stock_cards" AND column_name="product_color"');$query->execute();return(bool)$query->fetchColumn();})();
 if (!$hasProductColor) $pdo->exec('ALTER TABLE stock_cards ADD COLUMN product_color VARCHAR(50) NULL');
 
-$fields = ['stock_code','stock_name','brand','model','device_type','power_usage','product_color','min_stock','max_stock','stock_type'];
+$fields = ['stock_code','stock_name','brand','model','vat_rate','device_type','power_usage','product_color','min_stock','max_stock','stock_type'];
 $brands = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY name')->fetchAll();
 $models = $pdo->query('SELECT MIN(id) AS id,brand_id,name,MAX(stock_type) AS stock_type FROM models GROUP BY brand_id,name ORDER BY name')->fetchAll();
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: 0;
@@ -49,6 +49,7 @@ if ($editing) {
     $record = $statement->fetch();
     if (!$record) { http_response_code(404); exit('Stok kartı bulunamadı.'); }
     foreach ($fields as $field) $form[$field] = (string)($record[$field] ?? '');
+    $form['vat_rate'] = (string)(int)(float)$form['vat_rate'];
     $imagePath = (string)($record['image_path'] ?? '');
     $previousImagePath = $imagePath;
 }
@@ -59,7 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['serial_no'] = $form['stock_code'];
     $form['min_stock'] = max(0, (int)$form['min_stock']);
     $form['max_stock'] = max(0, (int)$form['max_stock']);
+    $form['vat_rate'] = in_array($form['vat_rate'], ['0', '10', '20'], true) ? $form['vat_rate'] : '';
     if ($form['stock_code'] === '' || $form['stock_name'] === '') $error = 'Stok kodu ve stok adı zorunludur.';
+    elseif ($form['vat_rate'] === '') $error = 'KDV oranı yalnız %0, %10 veya %20 olabilir.';
     elseif ($form['max_stock'] && $form['max_stock'] < $form['min_stock']) $error = 'Azami stok miktarı asgari stok miktarından düşük olamaz.';
     else {
         if (($_POST['image_action'] ?? '') === 'clear') $imagePath = '';
@@ -106,7 +109,7 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
     <h2>Temel Bilgiler ve Kodlama</h2><div class="stock-grid">
       <label>Stok Kodu *<input name="stock_code" value="<?=e($form['stock_code'])?>" required></label><label>Stok Adı *<input name="stock_name" value="<?=e($form['stock_name'])?>" placeholder="Cihazın tam ticari adı" required></label>
       <label>Marka<select name="brand" id="stock-brand"><option value="">Seçiniz</option><?php foreach ($brands as $brand): ?><option value="<?=e($brand['name'])?>" <?= $form['brand'] === $brand['name'] ? 'selected' : '' ?>><?=e($brand['name'])?></option><?php endforeach ?><?php if ($form['brand'] !== '' && !in_array($form['brand'], array_column($brands, 'name'), true)): ?><option value="<?=e($form['brand'])?>" selected><?=e($form['brand'])?></option><?php endif ?></select></label>
-      <label>Model<select name="model" id="stock-model"><option value="">Model seçiniz</option><?php foreach ($models as $model): ?><option value="<?=e($model['name'])?>" data-brand-id="<?=e((string)$model['brand_id'])?>" <?= $form['model'] === $model['name'] ? 'selected' : '' ?>><?=e($model['name'])?></option><?php endforeach ?><?php if ($form['model'] !== '' && !in_array($form['model'], array_column($models, 'name'), true)): ?><option value="<?=e($form['model'])?>" selected><?=e($form['model'])?></option><?php endif ?></select></label>
+      <label>Model<select name="model" id="stock-model"><option value="">Model seçiniz</option><?php foreach ($models as $model): ?><option value="<?=e($model['name'])?>" data-brand-id="<?=e((string)$model['brand_id'])?>" <?= $form['model'] === $model['name'] ? 'selected' : '' ?>><?=e($model['name'])?></option><?php endforeach ?><?php if ($form['model'] !== '' && !in_array($form['model'], array_column($models, 'name'), true)): ?><option value="<?=e($form['model'])?>" selected><?=e($form['model'])?></option><?php endif ?></select></label><label>KDV Oranı<select name="vat_rate"><option value="0" <?=$form['vat_rate']==='0'?'selected':''?>>%0</option><option value="10" <?=$form['vat_rate']==='10'?'selected':''?>>%10</option><option value="20" <?=$form['vat_rate']==='20'?'selected':''?>>%20</option></select></label>
       <label>Cihaz Tipi<select name="device_type"><option value="">Seçiniz</option><?php foreach (['Kulak arkası (BTE)','Kanal içi (CIC)','Kanal içi (ITC)','Kanal İçi Alıcı RIC/RIE'] as $type): ?><option <?=$form['device_type'] === $type ? 'selected' : ''?>><?=e($type)?></option><?php endforeach ?></select></label><label>Güç Kullanımı<select name="power_usage"><option value="">Seçiniz</option><?php foreach (['Pilli','Şarjlı'] as $powerUsage): ?><option <?=$form['power_usage'] === $powerUsage ? 'selected' : ''?>><?=e($powerUsage)?></option><?php endforeach ?></select></label><label>Ürün Rengi<select name="product_color"><option value="">Seçiniz</option><?php foreach (['Bej','Siyah','Şampanya'] as $productColor): ?><option <?=$form['product_color'] === $productColor ? 'selected' : ''?>><?=e($productColor)?></option><?php endforeach ?></select></label>
     </div>
     <h2>Finansal ve Depo Bilgileri</h2><div class="stock-grid">
@@ -118,13 +121,43 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
 </section></main>
 <div id="stock-card-image-modal" class="stock-card-image-modal" hidden role="dialog" aria-modal="true" aria-label="Ürün görseli"><button type="button" class="stock-card-image-modal-close" aria-label="Kapat">×</button><div class="stock-card-image-modal-content"><img src="" alt=""></div></div>
 <script>
-(() => { const brand = document.getElementById('stock-brand'), model = document.getElementById('stock-model'); if (!brand || !model) return; const filterModels = () => { const selected = brand.options[brand.selectedIndex]; const brandId = selected?.dataset.id || <?= json_encode((string)($brands[array_search($form['brand'], array_column($brands, 'name'), true)]['id'] ?? '')) ?>; [...model.options].forEach(option => { if (!option.dataset.brandId) return; option.hidden = !!brandId && option.dataset.brandId !== brandId; }); if (model.selectedOptions[0]?.hidden) model.value = ''; }; [...brand.options].forEach(option => { const entry = <?= json_encode($brands) ?>.find(item => item.name === option.value); if (entry) option.dataset.id = entry.id; }); brand.addEventListener('change', () => { model.value = ''; filterModels(); }); filterModels(); })();
+(() => {
+  const type = document.querySelector('select[name="stock_type"]');
+  const brand = document.getElementById('stock-brand');
+  const model = document.getElementById('stock-model');
+  const brands = <?=json_encode($brands, JSON_UNESCAPED_UNICODE)?>;
+  const models = <?=json_encode($models, JSON_UNESCAPED_UNICODE)?>;
+  const savedModel = <?=json_encode($form['model'], JSON_UNESCAPED_UNICODE)?>;
+  if (!type || !brand || !model) return;
+
+  const matchesType = value => {
+    const values = String(value || '').split(',').map(item => item.trim()).filter(Boolean);
+    return values.length === 0 || values.includes(type.value);
+  };
+  const brandByName = name => brands.find(item => item.name === name);
+  const renderModels = selectedModel => {
+    const brandId = String(brandByName(brand.value)?.id || '');
+    model.replaceChildren(new Option('Model seçiniz', ''));
+    models.filter(item => String(item.brand_id) === brandId && (item.name === selectedModel || matchesType(item.stock_type || brandByName(brand.value)?.stock_type)))
+      .forEach(item => model.add(new Option(item.name, item.name)));
+    if ([...model.options].some(option => option.value === selectedModel)) model.value = selectedModel;
+    model.disabled = !brandId;
+  };
+  const renderBrands = () => {
+    [...brand.options].forEach(option => {
+      if (!option.value) return;
+      option.hidden = !matchesType(brandByName(option.value)?.stock_type);
+    });
+    if (brand.selectedOptions[0]?.hidden) brand.value = '';
+  };
+  renderBrands();
+  renderModels(savedModel);
+  type.addEventListener('change', () => { brand.value = ''; renderBrands(); renderModels(''); });
+  brand.addEventListener('change', () => renderModels(''));
+})();
 </script>
 <script>(()=>{const input=document.getElementById('product-image-input'),action=document.getElementById('product-image-action');if(input&&action){input.addEventListener('click',()=>{action.value='clear'});input.addEventListener('change',()=>{if(input.files.length)action.value='upload'})}const open=document.getElementById('stock-card-image-open'),modal=document.getElementById('stock-card-image-modal'),image=modal?.querySelector('img'),close=modal?.querySelector('button');if(!open||!modal||!image||!close)return;const hide=()=>{modal.hidden=true;image.src=''};open.addEventListener('click',()=>{image.src=open.dataset.imageSrc||'';image.alt=open.dataset.imageAlt||'';modal.hidden=false});close.addEventListener('click',hide);modal.addEventListener('click',event=>{if(event.target===modal)hide()});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!modal.hidden)hide()})})();</script>
 <script>(()=>{const stockType=document.querySelector('select[name="stock_type"]')?.closest('label'),stockCode=document.querySelector('input[name="stock_code"]')?.closest('label'),grid=stockCode?.parentElement;if(stockType&&stockCode&&grid)grid.insertBefore(stockType,stockCode)})();</script>
-<script>(()=>{const type=document.querySelector('select[name="stock_type"]'),brand=document.getElementById('stock-brand'),model=document.getElementById('stock-model'),brands=<?=json_encode($brands,JSON_UNESCAPED_UNICODE)?>,models=<?=json_encode($models,JSON_UNESCAPED_UNICODE)?>;if(!type||!brand||!model)return;const typeMatches=(types,selected)=>{const values=String(types||'').split(',').map(value=>value.trim()).filter(Boolean);return selected!==''&&(values.length?values.includes(selected):selected==='İşitme Cihazı')};const update=reset=>{const selectedType=type.value,selectedBrand=brand.value;if(reset){brand.value='';model.value=''}brand.disabled=!selectedType;model.disabled=!selectedType||!brand.value;[...brand.options].forEach(option=>{if(!option.value)return;const entry=brands.find(item=>item.name===option.value);option.hidden=!entry||!typeMatches(entry.stock_type,selectedType)});if(brand.selectedOptions[0]?.hidden)brand.value='';[...model.options].forEach(option=>{if(!option.value)return;const entry=models.find(item=>item.name===option.value&&String(item.brand_id)===String(brand.selectedOptions[0]?.dataset.id||''));const brandEntry=brands.find(item=>String(item.id)===String(entry?.brand_id||''));option.hidden=!entry||!brand.value||!typeMatches(entry.stock_type||brandEntry?.stock_type,selectedType)});if(model.selectedOptions[0]?.hidden)model.value='';model.disabled=!selectedType||!brand.value};[...brand.options].forEach(option=>{const entry=brands.find(item=>item.name===option.value);if(entry)option.dataset.id=entry.id});type.addEventListener('change',()=>update(true));brand.addEventListener('change',()=>update(true));update(false)})();</script>
-<script>(()=>{const type=document.querySelector('select[name="stock_type"]'),brand=document.getElementById('stock-brand'),model=document.getElementById('stock-model'),brands=<?=json_encode($brands,JSON_UNESCAPED_UNICODE)?>,models=<?=json_encode($models,JSON_UNESCAPED_UNICODE)?>;if(!type||!brand||!model)return;const match=(types,selected)=>{const values=String(types||'').split(',').map(value=>value.trim()).filter(Boolean);return values.length?values.includes(selected):selected==='İşitme Cihazı'};brand.addEventListener('change',event=>{event.stopImmediatePropagation();model.value='';const brandId=brand.selectedOptions[0]?.dataset.id||'';[...model.options].forEach(option=>{if(!option.value)return;const entry=models.find(item=>item.name===option.value&&String(item.brand_id)===String(brandId));const brandEntry=brands.find(item=>String(item.id)===String(brandId));option.hidden=!entry||!match(entry.stock_type||brandEntry?.stock_type,type.value)});model.disabled=!brand.value},true)})();</script>
-<script>(()=>{const type=document.querySelector('select[name="stock_type"]'),brand=document.getElementById('stock-brand'),model=document.getElementById('stock-model'),brands=<?=json_encode($brands,JSON_UNESCAPED_UNICODE)?>,models=<?=json_encode($models,JSON_UNESCAPED_UNICODE)?>;if(!type||!brand||!model)return;const matches=(types,selected)=>{const values=String(types||'').split(',').map(value=>value.trim()).filter(Boolean);return values.length?values.includes(selected):selected==='İşitme Cihazı'};const rebuildModels=()=>{const brandId=brand.selectedOptions[0]?.dataset.id||'',selected=model.value;model.replaceChildren(new Option('Model seçiniz',''));models.filter(item=>String(item.brand_id)===String(brandId)&&matches(item.stock_type||(brands.find(entry=>String(entry.id)===String(brandId))?.stock_type||''),type.value)).forEach(item=>model.add(new Option(item.name,item.name)));if([...model.options].some(option=>option.value===selected))model.value=selected;model.disabled=!brandId};document.addEventListener('change',event=>{if(event.target===brand){event.stopImmediatePropagation();rebuildModels()}},true);type.addEventListener('change',()=>setTimeout(rebuildModels,0));rebuildModels()})();</script>
 <script>(()=>{const type=document.querySelector('select[name="stock_type"]'),fields=['device_type','power_usage','product_color'].map(name=>document.querySelector(`[name="${name}"]`)).filter(Boolean);if(!type)return;const toggle=()=>{const isBattery=type.value==='Pil';fields.forEach(field=>{field.closest('label').hidden=isBattery;if(isBattery)field.value=''})};type.addEventListener('change',toggle);toggle()})();</script>
 <script>(()=>{const type=document.querySelector('select[name="stock_type"]'),materialFields=['brand','model','device_type','power_usage','product_color'].map(name=>document.querySelector(`[name="${name}"]`)).filter(Boolean);if(!type)return;const toggle=()=>{const isMaterial=type.value==='Sarf Malzeme';materialFields.forEach(field=>{const hide=isMaterial;field.closest('label').hidden=hide;field.disabled=hide;if(hide)field.value=''})};type.addEventListener('change',toggle);toggle()})();</script>
 <script>(()=>{const type=document.querySelector('select[name="stock_type"]'),fields=['brand','model','device_type','power_usage','product_color'].map(name=>document.querySelector(`[name="${name}"]`)).filter(Boolean);if(!type)return;const toggle=()=>{const isMaterial=type.value==='Sarf Malzeme',isBattery=type.value==='Pil';fields.forEach(field=>{const deviceField=['device_type','power_usage','product_color'].includes(field.name),hide=isMaterial||(isBattery&&deviceField);field.closest('label').hidden=hide;field.disabled=isMaterial;if(hide)field.value=''})};type.addEventListener('change',toggle);toggle()})();</script>

@@ -39,16 +39,15 @@ patient_header('Stok Kartları Listesi', 'stock');
     <div class="stock-search"><i class="icon-base ti tabler-search"></i><input id="stock-list-search" type="search" placeholder="Stok kodu, stok adı, marka veya model ara" autocomplete="off"><select id="stock-type-filter" aria-label="Stok tipine göre süz"><option value="">Tüm stok tipleri</option><?php foreach (array_values(array_unique(array_filter(array_map(static fn($stock) => trim((string)($stock['stock_type'] ?? '')), $stocks)))) as $stockType): ?><option value="<?=e($stockType)?>"><?=e($stockType)?></option><?php endforeach; ?></select></div>
     <div class="table-responsive">
       <table class="stock-list-table">
-        <thead><tr><th>Stok Kodu</th><th>Stok Tipi</th><th>Stok Adı</th><th>Marka / Model</th><th>Cihaz Tipi</th><th>Güç Kullanımı</th><th>Renk</th><th>Görsel</th><th>Stok Miktarı</th><th>Kritik Stok</th><th>KDV Oranı</th><th>Satış Fiyatı</th><th>İşlemler</th></tr></thead>
+        <thead><tr><th>Stok Kodu</th><th>Stok Tipi</th><th>Stok Adı</th><th>Marka / Model</th><th>Cihaz Tipi</th><th>Güç Kullanımı</th><th>Renk</th><th>Görsel</th><th>Stok Miktarı</th><th>Kritik Stok</th><th>KDV Oranı</th><th>İşlemler</th></tr></thead>
         <tbody>
         <?php if (!$stocks): ?>
-          <tr><td colspan="13" class="stock-empty">Henüz stok kartı bulunmuyor.</td></tr>
+          <tr><td colspan="12" class="stock-empty">Henüz stok kartı bulunmuyor.</td></tr>
         <?php else: foreach ($stocks as $stock): ?>
           <tr data-stock-type="<?=e((string)($stock['stock_type'] ?? ''))?>">
             <td><?=e($stock['stock_code'])?></td><td><?=e($stock['stock_type'] ?: '—')?></td><td><?=e($stock['stock_name'])?></td>
             <td><?=e(trim((string)$stock['brand'] . ' ' . (string)$stock['model']) ?: '—')?></td>
             <td><?=e($stock['device_type'] ?: '—')?></td><td><?=e($stock['power_usage'] ?: '—')?></td><td><?=e($stock['product_color'] ?: '—')?></td><td class="stock-image-cell"><?php if (!empty($stock['image_path'])): ?><button type="button" class="stock-image-button" data-image-src="<?=e(url($stock['image_path']))?>" data-image-alt="<?=e($stock['stock_name'])?> görseli"><img src="<?=e(url($stock['image_path']))?>" alt="<?=e($stock['stock_name'])?> görseli"></button><?php else: ?>—<?php endif ?></td><td><?=e((string)$stock['stock_quantity'])?></td><td><?=e((string)$stock['min_stock'])?> / <?=e((string)$stock['max_stock'])?></td><td><?=e('%' . (string)(int)$stock['vat_rate'])?></td>
-            <td><?=number_format((float)$stock['sale_price'], 2, ',', '.')?> ₺</td>
             <td class="stock-actions"><a class="stock-action-button stock-history-action" title="Stok Hareketleri" href="<?=e(url('stock-movements.php?stock_id=' . (int)$stock['id']))?>"><i class="icon-base ti tabler-history"></i></a><a class="stock-action-button stock-edit" title="Düzenle" href="<?=e(url('stock-card.php?id=' . (int)$stock['id']))?>"><i class="icon-base ti tabler-pencil"></i></a><a class="stock-action-button stock-delete" style="margin-left:2px!important" title="Sil" href="#" onclick="event.preventDefault();if(confirm('Bu stok kartı silinsin mi?'))document.getElementById('stock-delete-<?=e((string)$stock['id'])?>').submit();"><i class="icon-base ti tabler-trash"></i></a><form id="stock-delete-<?=e((string)$stock['id'])?>" class="stock-delete-form" method="post" action="<?=e(url('stocks.php'))?>"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="delete_id" value="<?=e((string)$stock['id'])?>"></form></td>
           </tr>
         <?php endforeach; endif; ?>

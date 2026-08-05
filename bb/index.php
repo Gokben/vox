@@ -1,0 +1,35 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/../config.php';
+
+$userId = (int)($_SESSION['bb_user_id'] ?? 0);
+$userStatement = db()->prepare('SELECT id,name,role,active FROM users WHERE id=? LIMIT 1');
+$userStatement->execute([$userId]);
+$user = $userStatement->fetch();
+if (!$user || !(int)$user['active'] || normalize_role((string)$user['role']) !== ROLE_COMPANY_MANAGER) {
+    unset($_SESSION['bb_user_id']);
+    redirect('bb/login.php');
+}
+
+$pdo = db();
+$total = (int)$pdo->query('SELECT COUNT(*) FROM patients')->fetchColumn();
+$approved = (int)$pdo->query('SELECT COUNT(*) FROM patients WHERE approval=1')->fetchColumn();
+$considering = (int)$pdo->query('SELECT COUNT(*) FROM patients WHERE considering=1')->fetchColumn();
+$rejected = (int)$pdo->query('SELECT COUNT(*) FROM patients WHERE rejected=1')->fetchColumn();
+$yearExpression = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'substr(record_date,1,4)' : 'YEAR(record_date)';
+$years = $pdo->query("SELECT {$yearExpression} AS year_key,COUNT(*) AS total,COALESCE(SUM(CASE WHEN approval=1 THEN 1 ELSE 0 END),0) AS approved FROM patients WHERE record_date IS NOT NULL AND record_date<>'' GROUP BY {$yearExpression} ORDER BY year_key DESC")->fetchAll();
+$selectedYear = (int)($_GET['year'] ?? ($years[0]['year_key'] ?? date('Y')));
+$selected = $years[0] ?? ['total'=>0,'approved'=>0];
+foreach ($years as $year) if ((int)$year['year_key'] === $selectedYear) { $selected = $year; break; }
+$successRate = $total ? round($approved / $total * 100, 1) : 0;
+$yearRate = (int)$selected['total'] ? round((int)$selected['approved'] / (int)$selected['total'] * 100, 1) : 0;
+$statusRows = [['Onaylanan',$approved,'primary'],['Düşünecek',$considering,'warning'],['Reddedilen',$rejected,'danger']];
+?>
+<script>document.addEventListener('DOMContentLoaded',()=>{const menu=document.createElement('aside');menu.className='bb-sidebar';menu.setAttribute('aria-label','VOX menüsü');menu.innerHTML='<div class="bb-sidebar-menu"><span class="bb-menu-item active">⌂ <b>Ana Sayfa</b></span><span class="bb-menu-item">▣ Hasta Kartları</span><span class="bb-menu-item">▣ Takvim</span><span class="bb-menu-sub">○ Randevu Listesi</span><span class="bb-menu-item">◫ Listeler</span><span class="bb-menu-item">◇ Stoklar</span><span class="bb-menu-sub">○ Stok Giriş</span><span class="bb-menu-sub">○ Stok Çıkış</span><span class="bb-menu-sub">○ Stok Kartı Listesi</span><span class="bb-menu-sub">○ Liste Fiyatları</span><span class="bb-menu-item">⚒ Teknik Servis</span><span class="bb-menu-item">▣ Ön Kasa</span><span class="bb-menu-item">▣ Kasa</span><span class="bb-menu-item">▣ Cari Kartlar</span><span class="bb-menu-item">▥ Üniteler</span><span class="bb-menu-item">▥ Kurumlar &amp; Firmalar</span><span class="bb-menu-item">⚙ Ayarlar</span><span class="bb-menu-item">⚒ Kurulum</span></div>';document.body.prepend(menu);});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const menu=document.querySelector('.bb-sidebar-menu');if(menu){const icon=path=>`<svg class="bb-menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;menu.innerHTML=`<span class="bb-menu-item active">${icon('M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z')}<b>Ana Sayfa</b></span><span class="bb-menu-item">${icon('M3 7h18v12H3zM3 10h18M7 15h3')}Gelir / Gider</span><span class="bb-menu-item">${icon('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8m6-1a4 4 0 0 1 0 8')}Çalışan Performansı</span><span class="bb-menu-item">${icon('M4 4h16v16H4zM8 8h8M8 12h8M8 16h5')}Ürün Performansı</span><span class="bb-menu-item">${icon('M4 19V5m0 14h16M8 16v-5m4 5V7m4 9v-3')}Kar Marjları</span>`;}});</script>
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Yönetim Paneli | <?=e(APP_NAME)?></title><link rel="icon" href="<?=e(url('assets/favicon.png'))?>"><link rel="stylesheet" href="<?=e(url('bb/style.css'))?>"></head>
+<body class="bb-dashboard"><header class="bb-topbar"><a href="<?=e(url('bb/index.php'))?>" class="bb-brand"><img src="<?=e(url('assets/vox-logo-02.png'))?>" alt="VOX"><span>Yönetim Paneli</span></a><div><span class="bb-user"><?=e((string)$user['name'])?></span><a class="bb-logout" href="<?=e(url('bb/logout.php'))?>">Çıkış</a></div></header><main class="bb-shell"><div class="bb-title"><div><p class="bb-eyebrow">GENEL BAKIŞ</p><h1>Hasta Kayıtları</h1><p>Hasta süreçleri ve satış sonuçları tek ekranda.</p></div><form method="get"><label>Yıl<select name="year" onchange="this.form.submit()"><?php foreach($years as $year):?><option value="<?=e((string)$year['year_key'])?>" <?=((int)$year['year_key']===$selectedYear)?'selected':''?>><?=e((string)$year['year_key'])?></option><?php endforeach;?></select></label></form></div>
+<section class="bb-kpis"><article class="bb-kpi primary"><span class="bb-icon">⌁</span><div><b><?=$total?></b><p>Toplam kayıt</p><small>Tüm hasta kayıtları</small></div></article><article class="bb-kpi success"><span class="bb-icon">✓</span><div><b><?=$approved?></b><p>Onaylanan</p><small>%<?=$successRate?> başarı oranı</small></div></article><article class="bb-kpi warning"><span class="bb-icon">◷</span><div><b><?=$considering?></b><p>Düşünecek</p><small>Takip bekleyen kayıt</small></div></article><article class="bb-kpi danger"><span class="bb-icon">×</span><div><b><?=$rejected?></b><p>Reddedilen</p><small>Sonuçlanan kayıt</small></div></article></section>
+<section class="bb-grid"><article class="bb-card bb-overview"><header><div><p class="bb-eyebrow">SATIŞ GÖRÜNÜMÜ</p><h2><?=$selectedYear?> yılı performansı</h2></div><strong><?=$yearRate?>%</strong></header><div class="bb-progress"><i style="width:<?=$yearRate?>%"></i></div><div class="bb-overview-detail"><div><span>Onaylanan satışlar</span><b><?=(int)$selected['approved']?> / <?=(int)$selected['total']?></b></div><div><span>Toplam başarı oranı</span><b><?=$successRate?>%</b></div></div></article><article class="bb-card"><header><div><p class="bb-eyebrow">DURUM DAĞILIMI</p><h2>Kayıt sonuçları</h2></div></header><div class="bb-status-list"><?php foreach($statusRows as [$label,$count,$class]):$percent=$total?round($count/$total*100):0;?><div><div><span class="bb-dot <?=$class?>"></span><span><?=$label?></span><b><?=$count?></b></div><div class="bb-status-track"><i class="<?=$class?>" style="width:<?=$percent?>%"></i></div></div><?php endforeach;?></div></article></section>
+<section class="bb-card"><header><div><p class="bb-eyebrow">YILLARA GÖRE</p><h2>Başarı oranı karşılaştırması</h2></div></header><div class="bb-year-grid"><?php foreach(array_reverse($years) as $year):$rate=(int)$year['total']?round((int)$year['approved']/(int)$year['total']*100,1):0;?><article><span><?=e((string)$year['year_key'])?></span><strong><?=$rate?>%</strong><div class="bb-mini-track"><i style="width:<?=$rate?>%"></i></div><small><?=(int)$year['approved']?> / <?=(int)$year['total']?> onaylanan</small></article><?php endforeach;?></div></section></main></body></html>
