@@ -32,7 +32,7 @@ $statusRows = [['Onaylanan',$approved,'primary'],['Düşünecek',$considering,'w
 <script>document.addEventListener('DOMContentLoaded',()=>{const pages={'Gelir / Gider':'income-expense','Çalışan Performansı':'employee-performance','Ürün Performansı':'product-performance','Kar Marjları':'profit-margins'};document.querySelectorAll('.bb-sidebar-menu a').forEach(link=>{const page=pages[link.textContent.trim()];if(page)link.href=<?=json_encode(url('bb/section.php?page='))?>+page;});});</script>
 <script>document.addEventListener('click',event=>{const item=event.target.closest('.bb-sidebar-menu a');if(item&&item.textContent.trim()==='Ürün Performansı'){event.preventDefault();location.assign(<?=json_encode(url('bb/section.php?page=product-performance'))?>);}},true);</script>
 <script>
-document.addEventListener('DOMContentLoaded',()=>{
+if(false) document.addEventListener('DOMContentLoaded',()=>{
   const shell=document.querySelector('.bb-shell');
   if(!shell)return;
   const data=<?=json_encode(['total'=>$total,'approved'=>$approved,'considering'=>$considering,'rejected'=>$rejected,'rate'=>$successRate,'year'=>$selectedYear,'yearTotal'=>(int)$selected['total'],'yearApproved'=>(int)$selected['approved'],'yearRate'=>$yearRate,'years'=>$years],JSON_UNESCAPED_UNICODE)?>;
