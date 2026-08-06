@@ -10,11 +10,36 @@ $movements = $pdo->query("SELECT m.*, s.stock_code, s.stock_name, s.stock_type, 
     FROM stock_movements m
     INNER JOIN stock_cards s ON s.id = m.stock_id
     WHERE m.movement_type = 'Çıkış'
-    ORDER BY m.movement_date DESC, m.id DESC")->fetchAll();
+    ORDER BY m.movement_date DESC, m.id ASC")->fetchAll();
 $stockBalances = [];
 foreach ($pdo->query("SELECT stock_id, SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS balance FROM stock_movements GROUP BY stock_id") as $balance) {
     $stockBalances[(int)$balance['stock_id']] = (int)$balance['balance'];
 }
+$totalExitsByStock = [];
+foreach ($movements as $movement) {
+    $stockId = (int)$movement['stock_id'];
+    $totalExitsByStock[$stockId] = ($totalExitsByStock[$stockId] ?? 0) + (int)$movement['quantity'];
+}
+$totalEntriesByStock = [];
+foreach ($stockBalances as $stockId => $balance) {
+    $totalEntriesByStock[$stockId] = $balance + ($totalExitsByStock[$stockId] ?? 0);
+}
+
+// Her çıkış satırında, o hareket işlendiği andaki kalan miktarı göster.
+$remainingAfterExit = [];
+$runningStockBalances = [];
+foreach ($pdo->query('SELECT id, stock_id, movement_type, quantity FROM stock_movements ORDER BY id ASC') as $historyMovement) {
+    $stockId = (int)$historyMovement['stock_id'];
+    $quantity = (int)$historyMovement['quantity'];
+    $runningStockBalances[$stockId] = $runningStockBalances[$stockId] ?? 0;
+    if (str_starts_with((string)$historyMovement['movement_type'], 'G')) {
+        $runningStockBalances[$stockId] += $quantity;
+        continue;
+    }
+    $runningStockBalances[$stockId] -= $quantity;
+    $remainingAfterExit[(int)$historyMovement['id']] = $runningStockBalances[$stockId];
+}
+
 $totalSalesByProduct = [];
 foreach ($pdo->query("SELECT m.stock_id, m.quantity, s.stock_type, s.brand, s.model FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE m.movement_type='Çıkış'") as $saleMovement) {
     $key = implode('|', [(string)$saleMovement['stock_type'], trim((string)$saleMovement['brand']) ?: '#' . $saleMovement['stock_id'], trim((string)$saleMovement['model']) ?: '#' . $saleMovement['stock_id']]);
@@ -62,7 +87,7 @@ patient_header('Stok Çıkış', 'stock');
     <div class="stock-exit-search"><i class="ti tabler-search"></i><input id="stock-exit-search" type="search" placeholder="Stok, seri no, fatura no veya tarih ara" autocomplete="off"></div>
     <div class="stock-exit-table-wrap">
       <table>
-        <thead><tr><th>TARİH</th><th>STOK TİPİ</th><th>STOK KARTI</th><th>SERİ NO</th><th>FATURA NO</th><th>ÇIKIŞ</th><th>MEVCUT</th><th>T. SATIŞ</th></tr></thead>
+        <thead><tr><th>TARİH</th><th>STOK TİPİ</th><th>STOK KARTI</th><th>SERİ NO</th><th>FATURA NO</th><th>GİRİŞ</th><th>ÇIKIŞ</th><th>MEVCUT</th></tr></thead>
         <tbody>
         <?php foreach ($movements as $movement):
           $description = trim((string)($movement['description'] ?? ''));
@@ -78,9 +103,9 @@ patient_header('Stok Çıkış', 'stock');
             <td<?= $sale && trim((string)($sale['patient_name'] ?? '')) !== '' ? ' title="' . e((string)$sale['patient_name']) . '"' : '' ?>><?=e($movement['stock_code'] . ' — ' . $movement['stock_name'])?></td>
             <td><?=e(stock_exit_serials($movement['serial_numbers'] ?? null))?></td>
             <td><?=e($invoiceNo ?: '—')?></td>
+            <td><?=e((string)($totalEntriesByStock[(int)$movement['stock_id']] ?? 0))?></td>
             <td><?=e((string)$movement['quantity'])?></td>
-            <td><?=e((string)($stockBalances[(int)$movement['stock_id']] ?? 0))?></td>
-            <td><?=e((string)($totalEntriesByProduct[$productKey] ?? 0))?></td>
+            <td><?=e((string)($remainingAfterExit[(int)$movement['id']] ?? 0))?></td>
           </tr>
         <?php endforeach; if (!$movements): ?>
           <tr><td class="stock-exit-empty" colspan="8">Henüz stok çıkışı bulunmuyor.</td></tr>
@@ -94,6 +119,6 @@ patient_header('Stok Çıkış', 'stock');
 .stock-exit-page{width:100%!important;max-width:1800px!important;min-height:100vh;margin:0 auto!important;padding:46px 20px 48px!important}.stock-exit-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.stock-exit-card>header{padding:22px 24px;border-bottom:1px solid #e1e2e8}.stock-exit-card h1{margin:0 0 5px;color:#2f2b3d;font-size:21px}.stock-exit-card p{margin:0;color:#7b7b8d}.stock-exit-search{display:flex;align-items:center;gap:9px;padding:16px 24px;border-bottom:1px solid #e1e2e8;color:#6f7180}.stock-exit-search input{width:min(440px,100%);padding:10px 12px;border:1px solid #d7d9e2;border-radius:6px;font:inherit}.stock-exit-table-wrap{overflow:auto}.stock-exit-card table{width:100%;min-width:850px;border-collapse:collapse}.stock-exit-card th,.stock-exit-card td{padding:14px 18px;border-bottom:1px solid #e1e2e8;text-align:left;white-space:nowrap}.stock-exit-card th{font-size:12px;color:#5d5b6d}.stock-exit-card tbody tr:hover{background:#f8fcf9}.stock-exit-sale-row{cursor:pointer}.stock-exit-empty{text-align:center;color:#7b7b8d}@media(max-width:720px){.stock-exit-page{padding:92px 14px 30px!important}}
 </style>
 <script>
-(()=>{const search=document.getElementById('stock-exit-search');document.querySelector('.stock-exit-table-wrap thead tr th:last-child').textContent='GİRİŞ';if(!search)return;const normalize=value=>String(value||'').toLocaleLowerCase('tr-TR');search.addEventListener('input',()=>{const query=normalize(search.value.trim());document.querySelectorAll('.stock-exit-table-wrap tbody tr').forEach(row=>{if(row.querySelector('.stock-exit-empty'))return;row.hidden=!!query&&!normalize(row.textContent).includes(query)})})})();
+(()=>{const search=document.getElementById('stock-exit-search');if(!search)return;const normalize=value=>String(value||'').toLocaleLowerCase('tr-TR');search.addEventListener('input',()=>{const query=normalize(search.value.trim());document.querySelectorAll('.stock-exit-table-wrap tbody tr').forEach(row=>{if(row.querySelector('.stock-exit-empty'))return;row.hidden=!!query&&!normalize(row.textContent).includes(query)})})})();
 </script>
 <?php patient_footer(); ?>
