@@ -469,6 +469,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedStockId = (int)($_POST['stock_id'] ?? 0);
     $postedRepairDetails = json_decode((string)($_POST['repair_details'] ?? ''), true);
     if (is_array($postedRepairDetails)) {
+        foreach (['repair_accessories[]', 'repair_customer_issues[]', 'repair_technician_issues[]'] as $repairListKey) {
+            if (!isset($postedRepairDetails[$repairListKey]) || !is_array($postedRepairDetails[$repairListKey])) continue;
+            $postedRepairDetails[$repairListKey] = array_values(array_unique(array_filter(array_map('trim', $postedRepairDetails[$repairListKey]), static fn(string $item): bool => $item !== '')));
+        }
         $receivedBy = trim((string)($postedRepairDetails['repair_received_by'] ?? ''));
         if ($receivedBy !== '' && !in_array($receivedBy, patient_staff_names(), true)) $postedRepairDetails['repair_received_by'] = '';
     }
