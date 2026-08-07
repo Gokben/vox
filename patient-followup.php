@@ -38,7 +38,7 @@ try {
 }
 $technicalServiceAccounts = [];
 try {
-    $technicalServiceAccounts = $pdo->query("SELECT id,title,COALESCE(short_name,'') AS short_name,COALESCE(technical_service_type,'') AS technical_service_type FROM current_accounts WHERE COALESCE(technical_service,0)=1 ORDER BY title")->fetchAll();
+    $technicalServiceAccounts = $pdo->query("SELECT id,title,COALESCE(short_name,'') AS short_name,'' AS technical_service_type FROM current_accounts WHERE COALESCE(technical_service,0)=1 ORDER BY title")->fetchAll();
 } catch (Throwable $exception) {
 }
 ensure_patient_source_schema();
