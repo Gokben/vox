@@ -127,6 +127,8 @@ $patient = $patientStatement->fetch();
 if (!$patient) { http_response_code(404); exit('Hasta kaydı bulunamadı.'); }
 $patientOutcome = !empty($patient['approval']) ? 'Onay' : (!empty($patient['considering']) ? 'Düşünecek' : (!empty($patient['rejected']) ? 'Ret' : ''));
 $branches = $pdo->query('SELECT id,name FROM branches ORDER BY name')->fetchAll();
+$branchNamesById = [];
+foreach ($branches as $branch) $branchNamesById[(int)$branch['id']] = (string)$branch['name'];
 $serviceLocations = array_filter(service_type_definitions(), static fn(array $location): bool => (int)$location['active'] === 1);
 $serviceNames = array_filter(service_name_definitions(), static fn(array $name): bool => (int)$name['active'] === 1);
 $pdo->exec($sqlite
@@ -486,7 +488,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'performed_action'=>trim((string)($_POST['action_name'] ?? '')),
         'action_date'=>(string)($_POST['action_date'] ?? ''),
         'opened_by'=>(string)($_SESSION['user']['name'] ?? ''),
-        'branch_name'=>(string)($_POST['branch_name'] ?? ''),
+        'branch_name'=>$branchNamesById[(int)($_POST['branch_id'] ?? 0)] ?? '',
         'appointment_date'=>(string)($_POST['appointment_date'] ?? ''),
         'start_time'=>(string)($_POST['start_time'] ?? ''), 'end_time'=>(string)($_POST['end_time'] ?? ''),
         'service_type'=>trim((string)($_POST['service_type'] ?? '')), 'service_location'=>trim((string)($_POST['service_location'] ?? '')),
@@ -629,6 +631,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $servicesStatement = $pdo->prepare('SELECT * FROM patient_services WHERE patient_id=? ORDER BY service_date DESC,id DESC');
 $servicesStatement->execute([$id]);
 $services = $servicesStatement->fetchAll();
+foreach ($services as &$service) {
+    if (trim((string)($service['branch_name'] ?? '')) === '') $service['branch_name'] = $branchNamesById[(int)($service['branch_id'] ?? 0)] ?? '';
+}
+unset($service);
 $incomeValidationError = (string)($_SESSION['income_validation_error'] ?? '');
 $incomeValidationDraft = $_SESSION['income_validation_draft'] ?? [];
 if (!is_array($incomeValidationDraft)) $incomeValidationDraft = [];
@@ -717,7 +723,7 @@ if ($currentContactPerson !== '') {
 <label class="service-field">Kayıt No<input name="record_no" value="<?=e((string)$form['record_no'])?>"></label><label class="service-field">Kayıt Tarihi<input type="date" name="record_date" value="<?=e((string)$form['service_date'])?>"></label>
 <div class="service-three"><label class="service-field">Randevu Tarihi<input type="date" name="appointment_date" value="<?=e((string)$form['appointment_date'])?>"></label><label class="service-field">Başlangıç Saati<select name="start_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if($hour===19&&$minute>0)continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['start_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label><label class="service-field">Bitiş Saati<select name="end_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if(($hour===9&&$minute<15)||($hour===19&&$minute>0))continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['end_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label></div>
 <label class="service-field">Hizmet Tipi<select name="service_type"><option value="">Seçiniz</option><?php foreach($serviceCardTypes as $type):?><option value="<?=e($type['name'])?>" <?=((string)$form['service_type']===(string)$type['name'])?'selected':''?>><?=e($type['name'])?></option><?php endforeach?></select></label><label class="service-field">Hizmet Yeri<select name="service_location"><option value="">Seçiniz</option><?php foreach($serviceLocations as $location):?><option value="<?=e($location['name'])?>" <?=((string)$form['service_location']===(string)$location['name'])?'selected':''?>><?=e($location['name'])?></option><?php endforeach?></select></label>
-<label class="service-field service-wide">Şube Seçin<select name="branch_id"><option value="">Seçiniz</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=((int)$form['branch_id']===(int)$branch['id'])?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select><input type="hidden" name="branch_name" value="<?=e((string)$form['branch_name'])?>"></label>
+<label class="service-field service-wide">Şube Seçin<select name="branch_id"><option value="">Seçiniz</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=((int)$form['branch_id']===(int)$branch['id'])?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select></label>
 <label class="service-field">İlgilenen Kişi<select name="contact_person"><option value="">Seçiniz</option><?php foreach($contactPersonOptions as $person):?><option value="<?=e($person)?>" <?=((string)$form['contact_person']===(string)$person)?'selected':''?>><?=e($person)?></option><?php endforeach?></select></label><label class="service-field">Randevu Durumu<select name="appointment_status"><option value="" <?=((string)$form['appointment_status']==='')?'selected':''?>>Seçiniz</option><?php foreach(['Beklemede','Onaylandı','Tamamlandı','İptal'] as $status):?><option <?=((string)$form['appointment_status']===$status)?'selected':''?>><?=$status?></option><?php endforeach?></select></label>
 <label class="service-field service-wide">Anamnez<textarea name="complaint" placeholder="Anamnez Girin"><?=e((string)$form['complaint'])?></textarea></label><label class="service-field service-wide">Gözlem<textarea name="observation" placeholder="Gözlem Girin"><?=e((string)$form['observation'])?></textarea></label>
 <?php if ($serviceNameLocked): ?><label class="service-field">Hizmet Adı<span class="service-name-locked"><input value="<?=e((string)$form['service_name'])?>" readonly aria-label="Kilitli hizmet adı"><input type="hidden" name="service_name" value="<?=e((string)$form['service_name'])?>"><button type="button" class="service-detail-button" id="service-detail-button" title="Satış detayını aç" aria-label="Satış detayını aç"><i class="ti tabler-file-search"></i></button></span></label><?php else: ?><label class="service-field">Hizmet Adı<span class="service-name-income-slot"><select name="service_name"><option value="">Seçiniz</option><?php foreach($serviceNames as $serviceName):?><option value="<?=e($serviceName['name'])?>" <?=((string)$form['service_name']===(string)$serviceName['name'])?'selected':''?>><?=e($serviceName['name'])?></option><?php endforeach?></select><?php if($showSalesDetailsButton): ?><button type="button" class="sales-details-link" id="sales-details-link" title="Satış Kartını Aç" aria-label="Satış Kartını Aç"><i class="ti tabler-file-search"></i></button><?php endif ?></span></label><?php endif; ?><label class="service-field">Sonuç<select name="result_name"><?php foreach(['Beklemede','Onay','Düşünecek','Ret','Tamamlandı','İptal'] as $result):?><option <?=((string)$form['result_name']===$result)?'selected':''?>><?=$result?></option><?php endforeach?></select></label>
