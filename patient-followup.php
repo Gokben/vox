@@ -19,6 +19,15 @@ function patient_parse_money(mixed $value): float
     return (float)str_replace('.', '', $text);
 }
 
+function next_service_record_no(PDO $pdo): string
+{
+    $highest = 1452;
+    foreach ($pdo->query('SELECT record_no FROM patient_services WHERE record_no IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN) as $recordNo) {
+        if (preg_match('/^VK-(\d+)$/', (string)$recordNo, $matches)) $highest = max($highest, (int)$matches[1]);
+    }
+    return 'VK-' . ($highest + 1);
+}
+
 $pdo = db();
 ensure_cash_schema($pdo);
 $bankDefinitions = array_values(array_filter(bank_definitions(), static fn(array $bank): bool => (int)$bank['active'] === 1));
@@ -576,7 +585,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $values['sales_details'] = null;
         }
     }
-    if ($values['record_no'] === '') $values['record_no'] = 'HK' . date('ymdHis');
+    if ($values['record_no'] === '' || preg_match('/^HK\d+$/', $values['record_no'])) $values['record_no'] = next_service_record_no($pdo);
     $savedServiceId = $postedEditId;
     if ($postedEditId) {
         $set = implode(',', array_map(static fn(string $column): string => $column . '=?', array_keys($values)));
@@ -643,7 +652,7 @@ unset($_SESSION['income_validation_draft']);
 patient_header('Hizmetler', 'patients');
 if ($incomeValidationError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const openIncome=()=>{const form=document.querySelector('form[action*="cash.php"]'),modal=form?.parentElement;if(!modal){setTimeout(openIncome,50);return;}modal.hidden=false;modal.style.display='grid';setTimeout(()=>alert(<?=json_encode($incomeValidationError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0);};openIncome();},350));</script><?php endif;
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
-$form = array_merge(['record_no'=>'HK' . date('ymdHis'),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
+$form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
 if ($form['result_name'] === 'Red') $form['result_name'] = 'Ret';
 if ($editId && trim((string)$form['service_location']) === '') $form['service_location'] = (string)($patient['service_location'] ?? '');
 if ($editId && trim((string)$form['complaint']) === '') $form['complaint'] = (string)($patient['anamnesis'] ?? '');

@@ -2,7 +2,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
-require_login();
+// Kasa yalnızca BB Yönetim Paneli'nden açılır. Doğrudan Vox URL'si kullanılamaz.
+$cashRequestedFromBb = str_ends_with(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/bb/cash.php');
+if (!$cashRequestedFromBb) redirect('bb/cash.php');
+require_admin();
 require __DIR__ . '/cash-bootstrap.php';
 require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
