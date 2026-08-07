@@ -817,6 +817,10 @@ if ($currentContactPerson !== '') {
 #repair-modal #repair-tab-issues{padding:16px 24px}
 #repair-modal .repair-issues{max-height:none!important;overflow:visible!important}
 #repair-modal .repair-issues>label,#repair-modal .repair-issue-head{grid-template-columns:minmax(0,400px) 70px 70px!important;padding:3px 0!important}
+#repair-modal #repair-tab-delivery{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+#repair-modal #repair-tab-delivery .repair-grid{display:contents}
+#repair-modal #repair-tab-delivery .repair-switch,#repair-modal #repair-tab-delivery>label:last-child{grid-column:1/-1}
+@media(max-width:620px){#repair-modal #repair-tab-delivery{grid-template-columns:1fr}}
 @media(max-width:620px){#repair-modal .repair-tab-list{overflow-x:auto}#repair-modal .repair-tab{flex:0 0 auto;padding:12px 14px;font-size:14px}#repair-modal .repair-tab-panel{padding:16px}}
 </style>
 <div id="repair-modal" class="repair-modal" hidden aria-hidden="true">
