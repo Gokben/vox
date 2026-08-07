@@ -467,6 +467,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     $postedStockId = (int)($_POST['stock_id'] ?? 0);
+    $postedRepairDetails = json_decode((string)($_POST['repair_details'] ?? ''), true);
+    if (is_array($postedRepairDetails)) {
+        $receivedBy = trim((string)($postedRepairDetails['repair_received_by'] ?? ''));
+        if ($receivedBy !== '' && !in_array($receivedBy, patient_staff_names(), true)) $postedRepairDetails['repair_received_by'] = '';
+    }
+    $postedRepairDetailsJson = is_array($postedRepairDetails)
+        ? json_encode($postedRepairDetails, JSON_UNESCAPED_UNICODE)
+        : (string)($_POST['repair_details'] ?? '');
     $values = [
         'record_no'=>trim((string)($_POST['record_no'] ?? '')),
         'service_date'=>(string)($_POST['record_date'] ?? date('Y-m-d')),
@@ -482,7 +490,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'appointment_status'=>trim((string)($_POST['appointment_status'] ?? '')), 'complaint'=>trim((string)($_POST['complaint'] ?? '')),
         'observation'=>trim((string)($_POST['observation'] ?? '')), 'service_name'=>$postedServiceName, 'stock_id'=>$postedServiceName === 'Satış' && $postedStockId > 0 ? $postedStockId : null,
         'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
-        'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>(string)($_POST['repair_details'] ?? ''), 'sales_details'=>$postedServiceName === 'Satış' ? $postedSalesDetailsJson : null, 'description'=>trim((string)($_POST['description'] ?? '')),
+        'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>$postedRepairDetailsJson, 'sales_details'=>$postedServiceName === 'Satış' ? $postedSalesDetailsJson : null, 'description'=>trim((string)($_POST['description'] ?? '')),
     ];
     if ($saleProductDeleteLocked && $postedEditId && $postedServiceName === 'Satış') {
         $savedSalesDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
@@ -753,23 +761,51 @@ if ($currentContactPerson !== '') {
 <style>
 .sales-price-tooltip{position:relative}.sales-price-tooltip[data-list-price]:hover::after{content:attr(data-list-price);position:absolute;z-index:10;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);padding:6px 9px;border-radius:5px;background:#ea5455;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 3px 8px rgba(234,84,85,.28)}.sales-details-dialog .repair-body [id^="hearing-device-details-"]>label{border:3px solid #fff;border-radius:7px;padding:9px}.sales-details-dialog .repair-body [id^="hearing-device-details-"]>label>input,.sales-details-dialog .repair-body [id^="hearing-device-details-"]>label>select{border:3px solid #159447}.sales-details-dialog .repair-body #consumable-details>label{border:3px solid #fff;border-radius:7px;padding:9px}.sales-details-dialog .repair-body #consumable-details>label>input,.sales-details-dialog .repair-body #consumable-details>label>select{border:3px solid #e6b800}
 </style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap');
+/* Vuexy Form with Tabs: aynı kart, sekme ve tipografi ölçüleri */
+#repair-modal .repair-accordion{display:grid;gap:10px}
+#repair-modal .repair-accordion-item{overflow:hidden;border:1px solid #e1e2e8;border-radius:7px;background:#fff}
+#repair-modal .repair-accordion-trigger{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px 16px;border:0;background:#fff;color:#2f2b3d;font:600 15px inherit;text-align:left;cursor:pointer}
+#repair-modal .repair-accordion-trigger:hover{background:#f8f8fa}
+#repair-modal .repair-accordion-trigger .ti{color:#7a7890;transition:transform .2s ease}
+#repair-modal .repair-accordion-item.is-open .repair-accordion-trigger{color:#159447}
+#repair-modal .repair-accordion-item.is-open .repair-accordion-trigger .ti{transform:rotate(180deg)}
+#repair-modal .repair-accordion-panel{display:none;padding:16px;border-top:1px solid #e1e2e8}
+#repair-modal .repair-accordion-item.is-open .repair-accordion-panel{display:grid;gap:14px}
+#repair-modal .repair-accessories{display:grid;grid-template-columns:repeat(4,max-content);justify-content:start;gap:12px 28px}
+#repair-modal .repair-accessories label{display:flex;flex-direction:row!important;align-items:center;gap:7px;font-size:14px;color:#2f2b3d}
+#repair-modal .repair-accordion-panel>label{display:flex;flex-direction:column;gap:7px;color:#2f2b3d;font-size:14px}
+@media(max-width:620px){#repair-modal .repair-accessories{grid-template-columns:repeat(2,max-content);justify-content:start;gap:12px 20px}}
+#repair-modal .repair-dialog,#repair-modal .repair-dialog button,#repair-modal .repair-dialog input,#repair-modal .repair-dialog select,#repair-modal .repair-dialog textarea{font-family:'Public Sans',sans-serif}
+#repair-modal .repair-tabs{overflow:hidden;border:0;border-radius:6px;background:#fff;box-shadow:0 2px 6px 0 rgba(67,89,113,.12)}
+#repair-modal .repair-tab-list{display:flex;margin:0;padding:0;border:0;list-style:none;background:#fff}
+#repair-modal .repair-tab{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:48px;margin-right:4px;padding:12px 20px;border:0;border-bottom:2px solid transparent;background:transparent;color:#6d6875;font-size:15px;font-weight:400;line-height:24px;cursor:pointer}
+#repair-modal .repair-tab:hover{color:#159447}
+#repair-modal .repair-tab.is-active{color:#159447;background:transparent;font-weight:500}
+#repair-modal .repair-tab.is-active::after{position:absolute;right:0;bottom:-2px;left:0;height:2px;background:#159447;content:''}
+#repair-modal .repair-tab-panel{display:none;padding:24px}
+#repair-modal .repair-tab-panel.is-active{display:grid;gap:14px}
+#repair-modal .repair-tab-panel>label{display:flex;flex-direction:column;gap:7px;color:#2f2b3d;font-size:14px}
+#repair-modal #repair-save{display:inline-grid;place-items:center;width:36px;min-width:36px;height:36px;min-height:36px;padding:0}
+#repair-modal #repair-save .ti{font-size:20px;line-height:1}
+#repair-modal .repair-dialog{width:min(760px,100%)}
+#repair-modal #repair-tab-issues{padding:16px 24px}
+#repair-modal .repair-issues{max-height:none!important;overflow:visible!important}
+#repair-modal .repair-issues>label,#repair-modal .repair-issue-head{grid-template-columns:minmax(0,400px) 70px 70px!important;padding:3px 0!important}
+@media(max-width:620px){#repair-modal .repair-tab-list{overflow-x:auto}#repair-modal .repair-tab{flex:0 0 auto;padding:12px 14px;font-size:14px}#repair-modal .repair-tab-panel{padding:16px}}
+</style>
 <div id="repair-modal" class="repair-modal" hidden aria-hidden="true">
   <div class="repair-modal-backdrop" data-repair-close></div>
   <section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="repair-modal-title">
     <header><h2 id="repair-modal-title"><i class="ti tabler-tools" aria-hidden="true"></i> Tamir Kabul - Yeni Kayıt</h2><button type="button" class="repair-close" data-repair-close aria-label="Kapat">×</button></header>
-    <div class="repair-body">
-      <label>Hasta Kodu <small>(firma geneli benzersiz — önerilen kodu değiştirebilirsiniz)</small><input form="service-card-form" name="repair_patient_code" placeholder="Örn. MED-41"></label>
-      <label>Cihaz <span class="repair-check"><input form="service-card-form" type="checkbox" name="repair_external_device"> Dış cihaz (bizim sattığımız değil)</span><select form="service-card-form" name="repair_device"><option value="">Bu hastaya ait cihaz bulunamadı — dış cihaz işaretleyin</option></select></label>
-      <fieldset><legend>Birlikte alınan aksesuarlar</legend><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Pil"> Pil</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Garanti Kartı"> Garanti Kartı</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kutu"> Kutu</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kulak Kalıbı"> Kulak Kalıbı</label></fieldset>
-      <label>Kalip Modeli <small>(kalıp siparişi değilse boş bırakın)</small><select form="service-card-form" name="repair_mold"><option value="">Kalıp modeli seçin</option></select></label>
-      <fieldset class="repair-issues"><legend>Şikayet / Arıza</legend><div class="repair-issue-head"><span></span><span>Müşteri</span><span>Teknisyen</span></div><?php foreach($repairIssueDefinitions as $issue):?><label><span><?=e($issue['name'])?></span><input form="service-card-form" type="checkbox" name="repair_customer_issues[]" value="<?=e($issue['name'])?>"><input form="service-card-form" type="checkbox" name="repair_technician_issues[]" value="<?=e($issue['name'])?>"></label><?php endforeach?></fieldset>
-      <textarea form="service-card-form" name="repair_note" placeholder="Ek açıklama (opsiyonel)"></textarea>
-      <label class="repair-switch"><input form="service-card-form" type="checkbox" name="repair_warranty"><span></span> Garanti kapsamında</label>
-      <label>Tamire teslim tarihi<input form="service-card-form" type="date" name="repair_delivery_date" value="<?=date('Y-m-d')?>"></label>
-      <div class="repair-grid"><label>Teknik servise gönderilecekse (opsiyonel)<select form="service-card-form" name="repair_target"><option value="">Hedef</option><option>Teknik Servis</option></select></label><label>&nbsp;<input form="service-card-form" name="repair_technician" placeholder="Hangi teknik servis (ad)"></label></div>
-      <label>Teslim eden (cihazı bırakan kişi)<input form="service-card-form" name="repair_delivered_by" placeholder="Ad Soyad (opsiyonel)"></label>
-    </div>
-    <footer><button type="button" class="repair-cancel" data-repair-close>İptal</button><button type="button" class="button" id="repair-save">Tamir Kaydı Oluştur</button></footer>
+    <div class="repair-body"><div class="repair-tabs" id="repair-form-tabs"><div class="repair-tab-list" role="tablist"><button type="button" class="repair-tab is-active" role="tab" aria-selected="true" aria-controls="repair-tab-accessories" data-repair-tab="repair-tab-accessories">Aksesuarlar</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-issues" data-repair-tab="repair-tab-issues">&#350;ikayet / Ar&#305;za</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-delivery" data-repair-tab="repair-tab-delivery">Teslim ve Garanti</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-service-fee" data-repair-tab="repair-tab-service-fee">Hizmet bedeli</button></div>
+      <section id="repair-tab-accessories" class="repair-tab-panel repair-accessories is-active" role="tabpanel"><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Pil"> Pil</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Garanti Kart&#305;"> Garanti Kart&#305;</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kutu"> Kutu</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kulak Kal&#305;b&#305;"> Kulak Kal&#305;b&#305;</label></section>
+      <section id="repair-tab-issues" class="repair-tab-panel" role="tabpanel"><fieldset class="repair-issues"><div class="repair-issue-head"><span></span><span>M&uuml;&#351;teri</span><span>Teknisyen</span></div><?php foreach($repairIssueDefinitions as $issue):?><label><span><?=e($issue['name'])?></span><input form="service-card-form" type="checkbox" name="repair_customer_issues[]" value="<?=e($issue['name'])?>"><input form="service-card-form" type="checkbox" name="repair_technician_issues[]" value="<?=e($issue['name'])?>"></label><?php endforeach?></fieldset></section>
+      <section id="repair-tab-delivery" class="repair-tab-panel" role="tabpanel"><label class="repair-switch"><input form="service-card-form" type="checkbox" name="repair_warranty"><span></span> Garanti kapsam&#305;nda</label><label>&#350;ubeye Teslim tarihi<input form="service-card-form" type="date" name="repair_branch_delivery_date" value="<?=date('Y-m-d')?>"></label><label>Tamire teslim tarihi<input form="service-card-form" type="date" name="repair_delivery_date" value="<?=date('Y-m-d')?>"></label><div class="repair-grid"><label>Teknik servise g&ouml;nderilecekse (opsiyonel)<select form="service-card-form" name="repair_target"><option value="">Hedef</option><option>Teknik Servis</option></select></label><label>&nbsp;<input form="service-card-form" name="repair_technician" placeholder="Hangi teknik servis (ad)"></label></div><label>Teslim eden (cihaz&#305; b&#305;rakan ki&#351;i)<input form="service-card-form" name="repair_delivered_by" placeholder="Ad Soyad (opsiyonel)"></label><label>Cihaz&#305; teslim alan ki&#351;i<select form="service-card-form" name="repair_received_by"><option value="">Se&ccedil;iniz</option><?php foreach($activeStaffNames as $staffName):?><option value="<?=e($staffName)?>"><?=e($staffName)?></option><?php endforeach?></select></label><label>A&ccedil;&#305;klama<textarea form="service-card-form" name="repair_note" placeholder="Ek a&ccedil;&#305;klama (opsiyonel)"></textarea></label></section>
+      <section id="repair-tab-service-fee" class="repair-tab-panel" role="tabpanel"><div class="repair-grid"><label>Tarih<input form="service-card-form" type="date" name="repair_service_fee_date" value="<?=date('Y-m-d')?>"></label><label>&Uuml;cret<input form="service-card-form" type="text" name="repair_service_fee" inputmode="decimal" autocomplete="off" placeholder="0,00 &#8378;"></label></div></section>
+    </div></div>
+    <footer><button type="button" class="repair-cancel" data-repair-close>İptal</button><button type="button" class="button" id="repair-save" title="Tamir Kaydı Oluştur" aria-label="Tamir Kaydı Oluştur"><i class="ti tabler-device-floppy" aria-hidden="true"></i></button></footer>
   </section>
 </div>
 <?php endif; ?>
@@ -821,20 +857,55 @@ document.addEventListener('click',async event=>{
 <script>
 (() => {
   const modal = document.getElementById('repair-modal');
+  modal?.querySelectorAll('.repair-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabs = tab.closest('.repair-tabs');
+      if (!tabs) return;
+      const target = tab.dataset.repairTab;
+      tabs.querySelectorAll('.repair-tab').forEach(button => {
+        const active = button === tab;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      tabs.querySelectorAll('.repair-tab-panel').forEach(panel => panel.classList.toggle('is-active', panel.id === target));
+    });
+  });
+  modal?.querySelectorAll('.repair-accordion-trigger').forEach(trigger => {
+    trigger.addEventListener('click', () => {
+      const item = trigger.closest('.repair-accordion-item');
+      const accordion = item?.closest('.repair-accordion');
+      if (!item || !accordion) return;
+      const willOpen = !item.classList.contains('is-open');
+      accordion.querySelectorAll('.repair-accordion-item').forEach(section => {
+        const open = willOpen && section === item;
+        section.classList.toggle('is-open', open);
+        section.querySelector('.repair-accordion-trigger')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    });
+  });
   const form = document.getElementById('service-card-form');
   const serviceName = form?.querySelector('[name="service_name"]');
   const details = document.getElementById('repair_details');
   if (!modal || !form || !serviceName || !details) return;
   const controls = [...modal.querySelectorAll('[name]')];
+  const serviceFee = modal.querySelector('[name="repair_service_fee"]');
+  const formatServiceFee = () => {
+    if (!serviceFee || !serviceFee.value.trim()) return;
+    const raw = serviceFee.value.replace(/[^0-9,.-]/g, '');
+    const amount = Number(raw.includes(',') ? raw.replaceAll('.', '').replace(',', '.') : raw);
+    if (Number.isFinite(amount)) serviceFee.value = amount.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₺';
+  };
+  serviceFee?.addEventListener('blur', formatServiceFee);
   const open = () => { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); };
   const close = () => { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); };
   const restore = () => { try { const values = JSON.parse(details.value || '{}'); controls.forEach(control => { const value = values[control.name]; if (control.type === 'checkbox') control.checked = Array.isArray(value) ? value.includes(control.value) : Boolean(value); else if (value !== undefined) control.value = value; }); } catch (_) {} };
   const persist = () => { const values = {}; controls.forEach(control => { if (control.type === 'checkbox') { if (control.name.endsWith('[]')) { (values[control.name] ||= []); if (control.checked) values[control.name].push(control.value); } else values[control.name] = control.checked; } else values[control.name] = control.value; }); details.value = JSON.stringify(values); };
   restore();
+  formatServiceFee();
   serviceName.addEventListener('change', () => { if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open(); });
   document.querySelectorAll('[data-repair-close]').forEach(button => button.addEventListener('click', close));
   document.getElementById('repair-save')?.addEventListener('click', () => { persist(); form.requestSubmit(); });
-  form.addEventListener('submit', persist);
+  form.addEventListener('submit', () => { formatServiceFee(); persist(); });
   if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open();
 })();
 </script>
