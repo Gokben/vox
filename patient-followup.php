@@ -36,6 +36,11 @@ try {
     $mailOrderAccounts = $pdo->query("SELECT id,code,title,COALESCE(short_name,'') AS short_name FROM current_accounts ORDER BY title")->fetchAll();
 } catch (Throwable $exception) {
 }
+$technicalServiceAccounts = [];
+try {
+    $technicalServiceAccounts = $pdo->query("SELECT id,title,COALESCE(short_name,'') AS short_name,COALESCE(technical_service_type,'') AS technical_service_type FROM current_accounts WHERE COALESCE(technical_service,0)=1 ORDER BY title")->fetchAll();
+} catch (Throwable $exception) {
+}
 ensure_patient_source_schema();
 ensure_patient_staff_yeliz_schema();
 $staffNames = patient_staff_names(true);
@@ -821,7 +826,7 @@ if ($currentContactPerson !== '') {
     <div class="repair-body"><div class="repair-tabs" id="repair-form-tabs"><div class="repair-tab-list" role="tablist"><button type="button" class="repair-tab is-active" role="tab" aria-selected="true" aria-controls="repair-tab-accessories" data-repair-tab="repair-tab-accessories">Aksesuarlar</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-issues" data-repair-tab="repair-tab-issues">&#350;ikayet / Ar&#305;za</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-delivery" data-repair-tab="repair-tab-delivery">Teslim ve Garanti</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-service-fee" data-repair-tab="repair-tab-service-fee">Hizmet bedeli</button></div>
       <section id="repair-tab-accessories" class="repair-tab-panel repair-accessories is-active" role="tabpanel"><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Pil"> Pil</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Garanti Kart&#305;"> Garanti Kart&#305;</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kutu"> Kutu</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kulak Kal&#305;b&#305;"> Kulak Kal&#305;b&#305;</label></section>
       <section id="repair-tab-issues" class="repair-tab-panel" role="tabpanel"><fieldset class="repair-issues"><div class="repair-issue-head"><span></span><span>M&uuml;&#351;teri</span><span>Teknisyen</span></div><?php foreach($repairIssueDefinitions as $issue):?><label><span><?=e($issue['name'])?></span><input form="service-card-form" type="checkbox" name="repair_customer_issues[]" value="<?=e($issue['name'])?>"><input form="service-card-form" type="checkbox" name="repair_technician_issues[]" value="<?=e($issue['name'])?>"></label><?php endforeach?></fieldset></section>
-      <section id="repair-tab-delivery" class="repair-tab-panel" role="tabpanel"><label class="repair-switch"><input form="service-card-form" type="checkbox" name="repair_warranty"><span></span> Garanti kapsam&#305;nda</label><label>&#350;ubeye Teslim tarihi<input form="service-card-form" type="date" name="repair_branch_delivery_date" value="<?=date('Y-m-d')?>"></label><label>Tamire teslim tarihi<input form="service-card-form" type="date" name="repair_delivery_date" value="<?=date('Y-m-d')?>"></label><div class="repair-grid"><label>Teknik servise g&ouml;nderilecekse (opsiyonel)<select form="service-card-form" name="repair_target"><option value="">Hedef</option><option>Teknik Servis</option></select></label><label>&nbsp;<input form="service-card-form" name="repair_technician" placeholder="Hangi teknik servis (ad)"></label></div><label>Teslim eden (cihaz&#305; b&#305;rakan ki&#351;i)<input form="service-card-form" name="repair_delivered_by" placeholder="Ad Soyad (opsiyonel)"></label><label>Cihaz&#305; teslim alan ki&#351;i<select form="service-card-form" name="repair_received_by"><option value="">Se&ccedil;iniz</option><?php foreach($activeStaffNames as $staffName):?><option value="<?=e($staffName)?>"><?=e($staffName)?></option><?php endforeach?></select></label><label>A&ccedil;&#305;klama<textarea form="service-card-form" name="repair_note" placeholder="Ek a&ccedil;&#305;klama (opsiyonel)"></textarea></label></section>
+      <section id="repair-tab-delivery" class="repair-tab-panel" role="tabpanel"><label class="repair-switch"><input form="service-card-form" type="checkbox" name="repair_warranty"><span></span> Garanti kapsam&#305;nda</label><label>&#350;ubeye Teslim tarihi<input form="service-card-form" type="date" name="repair_branch_delivery_date" value="<?=date('Y-m-d')?>"></label><label>Tamire teslim tarihi<input form="service-card-form" type="date" name="repair_delivery_date" value="<?=date('Y-m-d')?>"></label><div class="repair-grid"><label>Teknik servise g&ouml;nderilecekse (opsiyonel)<select form="service-card-form" name="repair_target"><option value="">Hedef</option><option>Teknik Servis</option></select></label><label>Teknik Servis<select form="service-card-form" name="repair_technician"><option value="">Teknik servis se&ccedil;in</option><?php foreach($technicalServiceAccounts as $technicalServiceAccount): $technicalServiceLabel=trim((string)($technicalServiceAccount['short_name'] ?: $technicalServiceAccount['title'])); $technicalServiceType=(string)$technicalServiceAccount['technical_service_type']; if($technicalServiceType !== '') $technicalServiceLabel.=' — '.str_replace(['inside','outside'], ['İç Servis','Dış Servis'], $technicalServiceType);?><option value="<?=e((string)$technicalServiceAccount['title'])?>"><?=e($technicalServiceLabel)?></option><?php endforeach?></select></label></div><label>Teslim eden (cihaz&#305; b&#305;rakan ki&#351;i)<input form="service-card-form" name="repair_delivered_by" placeholder="Ad Soyad (opsiyonel)"></label><label>Cihaz&#305; teslim alan ki&#351;i<select form="service-card-form" name="repair_received_by"><option value="">Se&ccedil;iniz</option><?php foreach($activeStaffNames as $staffName):?><option value="<?=e($staffName)?>"><?=e($staffName)?></option><?php endforeach?></select></label><label>A&ccedil;&#305;klama<textarea form="service-card-form" name="repair_note" placeholder="Ek a&ccedil;&#305;klama (opsiyonel)"></textarea></label></section>
       <section id="repair-tab-service-fee" class="repair-tab-panel" role="tabpanel"><div class="repair-grid"><label>Tarih<input form="service-card-form" type="date" name="repair_service_fee_date" value="<?=date('Y-m-d')?>"></label><label>&Uuml;cret<input form="service-card-form" type="text" name="repair_service_fee" inputmode="decimal" autocomplete="off" placeholder="0,00 &#8378;"></label></div></section>
     </div></div>
     <footer><button type="button" class="repair-cancel" data-repair-close>İptal</button><button type="button" class="button" id="repair-save" title="Tamir Kaydı Oluştur" aria-label="Tamir Kaydı Oluştur"><i class="ti tabler-device-floppy" aria-hidden="true"></i></button></footer>
@@ -907,6 +912,15 @@ document.addEventListener('click',async event=>{
   const details = document.getElementById('repair_details');
   if (!modal || !form || !serviceName || !details) return;
   const controls = [...modal.querySelectorAll('[name]')];
+  const repairTarget = modal.querySelector('[name="repair_target"]');
+  const repairTechnician = modal.querySelector('[name="repair_technician"]');
+  const syncRepairTechnician = () => {
+    if (!repairTarget || !repairTechnician) return;
+    const enabled = repairTarget.value === 'Teknik Servis';
+    repairTechnician.disabled = !enabled;
+    repairTechnician.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+  };
+  repairTarget?.addEventListener('change', syncRepairTechnician);
   const serviceFee = modal.querySelector('[name="repair_service_fee"]');
   const formatServiceFee = () => {
     if (!serviceFee || !serviceFee.value.trim()) return;
@@ -920,6 +934,7 @@ document.addEventListener('click',async event=>{
   const restore = () => { try { const values = JSON.parse(details.value || '{}'); controls.forEach(control => { const value = values[control.name]; if (control.type === 'checkbox') control.checked = Array.isArray(value) ? value.includes(control.value) : Boolean(value); else if (value !== undefined) control.value = value; }); } catch (_) {} };
   const persist = () => { const values = {}; controls.forEach(control => { if (control.type === 'checkbox') { if (control.name.endsWith('[]')) { (values[control.name] ||= []); if (control.checked) values[control.name].push(control.value); } else values[control.name] = control.checked; } else values[control.name] = control.value; }); details.value = JSON.stringify(values); };
   restore();
+  syncRepairTechnician();
   formatServiceFee();
   serviceName.addEventListener('change', () => { if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open(); });
   document.querySelectorAll('[data-repair-close]').forEach(button => button.addEventListener('click', close));
