@@ -67,6 +67,7 @@ function anamnesis_print_settings(): array
         'footer_height' => '34', 'line_width' => '1',
         'company_logo_enabled' => '1', 'company_logo_path' => 'assets/vox-logo-02.png',
         'company_logo_width' => '28',
+        'grapesjs_project' => '',
         'layout' => '{"header":{"x":8,"y":7},"meta":{"x":8,"y":17},"questions":{"x":8,"y":27},"footer":{"x":8,"y":91}}'
     ];
     $statement = $pdo->query('SELECT setting_key,setting_value FROM anamnesis_print_settings');

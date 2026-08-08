@@ -125,7 +125,7 @@ patient_header('Ayarlar - Anamnez', 'settings');
         <label>Logo genişliği (mm)<input type="number" name="company_logo_width" min="10" max="80" value="<?=e($printSettings['company_logo_width'])?>"></label>
       </div>
       <p class="designer-help">Değerleri değiştirip <strong>Ön Görüntü</strong> ile A4 sonucunu kontrol edin. Beğendiğiniz sonucu <strong>Tasarımı Kaydet</strong> ile kalıcılaştırın.</p>
-      <div class="personnel-actions"><button type="submit">Tasarımı Kaydet</button><button type="button" class="print-preview-button">Ön Görüntü</button></div>
+      <div class="personnel-actions"><button type="submit">Tasarımı Kaydet</button><button type="button" class="print-preview-button">Ön Görüntü</button><a class="edit-definition" href="<?=url('anamnesis-designer.php')?>">Görsel Tasarımcı</a></div>
     </form>
   </details>
 </main>
