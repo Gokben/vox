@@ -2074,7 +2074,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       const detailCaption = document.createElement('span');
       detailCaption.className = 'anamnesis-detail-caption'; detailCaption.textContent = detailLabel;
       const detail = document.createElement('input');
-      detail.type = 'text'; detail.name = key + '_detail'; detail.maxLength = 190; detail.placeholder = detailLabel;
+      detail.type = 'text'; detail.name = key + '_detail'; detail.maxLength = 190; detail.placeholder = '';
       detail.value = saved[detail.name] || ''; detail.dataset.anamnesisDetail = '1';
       row.classList.add('anamnesis-with-detail'); row.append(detailCaption, detail);
     }
@@ -2138,5 +2138,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row:has(textarea){min-height:var(--anamnesis-notes-height,65px)!important}
 @media print{#anamnesis-card-modal{padding:var(--anamnesis-page-margin,20mm)!important;box-sizing:border-box!important}#anamnesis-card-modal .anamnesis-dialog{position:static!important;min-height:0!important;width:100%!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:static!important;width:auto!important;margin:0!important}}
 @media print{#anamnesis-card-modal .anamnesis-row>.anamnesis-yes input{display:none!important}}
+#anamnesis-card-modal .anamnesis-row:has(input[name="complaint"]){grid-column:1/-1!important;width:100%!important;grid-template-columns:35% minmax(0,1fr)!important}
+#anamnesis-card-modal .anamnesis-row:has(textarea){min-height:36px!important}
+#anamnesis-card-modal .anamnesis-row textarea{height:36px!important;min-height:36px!important;resize:none!important}
 </style>
 <?php patient_footer(); ?>
