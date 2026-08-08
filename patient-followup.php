@@ -1169,7 +1169,7 @@ document.addEventListener('click',async event=>{
     applyRepairPaymentType();
     // Ortak gelir penceresinin satışa ait yerleşim betikleri çalıştıktan sonra da
     // teknik servis ödeme seçimini koru.
-    [0, 80, 250].forEach(delay => setTimeout(applyRepairPaymentType, delay));
+    [0, 80, 250, 500, 800].forEach(delay => setTimeout(applyRepairPaymentType, delay));
     if (cashAmount) cashAmount.value = serviceFee.value;
     if (description) description.value = <?=json_encode($patient['full_name'] . ' — Tamir hizmet bedeli tahsilatı', JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
     if (source) source.value = <?=json_encode(url('patient-followup.php?id=' . $id))?> + '&repair=' + repairId;
@@ -1843,6 +1843,16 @@ document.addEventListener('DOMContentLoaded', () => {
         label.style.setProperty('grid-row', row, 'important');
       }
     };
+    const setTitle = (name, title) => {
+      const label = cashForm.querySelector(`[name="${name}"]`)?.closest('label');
+      const text = [...(label?.childNodes || [])].find(node => node.nodeType === Node.TEXT_NODE);
+      if (text) text.nodeValue = title;
+    };
+    setTitle('bank_name', 'Banka');
+    setTitle('current_account_id', 'Cari Hesap');
+    setTitle('installment_count', type === 'term' ? 'Vade Sayısı' : 'KK Taksit Sayısı');
+    setTitle('commission_rate', type === 'term' ? 'Aylık Ödeme' : 'Komisyon Oranı');
+    setTitle('amount', type === 'term' ? 'Toplam' : 'Tutar');
     setLabel('bank_name', type === 'mail_order' || type === 'credit_card', '1 / 2', '2');
     setLabel('current_account_id', type === 'mail_order', '2 / 3', '2');
     setLabel('installment_count', type === 'credit_card' || type === 'term', type === 'term' ? '1 / 2' : '2 / 3', '2');
@@ -1850,7 +1860,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', type === 'credit_card' ? '3' : '3');
     setLabel('description', true, '1 / -1', '4');
   };
-  cashForm.addEventListener('repair-payment-change', () => [0, 80, 250].forEach(delay => setTimeout(refreshRepairPayment, delay)));
+  cashForm.addEventListener('repair-payment-change', () => [0, 80, 250, 500, 800].forEach(delay => setTimeout(refreshRepairPayment, delay)));
 });
 </script>
 <?php patient_footer(); ?>
