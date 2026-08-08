@@ -1204,6 +1204,8 @@ document.addEventListener('click',async event=>{
     const saveButton = footer?.querySelector('#repair-save');
     if (saveButton) footer.insertBefore(button, saveButton);
     else footer?.append(button);
+    // Tahsilat penceresi ödeme şekliyle otomatik açılır; ayrıca bir düğme gerekmez.
+    button.remove();
   }
   const open = () => { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); };
   const close = () => { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); };
