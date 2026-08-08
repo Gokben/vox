@@ -2067,6 +2067,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     const row = document.createElement('label'); row.className = 'anamnesis-row';
     if (key === 'complaint' || key === 'profession') row.classList.add('anamnesis-wide');
     if (type !== 'choice') row.classList.add('anamnesis-free-text');
+    if (type === 'area') row.classList.add('anamnesis-note-field');
     const caption = document.createElement('span'); caption.textContent = label;
     let control;
     if (type === 'choice') {
@@ -2194,6 +2195,6 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-grid{flex:1 1 auto;overflow:hidden}
 @page{size:A4 portrait;margin:0}
 @media print{#anamnesis-card-modal .anamnesis-dialog{width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;display:block!important}#anamnesis-card-modal .anamnesis-grid{overflow:visible!important;zoom:1!important}}
-@media print{#anamnesis-card-modal .anamnesis-row.anamnesis-free-text{grid-template-columns:1fr!important;min-height:24px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>span{grid-column:1!important;border-right:0!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>input,#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>textarea{display:none!important}}
+@media print{#anamnesis-card-modal .anamnesis-row>.anamnesis-yes{white-space:nowrap!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text{grid-template-columns:1fr!important;min-height:24px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>span{grid-column:1!important;border-right:0!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>input,#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>textarea{display:none!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field{min-height:78px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field>span{align-items:flex-start!important;padding-top:8px!important}}
 </style>
 <?php patient_footer(); ?>
