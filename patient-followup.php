@@ -2056,10 +2056,11 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     const caption = document.createElement('span'); caption.textContent = label;
     let control;
     if (type === 'choice') {
-      control = document.createElement('select');
-      const options = answerOptions === 'var_yok' ? ['Var', 'Yok'] : ['Evet', 'Hayır'];
-      control.append(new Option('Seçiniz', ''), ...options.map(option => new Option(option, option)));
-      control.value = saved[key] || '';
+      const positive = answerOptions === 'var_yok' ? 'Var' : 'Evet';
+      const choice = document.createElement('span'); choice.className = 'anamnesis-yes';
+      control = document.createElement('input'); control.type = 'checkbox';
+      control.checked = saved[key] === true || saved[key] === positive;
+      choice.append(control, document.createTextNode(' ' + positive)); control = choice;
     }
     else if (type === 'area') control = document.createElement('textarea');
     else { control = document.createElement('input'); control.type = 'text'; }
@@ -2082,9 +2083,10 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'anamnesis_form'; hidden.value = JSON.stringify(saved);
   serviceForm.append(hidden);
   const close = () => { modal.hidden = true; };
-  const collect = () => Object.fromEntries(fields.map(([key]) => {
+  const collect = () => Object.fromEntries(fields.map(([key, , type, , answerOptions = 'yes_no']) => {
     const field = modal.querySelector(`[name="${key}"]`);
-    return [key, field?.type === 'checkbox' ? (field.checked ? 'Evet' : '') : (field?.value.trim() || '')];
+    if (field?.type === 'checkbox') return [key, field.checked ? (answerOptions === 'var_yok' ? 'Var' : 'Evet') : (answerOptions === 'var_yok' ? 'Yok' : 'Hayır')];
+    return [key, field?.value.trim() || ''];
   }));
   const baseCollect = collect;
   const collectWithDetails = () => {
