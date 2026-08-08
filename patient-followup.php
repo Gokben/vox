@@ -1153,6 +1153,7 @@ document.addEventListener('click',async event=>{
     const paymentMap = {'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'};
     const date = cashForm.querySelector('[name="transaction_date"]');
     const payment = cashForm.querySelector('[name="payment_type"]');
+    const salesPayment = document.querySelector('[name="sales_payment_type"]');
     const cashAmount = cashForm.querySelector('[name="amount"]');
     const description = cashForm.querySelector('[name="description"]');
     const source = cashForm.querySelector('[name="source_url"]');
@@ -1161,6 +1162,13 @@ document.addEventListener('click',async event=>{
     cashForm.dataset.forcedPaymentType = selectedPaymentType;
     if (date && serviceFeeDate?.value) date.value = serviceFeeDate.value;
     const applyRepairPaymentType = () => {
+      // Ortak gelir penceresinin yerleşimi satış seçimini kaynak alır. Teknik
+      // servis tahsilatında bu seçimi geçici olarak aynı ödeme türüne eşitle.
+      if (salesPayment) {
+        salesPayment.dataset.repairOriginalValue ||= salesPayment.value;
+        salesPayment.value = serviceFeePayment.value;
+        salesPayment.dispatchEvent(new Event('change', {bubbles:true}));
+      }
       if (!payment) return;
       payment.value = selectedPaymentType;
       payment.dispatchEvent(new Event('change', {bubbles:true}));
