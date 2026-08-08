@@ -1882,6 +1882,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshRepairPayment = () => {
     const type = cashForm.dataset.forcedPaymentType;
     if (!type) return;
+    cashForm.dataset.repairPaymentLayout = type;
     const payment = cashForm.querySelector('[name="payment_type"]');
     if (payment) payment.value = type;
     const setLabel = (name, visible, column, row) => {
@@ -1936,5 +1937,6 @@ document.addEventListener('DOMContentLoaded', () => {
 <style>
 form[action*="cash.php"] section label:has([name="current_account_id"]){grid-column:2/3!important;grid-row:2!important;width:100%!important;min-width:0!important}
 form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;height:40px!important;min-height:40px!important;padding:8px 10px!important;box-sizing:border-box!important;visibility:visible!important;opacity:1!important}
+form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minmax(0,1fr) minmax(280px,1fr)!important}
 </style>
 <?php patient_footer(); ?>
