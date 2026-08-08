@@ -46,6 +46,7 @@ ensure_patient_source_schema();
 ensure_patient_staff_yeliz_schema();
 $staffNames = patient_staff_names(true);
 $anamnesisQuestions = array_values(array_filter(anamnesis_question_definitions(), static fn(array $question): bool => (int)$question['active'] === 1));
+$anamnesisPrintSettings = anamnesis_print_settings();
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS patient_services (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER NOT NULL, service_date TEXT NOT NULL, service_status TEXT NOT NULL, performed_action TEXT, action_date TEXT, opened_by TEXT, branch_name TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
@@ -2022,6 +2023,11 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   modal.id = 'anamnesis-card-modal'; modal.hidden = true;
   modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print">Yazdır</button><button type="button" class="button anamnesis-apply">Formu Aktar</button></footer></section>`;
   document.body.append(modal);
+  const printSettings = <?=json_encode($anamnesisPrintSettings, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  modal.querySelector('#anamnesis-card-title').textContent = printSettings.title || 'VOX İ.M. - HASTA KARTI';
+  modal.style.setProperty('--anamnesis-header-color', printSettings.header_color || '#14843c');
+  modal.style.setProperty('--anamnesis-font-size', String(printSettings.font_size || 11) + 'px');
+  modal.style.setProperty('--anamnesis-question-font-size', String(printSettings.question_font_size || 11) + 'px');
   const grid = modal.querySelector('.anamnesis-grid');
   fields.forEach(([key, label, type]) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
@@ -2060,4 +2066,9 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal[hidden]{display:none!important}#anamnesis-card-modal{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;padding:20px}.anamnesis-backdrop{position:absolute;inset:0;background:rgba(28,30,40,.56)}.anamnesis-dialog{position:relative;width:min(900px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:8px;color:#182438;box-shadow:0 18px 46px rgba(0,0,0,.28)}.anamnesis-dialog header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #d9dde5}.anamnesis-dialog h2{margin:0;color:#14843c;font-size:21px}.anamnesis-dialog header button{border:0;background:transparent;font-size:28px;color:#777;cursor:pointer}.anamnesis-meta{display:flex;justify-content:space-between;padding:14px 24px;background:#f7faf8}.anamnesis-grid{padding:20px 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}.anamnesis-row{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;align-items:center;font-size:13px}.anamnesis-row span{line-height:1.25}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #bfc6d2;border-radius:4px;padding:6px;font:inherit}.anamnesis-row textarea{height:60px;resize:vertical}.anamnesis-row:has(textarea),.anamnesis-row.anamnesis-wide{grid-column:1/-1;grid-template-columns:220px minmax(0,1fr)}.anamnesis-yes{display:inline-flex!important;align-items:center;gap:6px;font-size:14px}.anamnesis-row .anamnesis-yes input{width:16px!important;min-height:16px!important;height:16px!important;margin:0!important;padding:0!important;accent-color:#19a94b}.anamnesis-row:has(input[name="duration"]){grid-template-columns:minmax(0,1fr) 45px}.anamnesis-dialog footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid #d9dde5}.anamnesis-dialog footer button{border:0;border-radius:5px;padding:10px 15px;cursor:pointer}.anamnesis-print{background:#30435d;color:#fff}.anamnesis-cancel{background:#e6525d;color:#fff}@media(max-width:680px){.anamnesis-grid{grid-template-columns:1fr}.anamnesis-row:has(textarea),.anamnesis-row.anamnesis-wide{grid-column:auto;grid-template-columns:1fr}.anamnesis-meta{gap:8px;flex-direction:column}}@media print{body>*{display:none!important}#anamnesis-card-modal{position:static!important;display:block!important;padding:0!important}#anamnesis-card-modal .anamnesis-backdrop,#anamnesis-card-modal header button,#anamnesis-card-modal footer{display:none!important}.anamnesis-dialog{width:100%!important;max-height:none!important;box-shadow:none!important;border-radius:0!important}.anamnesis-grid{gap:6px 10px!important;padding:12px!important}.anamnesis-row{font-size:11px!important}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{border:1px solid #222!important;border-radius:0!important}}
 </style>
 <?php endif; ?>
+<style>
+#anamnesis-card-modal .anamnesis-dialog h2{color:var(--anamnesis-header-color,#14843c)!important}
+#anamnesis-card-modal .anamnesis-dialog{font-size:var(--anamnesis-font-size,11px)}
+#anamnesis-card-modal .anamnesis-row{font-size:var(--anamnesis-question-font-size,11px)}
+</style>
 <?php patient_footer(); ?>
