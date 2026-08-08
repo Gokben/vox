@@ -680,7 +680,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>$postedRepairDetailsJson, 'sales_details'=>$postedServiceName === 'Satış' ? $postedSalesDetailsJson : null, 'description'=>trim((string)($_POST['description'] ?? '')),
     ];
     if ($postedEditId && $linkedSaleState['sale'] && ($linkedSaleState['cash'] || $linkedSaleState['stock'])) {
-        if ((string)($_POST['confirm_linked_sale_change'] ?? '') !== '1') {
+        $savedDetailsForInvoice = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
+        $postedDetailsForInvoice = json_decode((string)($values['sales_details'] ?? ''), true);
+        $invoiceOnlyUpdate = false;
+        if (is_array($savedDetailsForInvoice) && is_array($postedDetailsForInvoice)) {
+            $savedInvoice = trim((string)($savedDetailsForInvoice['sales_invoice_no'] ?? ''));
+            $postedInvoice = trim((string)($postedDetailsForInvoice['sales_invoice_no'] ?? ''));
+            unset($savedDetailsForInvoice['sales_invoice_no'], $postedDetailsForInvoice['sales_invoice_no']);
+            ksort($savedDetailsForInvoice);
+            ksort($postedDetailsForInvoice);
+            $invoiceOnlyUpdate = $savedInvoice !== $postedInvoice && $savedDetailsForInvoice === $postedDetailsForInvoice;
+        }
+        if (!$invoiceOnlyUpdate && (string)($_POST['confirm_linked_sale_change'] ?? '') !== '1') {
             $_SESSION['service_integrity_error'] = 'Bu satış kartı kasa tahsilatı veya stok çıkışı ile bağlıdır. Değişikliğin tüm bağlı kayıtları etkileyebileceğini onaylamalısınız.';
             redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
         }
