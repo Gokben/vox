@@ -407,12 +407,35 @@ $showIncomeRecordButton = $editId > 0
 $showSalesDetailsButton = $showForm;
 $salesDetailsLocked = (bool)($serviceCard['sales_locked'] ?? false);
 $canManageSalesLock = is_admin();
+$saleLinkState = static function (int $serviceId) use ($pdo, $id): array {
+    $state = ['sale' => false, 'cash' => false, 'stock' => false, 'record_no' => ''];
+    if ($serviceId < 1) return $state;
+    $serviceStatement = $pdo->prepare('SELECT service_name,record_no FROM patient_services WHERE id=? AND patient_id=?');
+    $serviceStatement->execute([$serviceId, $id]);
+    $sale = $serviceStatement->fetch() ?: [];
+    if (trim((string)($sale['service_name'] ?? '')) !== 'Satış') return $state;
+    $state['sale'] = true;
+    $state['record_no'] = trim((string)($sale['record_no'] ?? ''));
+    try {
+        $cashStatement = $pdo->prepare("SELECT 1 FROM cash_transactions WHERE source_url=? AND transaction_type='income' LIMIT 1");
+        $cashStatement->execute([url('patient-followup.php?id=' . $id)]);
+        $state['cash'] = (bool)$cashStatement->fetchColumn();
+    } catch (Throwable $exception) { }
+    if ($state['record_no'] !== '') {
+        $stockStatement = $pdo->prepare("SELECT 1 FROM stock_movements WHERE movement_type='Çıkış' AND description LIKE ? LIMIT 1");
+        $stockStatement->execute(['Hizmet kartı satışı: ' . $state['record_no'] . '%']);
+        $state['stock'] = (bool)$stockStatement->fetchColumn();
+    }
+    return $state;
+};
+$saleEditLinks = $editId > 0 ? $saleLinkState($editId) : ['sale'=>false, 'cash'=>false, 'stock'=>false, 'record_no'=>''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = (string)($_POST['action'] ?? 'save');
     $postedEditId = (int)($_POST['edit_id'] ?? 0);
     $cashDeleteId = (int)($_POST['cash_delete_id'] ?? 0);
+    $linkedSaleState = $postedEditId > 0 ? $saleLinkState($postedEditId) : ['sale'=>false, 'cash'=>false, 'stock'=>false, 'record_no'=>''];
     if ($action === 'sales_toggle_lock' && $postedEditId > 0) {
         $lockStatement = $pdo->prepare("SELECT service_name,sales_locked FROM patient_services WHERE id=? AND patient_id=?");
         $lockStatement->execute([$postedEditId, $id]);
@@ -572,6 +595,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit('Satış bilgileri kilitli. Yalnız yönetici kilidi açabilir.');
     }
     if ($action === 'delete' && $postedEditId) {
+        if ($linkedSaleState['sale'] && ($linkedSaleState['cash'] || $linkedSaleState['stock'])) {
+            $_SESSION['service_integrity_error'] = 'Bu satışa bağlı ' . ($linkedSaleState['cash'] ? 'kasa tahsilatı' : '') . (($linkedSaleState['cash'] && $linkedSaleState['stock']) ? ' ve ' : '') . ($linkedSaleState['stock'] ? 'stok çıkışı' : '') . ' bulunuyor. Bağlantının kopmaması için önce tahsilatı iptal edip stok iadesini tamamlayın; satış kartı bu işlemler yapılmadan silinemez.';
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+        }
         $pdo->prepare('DELETE FROM patient_services WHERE id=? AND patient_id=?')->execute([$postedEditId, $id]);
         redirect('patient-followup.php?id=' . $id);
     }
@@ -630,6 +657,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
         'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>$postedRepairDetailsJson, 'sales_details'=>$postedServiceName === 'Satış' ? $postedSalesDetailsJson : null, 'description'=>trim((string)($_POST['description'] ?? '')),
     ];
+    if ($postedEditId && $linkedSaleState['sale'] && ($linkedSaleState['cash'] || $linkedSaleState['stock'])) {
+        if ((string)($_POST['confirm_linked_sale_change'] ?? '') !== '1') {
+            $_SESSION['service_integrity_error'] = 'Bu satış kartı kasa tahsilatı veya stok çıkışı ile bağlıdır. Değişikliğin tüm bağlı kayıtları etkileyebileceğini onaylamalısınız.';
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+        }
+        if ($linkedSaleState['cash'] && $postedServiceName === 'Satış') {
+            $newDetails = json_decode((string)$values['sales_details'], true);
+            $newSaleTotal = patient_parse_money(is_array($newDetails) ? ($newDetails['sales_payment_amount'] ?? 0) : 0);
+            $cashTotalStatement = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM cash_transactions WHERE source_url=? AND transaction_type='income'");
+            $cashTotalStatement->execute([url('patient-followup.php?id=' . $id)]);
+            $cashTotal = (float)$cashTotalStatement->fetchColumn();
+            if ($newSaleTotal > 0 && abs($newSaleTotal - $cashTotal) > 0.009) {
+                $_SESSION['service_integrity_error'] = 'Satış toplamı ile kasa tahsilatı farklı olamaz. Önce Gelir Kayıt ekranından tahsilatı güncelleyin.';
+                redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
+            }
+        }
+    }
     if ($saleProductDeleteLocked && $postedEditId && $postedServiceName === 'Satış') {
         $savedSalesDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
         $postedSalesDetails = json_decode((string)$values['sales_details'], true);
@@ -769,10 +813,13 @@ foreach ($services as &$service) {
 unset($service);
 $incomeValidationError = (string)($_SESSION['income_validation_error'] ?? '');
 $incomeValidationDraft = $_SESSION['income_validation_draft'] ?? [];
+$serviceIntegrityError = (string)($_SESSION['service_integrity_error'] ?? '');
 if (!is_array($incomeValidationDraft)) $incomeValidationDraft = [];
 unset($_SESSION['income_validation_error']);
 unset($_SESSION['income_validation_draft']);
+unset($_SESSION['service_integrity_error']);
 patient_header('Hizmetler', 'patients');
+if ($serviceIntegrityError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>alert(<?=json_encode($serviceIntegrityError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0));</script><?php endif;
 if ($incomeValidationError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const openIncome=()=>{const form=document.querySelector('form[action*="cash.php"]'),modal=form?.parentElement;if(!modal){setTimeout(openIncome,50);return;}modal.hidden=false;modal.style.display='grid';setTimeout(()=>alert(<?=json_encode($incomeValidationError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0);};openIncome();},350));</script><?php endif;
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
 $form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
@@ -1072,6 +1119,10 @@ const initializeSalesScreen=()=>{
   if(!form||!service||!modal||!value)return;
   const saleStockLocked=<?=json_encode($saleProductDeleteLocked)?>;
   const salePaymentCompleted=<?=json_encode($serviceNameLocked)?>;
+  const linkedSaleNeedsConfirmation=<?=json_encode((bool)($saleEditLinks['sale'] && ($saleEditLinks['cash'] || $saleEditLinks['stock'])))?>;
+  const confirmLinkedSaleChange=()=>{if(!linkedSaleNeedsConfirmation)return true;let confirmation=form.querySelector('[name="confirm_linked_sale_change"]');if(confirmation?.value==='1')return true;if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return false;confirmation=document.createElement('input');confirmation.type='hidden';confirmation.name='confirm_linked_sale_change';confirmation.value='1';form.append(confirmation);return true;};
+  form.addEventListener('submit',event=>{if(!confirmLinkedSaleChange())event.preventDefault();},true);
+  detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',event=>{if(confirmLinkedSaleChange())return;event.preventDefault();event.stopImmediatePropagation();},true);
   const salesLockButton=detailsModal?.querySelector('#sales-lock-toggle'),applySalesLock=locked=>{if(!detailsModal)return;detailsModal.dataset.salesLocked=locked?'1':'0';detailsModal.querySelectorAll('.repair-body [name]').forEach(field=>{field.disabled=locked;field.readOnly=locked;});detailsModal.querySelectorAll('.sales-product-cancel,#add-hearing-device').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('#add-hearing-device,.sales-product-actions .button,[data-sales-product-action]').forEach(button=>{button.disabled=locked;button.setAttribute('aria-disabled',locked?'true':'false');button.style.opacity=locked?'.48':'';button.style.cursor=locked?'not-allowed':'';});detailsModal.querySelectorAll('[aria-label="Kasa"]').forEach(link=>{link.style.pointerEvents=locked?'none':'';link.style.opacity=locked?'.38':'';});const saveButton=detailsModal.querySelector('#sales-details-save');if(saveButton)saveButton.disabled=locked;if(salesLockButton){salesLockButton.title=locked?'Satış kilidini aç':'Satış bilgilerini kilitle';salesLockButton.innerHTML=`<i class="ti ${locked?'tabler-lock':'tabler-lock-open'}"></i>`;salesLockButton.style.background=locked?'#e6525d':'#19a94b';}};
   salesLockButton?.addEventListener('click',async()=>{const locked=detailsModal?.dataset.salesLocked==='1',isAdmin=salesLockButton.dataset.admin==='1';if(locked&&!isAdmin){alert('Kilidi yalnız yönetici açabilir.');return;}salesLockButton.disabled=true;try{const data=new FormData();data.set('csrf',form.querySelector('[name="csrf"]')?.value||'');data.set('action','sales_toggle_lock');data.set('edit_id',form.querySelector('[name="edit_id"]')?.value||'');data.set('sales_locked',locked?'0':'1');const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'}),result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Kilit işlemi tamamlanamadı.');applySalesLock(!!result.locked);updateTotalAmount();alert(result.locked?'Satış bilgileri kilitlendi.':'Satış kilidi açıldı.');}catch(error){alert(error.message||'Kilit işlemi tamamlanamadı.');}finally{salesLockButton.disabled=false;}});
   let savedSaleProducts={};try{savedSaleProducts=JSON.parse(details?.value||'{}')||{};}catch(_){savedSaleProducts={};}
