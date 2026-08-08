@@ -1147,8 +1147,7 @@ document.addEventListener('click',async event=>{
   const serviceFeeDate = modal.querySelector('[name="repair_service_fee_date"]');
   const serviceFeePayment = modal.querySelector('[name="repair_service_fee_payment_type"]');
   const openRepairFeeIncome = async () => {
-    const repairId = Number(form.querySelector('[name="edit_id"]')?.value || 0);
-    if (!repairId) { alert('Önce Tamir Kaydı Oluştur düğmesiyle tamir kartını kaydedin; ardından hizmet bedeli tahsilatını ekleyin.'); return; }
+    let repairId = Number(form.querySelector('[name="edit_id"]')?.value || 0);
     formatServiceFee();
     const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
     if (amount <= 0) { alert('Önce hizmet bedelini giriniz.'); serviceFee?.focus(); return; }
@@ -1157,7 +1156,16 @@ document.addEventListener('click',async event=>{
     try {
       const response = await fetch(form.action || location.href, {method:'POST', body:new FormData(form), credentials:'same-origin'});
       if (!response.ok) throw new Error('Hizmet bedeli kaydedilemedi.');
+      const responseUrl = new URL(response.url);
+      const savedEditId = Number(responseUrl.searchParams.get('edit') || 0);
+      if (savedEditId) {
+        repairId = savedEditId;
+        const editInput = form.querySelector('[name="edit_id"]');
+        if (editInput) editInput.value = String(savedEditId);
+        history.replaceState(null, '', responseUrl.pathname + responseUrl.search);
+      }
     } catch (error) { alert(error.message || 'Hizmet bedeli kaydedilemedi.'); return; }
+    if (!repairId) { alert('Tamir kartı kaydedilemedi. Lütfen tekrar deneyin.'); return; }
     const cashForm = document.querySelector('form[action*="cash.php"]');
     if (!cashForm) { alert('Gelir kayıt ekranı hazırlanamadı.'); return; }
     const paymentMap = {'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'};
