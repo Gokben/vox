@@ -489,6 +489,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode($response, JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($action === 'save_anamnesis') {
+        if ($postedEditId <= 0) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Önce hizmet kartını kaydedin; ardından anamnezi ayrı olarak kaydedebilirsiniz.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $statement = $pdo->prepare('UPDATE patient_services SET anamnesis_form=? WHERE id=? AND patient_id=?');
+        $statement->execute([(string)($_POST['anamnesis_form'] ?? ''), $postedEditId, $id]);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => $statement->rowCount() >= 0, 'message' => 'Anamnez kaydedildi.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($action === 'cash_delete_only' && $cashDeleteId) {
         $cashDeleteStatement = $pdo->prepare("DELETE FROM cash_transactions WHERE id=? AND transaction_type='income' AND source_url=?");
         $cashDeleteStatement->execute([$cashDeleteId, url('patient-followup.php?id=' . $id)]);
@@ -2028,7 +2041,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   ];
   const modal = document.createElement('div');
   modal.id = 'anamnesis-card-modal'; modal.hidden = true;
-  modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print">Yazdır</button><button type="button" class="button anamnesis-apply">Formu Aktar</button></footer></section>`;
+  modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print">Yazdır</button><button type="button" class="button anamnesis-apply" title="Anketi kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy"></i></button></footer></section>`;
   document.body.append(modal);
   const printSettings = <?=json_encode($anamnesisPrintSettings, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
   modal.querySelector('#anamnesis-card-title').textContent = printSettings.title || 'VOX İ.M. - HASTA KARTI';
@@ -2097,7 +2110,23 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
   anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; });
   modal.querySelectorAll('header button,.anamnesis-cancel,.anamnesis-backdrop').forEach(button => button.addEventListener('click', close));
-  modal.querySelector('.anamnesis-apply').addEventListener('click', () => { hidden.value = JSON.stringify(collectWithDetails()); modal.hidden = true; });
+  modal.querySelector('.anamnesis-apply').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    hidden.value = JSON.stringify(collectWithDetails());
+    const data = new FormData();
+    data.set('csrf', serviceForm.querySelector('[name="csrf"]').value);
+    data.set('action', 'save_anamnesis');
+    data.set('edit_id', serviceForm.querySelector('[name="edit_id"]').value);
+    data.set('anamnesis_form', hidden.value);
+    button.disabled = true;
+    try {
+      const response = await fetch(location.href, {method:'POST', body:data, headers:{Accept:'application/json'}});
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Kayıt tamamlanamadı.');
+      modal.hidden = true;
+    } catch (error) { alert(error.message || 'Anamnez kaydedilemedi.'); }
+    finally { button.disabled = false; }
+  });
   modal.querySelector('.anamnesis-print').addEventListener('click', () => { hidden.value = JSON.stringify(collectWithDetails()); window.print(); });
 })();
 </script>
@@ -2141,5 +2170,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row:has(input[name="complaint"]){grid-column:1/-1!important;width:100%!important;grid-template-columns:35% minmax(0,1fr)!important}
 #anamnesis-card-modal .anamnesis-row:has(textarea){min-height:36px!important}
 #anamnesis-card-modal .anamnesis-row textarea{height:36px!important;min-height:36px!important;resize:none!important}
+#anamnesis-card-modal .anamnesis-apply{display:inline-grid!important;place-items:center;min-width:42px;padding:10px!important}
+#anamnesis-card-modal .anamnesis-apply i{font-size:18px;line-height:1}
 </style>
 <?php patient_footer(); ?>
