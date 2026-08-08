@@ -2134,5 +2134,6 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row>span{border-right-width:var(--anamnesis-line-width,1px)!important}
 #anamnesis-card-modal .anamnesis-row:has(textarea){min-height:var(--anamnesis-notes-height,65px)!important}
 @media print{#anamnesis-card-modal{padding:var(--anamnesis-page-margin,20mm)!important;box-sizing:border-box!important}#anamnesis-card-modal .anamnesis-dialog{position:static!important;min-height:0!important;width:100%!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:static!important;width:auto!important;margin:0!important}}
+@media print{#anamnesis-card-modal .anamnesis-row>.anamnesis-yes input{display:none!important}}
 </style>
 <?php patient_footer(); ?>
