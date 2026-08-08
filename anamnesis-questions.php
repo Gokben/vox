@@ -11,6 +11,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf(); $action = (string)($_POST['action'] ?? 'save_question'); $id = (int)($_POST['anamnesis_question_id'] ?? 0);
     if ($action === 'save_print_settings') {
         $headerColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($_POST['header_color'] ?? '')) ? (string)$_POST['header_color'] : '#14843c';
+        $logoPath = mb_substr(trim((string)($_POST['company_logo_path'] ?? '')), 0, 255);
+        if (($_FILES['company_logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            if (($_FILES['company_logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) $error = 'Logo dosyası yüklenemedi.';
+            elseif ((int)($_FILES['company_logo']['size'] ?? 0) > 2097152) $error = 'Logo dosyası en fazla 2 MB olabilir.';
+            else {
+                $mime = (new finfo(FILEINFO_MIME_TYPE))->file($_FILES['company_logo']['tmp_name']);
+                $types = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+                if (!isset($types[$mime])) $error = 'Yalnızca JPG, PNG, WEBP veya GIF logo yükleyebilirsiniz.';
+                else {
+                    $directory = __DIR__ . '/assets/uploads/anamnesis';
+                    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) $error = 'Logo klasörü oluşturulamadı.';
+                    else {
+                        $filename = 'company-logo-' . bin2hex(random_bytes(12)) . '.' . $types[$mime];
+                        if (!move_uploaded_file($_FILES['company_logo']['tmp_name'], $directory . '/' . $filename)) $error = 'Logo dosyası kaydedilemedi.';
+                        else $logoPath = 'assets/uploads/anamnesis/' . $filename;
+                    }
+                }
+            }
+        }
         save_anamnesis_print_settings([
             'title' => mb_substr(trim((string)($_POST['print_title'] ?? 'VOX İ.M. - HASTA KARTI')), 0, 120),
             'header_color' => $headerColor,
@@ -25,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'footer_height' => (string)max(24, min(80, (int)($_POST['footer_height'] ?? 34))),
             'line_width' => (string)max(1, min(3, (int)($_POST['line_width'] ?? 1))),
             'company_logo_enabled' => isset($_POST['company_logo_enabled']) ? '1' : '0',
-            'company_logo_path' => mb_substr(trim((string)($_POST['company_logo_path'] ?? '')), 0, 255),
+            'company_logo_path' => $logoPath,
             'company_logo_width' => (string)max(10, min(80, (int)($_POST['company_logo_width'] ?? 28))),
             'layout' => mb_substr((string)($_POST['layout'] ?? ''), 0, 2000),
         ]);
@@ -79,7 +98,7 @@ patient_header('Ayarlar - Anamnez', 'settings');
     <div class="table-responsive"><table class="personnel-table anamnesis-text-field-table"><thead><tr><th>Başlık</th><th>Tür</th><th>Sıra</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody><?php foreach($textRows as $textRow):?><tr><td><?=e($textRow['name'])?></td><td><?=$textRow['field_type']==='area'?'Not alanı':'Tek satır'?></td><td><?=(int)$textRow['sort_order']?></td><td><form method="post" class="inline"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="toggle_text_field"><input type="hidden" name="text_field_id" value="<?=(int)$textRow['id']?>"><button type="submit" class="status-toggle <?=$textRow['active']?'active':'passive'?>"><?=$textRow['active']?'Aktif':'Pasif'?></button></form></td><td><a class="edit-definition" href="<?=url('anamnesis-questions.php?edit_text='.(int)$textRow['id'])?>">Düzenle</a></td></tr><?php endforeach?></tbody></table></div>
   </details>
   <details class="vuexy-form-card definition-accordion"><summary class="form-card-title"><span><h2>Yazıcı Çıktısı Tasarımı</h2><p>Anamnez hasta kartının yazdırılmış görünümünü düzenleyin.</p></span><i class="definition-chevron" aria-hidden="true"></i></summary>
-    <form method="post" class="personnel-form print-design-form"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_print_settings"><input type="hidden" name="layout" value="<?=e($printSettings['layout'])?>">
+    <form method="post" enctype="multipart/form-data" class="personnel-form print-design-form"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_print_settings"><input type="hidden" name="layout" value="<?=e($printSettings['layout'])?>">
       <div class="print-settings-panel">
         <h3>Sayfa ve başlık</h3>
         <label>Başlık<input name="print_title" maxlength="120" value="<?=e($printSettings['title'])?>" required></label>
@@ -101,6 +120,7 @@ patient_header('Ayarlar - Anamnez', 'settings');
       <div class="print-settings-panel">
         <h3>Alt şirket logosu</h3>
         <label class="personnel-check"><span><input type="checkbox" name="company_logo_enabled" <?=$printSettings['company_logo_enabled']==='1'?'checked':''?>> Çıktının en altında logo göster</span></label>
+        <label>Bilgisayardan logo yükle<input type="file" name="company_logo" accept="image/png,image/jpeg,image/webp,image/gif"></label>
         <label>Logo dosya yolu / bağlantısı<input name="company_logo_path" maxlength="255" placeholder="assets/vox-logo-02.png" value="<?=e($printSettings['company_logo_path'])?>"></label>
         <label>Logo genişliği (mm)<input type="number" name="company_logo_width" min="10" max="80" value="<?=e($printSettings['company_logo_width'])?>"></label>
       </div>
