@@ -6,9 +6,9 @@ require __DIR__ . '/anamnesis-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db(); $message = ''; $error = '';
-$editId = (int)($_GET['edit'] ?? $_POST['edit_id'] ?? 0);
+$editId = (int)($_GET['edit'] ?? $_POST['anamnesis_question_id'] ?? 0);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    verify_csrf(); $action = (string)($_POST['action'] ?? 'save'); $id = (int)($_POST['edit_id'] ?? $_POST['id'] ?? 0);
+    verify_csrf(); $action = (string)($_POST['action'] ?? 'save_question'); $id = (int)($_POST['anamnesis_question_id'] ?? 0);
     if ($action === 'save_print_settings') {
         $headerColor = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($_POST['header_color'] ?? '')) ? (string)$_POST['header_color'] : '#14843c';
         save_anamnesis_print_settings([
@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'question_font_size' => (string)max(9, min(16, (int)($_POST['question_font_size'] ?? 11))),
         ]);
         $message = 'Yazıcı çıktısı tasarımı kaydedildi.';
-    } elseif ($action === 'delete') {
+    } elseif ($action === 'delete_question') {
         $pdo->prepare('DELETE FROM anamnesis_question_definitions WHERE id=?')->execute([$id]); $message = 'Anamnez sorusu silindi.';
     } else {
         $name = trim((string)($_POST['name'] ?? '')); $active = isset($_POST['active']) ? 1 : 0; $sort = (int)($_POST['sort_order'] ?? 0);
@@ -40,9 +40,9 @@ patient_header('Ayarlar - Anamnez', 'settings');
 <main class="patient-container personnel-page"><nav class="settings-tabs"></nav>
   <?php if($message):?><p class="vox-message success"><?=e($message)?></p><?php endif?><?php if($error):?><p class="vox-message error"><?=e($error)?></p><?php endif?>
   <details class="vuexy-form-card definition-accordion"<?=($editId||$error)?' open':''?>><summary class="form-card-title"><span><h1><?=$editId?'Anamnez Sorusu Düzenle':'Yeni Anamnez Sorusu'?></h1><p>Hasta kartındaki Evet / Hayır sorularını yönetin.</p></span><i class="definition-chevron" aria-hidden="true"></i></summary>
-    <form method="post" class="personnel-form"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=(int)$edit['id']?>"><label>Soru<input name="name" maxlength="512" value="<?=e($edit['name'])?>" required></label><label>Sıra<input type="number" name="sort_order" value="<?=(int)$edit['sort_order']?>"></label><label class="personnel-check"><span>Durum</span><span><input type="checkbox" name="active" <?=$edit['active']?'checked':''?>> Aktif</span></label><div class="personnel-actions"><button><?=$editId?'Güncelle':'Kaydet'?></button><?php if($editId):?><a class="edit-definition" href="<?=url('anamnesis-questions.php')?>">İptal</a><?php endif?></div></form>
+    <form method="post" class="personnel-form"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_question"><input type="hidden" name="anamnesis_question_id" value="<?=(int)$edit['id']?>"><label>Soru<input name="name" maxlength="512" value="<?=e($edit['name'])?>" required></label><label>Sıra<input type="number" name="sort_order" value="<?=(int)$edit['sort_order']?>"></label><label class="personnel-check"><span>Durum</span><span><input type="checkbox" name="active" <?=$edit['active']?'checked':''?>> Aktif</span></label><div class="personnel-actions"><button type="submit"><?=$editId?'Güncelle':'Kaydet'?></button><?php if($editId):?><a class="edit-definition" href="<?=url('anamnesis-questions.php')?>">İptal</a><?php endif?></div></form>
   </details>
-  <section class="vuexy-form-card"><header class="form-card-title"><h2>Anamnez Soruları</h2><p><?=count($rows)?> kayıt</p></header><div class="table-responsive"><table class="personnel-table"><thead><tr><th>Soru</th><th>Sıra</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody><?php foreach($rows as $row):?><tr><td><?=e($row['name'])?></td><td><?=(int)$row['sort_order']?></td><td><span class="status-pill <?=$row['active']?'active':'passive'?>"><?=$row['active']?'Aktif':'Pasif'?></span></td><td><a class="edit-definition" href="<?=url('anamnesis-questions.php?edit='.(int)$row['id'])?>">Düzenle</a><form method="post" class="inline" onsubmit="return confirm('Bu soru silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$row['id']?>"><button class="delete-definition">Sil</button></form></td></tr><?php endforeach?></tbody></table></div></section>
+  <section class="vuexy-form-card"><header class="form-card-title"><h2>Anamnez Soruları</h2><p><?=count($rows)?> kayıt</p></header><div class="table-responsive"><table class="personnel-table"><thead><tr><th>Soru</th><th>Sıra</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody><?php foreach($rows as $row):?><tr><td><?=e($row['name'])?></td><td><?=(int)$row['sort_order']?></td><td><span class="status-pill <?=$row['active']?'active':'passive'?>"><?=$row['active']?'Aktif':'Pasif'?></span></td><td><a class="edit-definition" href="<?=url('anamnesis-questions.php?edit='.(int)$row['id'])?>">Düzenle</a><form method="post" class="inline" onsubmit="return confirm('Bu soru silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete_question"><input type="hidden" name="anamnesis_question_id" value="<?=(int)$row['id']?>"><button type="submit" class="delete-definition">Sil</button></form></td></tr><?php endforeach?></tbody></table></div></section>
   <details class="vuexy-form-card definition-accordion"><summary class="form-card-title"><span><h2>Yazıcı Çıktısı Tasarımı</h2><p>Anamnez hasta kartının yazdırılmış görünümünü düzenleyin.</p></span><i class="definition-chevron" aria-hidden="true"></i></summary>
     <form method="post" class="personnel-form"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_print_settings"><label>Başlık<input name="print_title" maxlength="120" value="<?=e($printSettings['title'])?>" required></label><label>Başlık Rengi<input type="color" name="header_color" value="<?=e($printSettings['header_color'])?>"></label><label>Gövde Yazı Boyutu<input type="number" name="font_size" min="9" max="16" value="<?=e($printSettings['font_size'])?>"></label><label>Soru Yazı Boyutu<input type="number" name="question_font_size" min="9" max="16" value="<?=e($printSettings['question_font_size'])?>"></label><div class="personnel-actions"><button>Tasarımı Kaydet</button></div></form>
   </details>
