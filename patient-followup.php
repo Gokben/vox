@@ -1036,6 +1036,7 @@ if ($currentContactPerson !== '') {
 #repair-modal #repair-tab-delivery .repair-switch{grid-column:1/2!important}
 #repair-modal #repair-tab-delivery .repair-priority{grid-column:2/3;display:flex;align-items:center;gap:16px;font-size:14px}
 #repair-modal #repair-tab-delivery .repair-priority label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+#repair-modal #repair-tab-delivery .repair-switch input,#repair-modal #repair-tab-delivery .repair-priority input{width:16px;height:16px;margin:0;accent-color:#19a94b}
 @media(max-width:620px){#repair-modal #repair-tab-delivery{grid-template-columns:1fr}}
 @media(max-width:620px){#repair-modal .repair-tab-list{overflow-x:auto}#repair-modal .repair-tab{flex:0 0 auto;padding:12px 14px;font-size:14px}#repair-modal .repair-tab-panel{padding:16px}}
 </style>
@@ -1136,11 +1137,14 @@ document.addEventListener('click',async event=>{
   if (!modal || !form || !serviceName || !details) return;
   const controls = [...modal.querySelectorAll('[name]')];
   const deliveryTab = modal.querySelector('#repair-tab-delivery');
+  const repairBranchDeliveryLabel = deliveryTab?.querySelector('[name="repair_branch_delivery_date"]')?.closest('label');
+  const repairBranchDeliveryTitle = repairBranchDeliveryLabel && [...repairBranchDeliveryLabel.childNodes].find(node => node.nodeType === Node.TEXT_NODE);
+  if (repairBranchDeliveryTitle) repairBranchDeliveryTitle.nodeValue = 'Şubeye Teslim';
   const repairDeliveryDate = deliveryTab?.querySelector('[name="repair_delivery_date"]');
   const repairDeliveryLabel = repairDeliveryDate?.closest('label');
   if (repairDeliveryLabel) {
     const title = [...repairDeliveryLabel.childNodes].find(node => node.nodeType === Node.TEXT_NODE);
-    if (title) title.nodeValue = 'Servise Teslim Trh';
+    if (title) title.nodeValue = 'Servise Teslim';
     const addDateField = (name, labelText) => {
       if (deliveryTab.querySelector(`[name="${name}"]`)) return;
       const label = document.createElement('label');
@@ -1150,8 +1154,8 @@ document.addEventListener('click',async event=>{
       label.append(input); deliveryTab.insertBefore(label, deliveryTab.querySelector('.repair-grid'));
       controls.push(input);
     };
-    addDateField('repair_service_return_date', 'Servisten Gelme Trh.');
-    addDateField('repair_patient_delivery_date', 'Hasta Teslim Trh');
+    addDateField('repair_service_return_date', 'Servisten Gelme');
+    addDateField('repair_patient_delivery_date', 'Hasta Teslim');
   }
   const warrantyLabel = deliveryTab?.querySelector('[name="repair_warranty"]')?.closest('label');
   if (warrantyLabel && !deliveryTab.querySelector('.repair-priority')) {
@@ -1166,6 +1170,13 @@ document.addEventListener('click',async event=>{
     });
     warrantyLabel.after(priorities);
   }
+  deliveryTab?.querySelectorAll('[name="repair_priority[]"]').forEach(input => {
+    input.addEventListener('change', () => {
+      if (input.checked) deliveryTab.querySelectorAll('[name="repair_priority[]"]').forEach(other => {
+        if (other !== input) other.checked = false;
+      });
+    });
+  });
   const repairTarget = modal.querySelector('[name="repair_target"]');
   const repairTechnician = modal.querySelector('[name="repair_technician"]');
   const syncRepairTechnician = () => {
