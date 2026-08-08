@@ -1171,6 +1171,9 @@ document.addEventListener('click',async event=>{
     button.innerHTML = '<i class="ti tabler-cash-register" style="font-size:20px;line-height:1" aria-hidden="true"></i>';
     button.style.cssText = 'width:36px;min-width:36px;height:36px;min-height:36px;margin:0;padding:0;display:inline-grid;place-items:center';
     button.addEventListener('click', openRepairFeeIncome);
+    const syncIncomeButton = () => { button.hidden = serviceFeePayment.value === 'Nakit'; };
+    serviceFeePayment.addEventListener('change', syncIncomeButton);
+    syncIncomeButton();
     const footer = modal.querySelector('footer');
     const saveButton = footer?.querySelector('#repair-save');
     if (saveButton) footer.insertBefore(button, saveButton);
