@@ -1922,6 +1922,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setLabel('commission_rate', type === 'credit_card' || type === 'term', '2 / 3', '3');
     setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', '3');
     setLabel('description', true, '1 / -1', '4');
+    if (type === 'term') {
+      const fee = document.querySelector('[name="repair_service_fee"]')?.value || '';
+      const amountField = cashForm.querySelector('[name="amount"]');
+      setLabel('amount', true, '2 / 3', '2');
+      setTitle('amount', 'Toplam');
+      if (amountField && fee.trim() !== '') amountField.value = fee;
+    }
   };
   cashForm.addEventListener('repair-payment-change', () => [0, 80, 250, 500, 800].forEach(delay => setTimeout(refreshRepairPayment, delay)));
 });
