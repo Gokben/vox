@@ -222,6 +222,18 @@ if (!$salesServiceNameFixCheck->fetchColumn()) {
     $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$salesServiceNameFixKey]);
 }
 
+// Geri yukleme sonrasinda eklenen kisaltilmis personel adlarini da tam adla korur.
+$servicePersonnelPostRestoreFixKey = '20260808_normalize_restored_service_personnel_v5';
+$servicePersonnelPostRestoreFixCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+$servicePersonnelPostRestoreFixCheck->execute([$servicePersonnelPostRestoreFixKey]);
+if (!$servicePersonnelPostRestoreFixCheck->fetchColumn()) {
+    $pdo->prepare('UPDATE patient_services SET contact_person=? WHERE contact_person=?')
+        ->execute(['Yeliz Girgin Özkan', 'Yeliz']);
+    $pdo->prepare('UPDATE patient_services SET related_personnel=? WHERE related_personnel=?')
+        ->execute(['Yeliz Girgin Özkan', 'Yeliz']);
+    $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$servicePersonnelPostRestoreFixKey]);
+}
+
 $patientColumns = $sqlite
     ? array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name')
     : array_column($pdo->query('SHOW COLUMNS FROM patients')->fetchAll(), 'Field');
