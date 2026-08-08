@@ -1134,6 +1134,45 @@ document.addEventListener('click',async event=>{
     if (Number.isFinite(amount)) serviceFee.value = amount.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ₺';
   };
   serviceFee?.addEventListener('blur', formatServiceFee);
+  const serviceFeeDate = modal.querySelector('[name="repair_service_fee_date"]');
+  const serviceFeePayment = modal.querySelector('[name="repair_service_fee_payment_type"]');
+  const openRepairFeeIncome = async () => {
+    const repairId = Number(form.querySelector('[name="edit_id"]')?.value || 0);
+    if (!repairId) { alert('Önce Tamir Kaydı Oluştur düğmesiyle tamir kartını kaydedin; ardından hizmet bedeli tahsilatını ekleyin.'); return; }
+    formatServiceFee();
+    const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
+    if (amount <= 0) { alert('Önce hizmet bedelini giriniz.'); serviceFee?.focus(); return; }
+    if (!serviceFeePayment?.value) { alert('Ödeme şeklini seçiniz.'); serviceFeePayment?.focus(); return; }
+    persist();
+    try {
+      const response = await fetch(form.action || location.href, {method:'POST', body:new FormData(form), credentials:'same-origin'});
+      if (!response.ok) throw new Error('Hizmet bedeli kaydedilemedi.');
+    } catch (error) { alert(error.message || 'Hizmet bedeli kaydedilemedi.'); return; }
+    const cashForm = document.querySelector('form[action*="cash.php"]');
+    if (!cashForm) { alert('Gelir kayıt ekranı hazırlanamadı.'); return; }
+    const paymentMap = {'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'};
+    const date = cashForm.querySelector('[name="transaction_date"]');
+    const payment = cashForm.querySelector('[name="payment_type"]');
+    const cashAmount = cashForm.querySelector('[name="amount"]');
+    const description = cashForm.querySelector('[name="description"]');
+    const source = cashForm.querySelector('[name="source_url"]');
+    if (date && serviceFeeDate?.value) date.value = serviceFeeDate.value;
+    if (payment) { payment.value = paymentMap[serviceFeePayment.value] || 'cash'; payment.dispatchEvent(new Event('change', {bubbles:true})); }
+    if (cashAmount) cashAmount.value = serviceFee.value;
+    if (description) description.value = <?=json_encode($patient['full_name'] . ' — Tamir hizmet bedeli tahsilatı', JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+    if (source) source.value = <?=json_encode(url('patient-followup.php?id=' . $id))?> + '&repair=' + repairId;
+    const cashModal = cashForm.parentElement;
+    if (cashModal) { cashModal.hidden = false; cashModal.style.display = 'grid'; }
+  };
+  if (serviceFeePayment && !modal.querySelector('#repair-fee-income')) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.id = 'repair-fee-income'; button.className = 'button';
+    button.title = 'Hizmet bedeli gelir kaydı'; button.setAttribute('aria-label', 'Hizmet bedeli gelir kaydı');
+    button.innerHTML = '<i class="ti tabler-cash-register"></i>';
+    button.style.cssText = 'width:38px;min-width:38px;height:38px;margin-top:8px;padding:0;display:inline-grid;place-items:center';
+    button.addEventListener('click', openRepairFeeIncome);
+    serviceFeePayment.closest('label')?.after(button);
+  }
   const open = () => { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); };
   const close = () => { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); };
   const restore = () => { try { const values = JSON.parse(details.value || '{}'); controls.forEach(control => { const value = values[control.name]; if (control.type === 'checkbox') control.checked = Array.isArray(value) ? value.includes(control.value) : Boolean(value); else if (value !== undefined) control.value = value; }); } catch (_) {} };
