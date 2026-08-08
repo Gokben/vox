@@ -1168,10 +1168,13 @@ document.addEventListener('click',async event=>{
     const button = document.createElement('button');
     button.type = 'button'; button.id = 'repair-fee-income'; button.className = 'button';
     button.title = 'Hizmet bedeli gelir kaydı'; button.setAttribute('aria-label', 'Hizmet bedeli gelir kaydı');
-    button.innerHTML = '<i class="ti tabler-cash-register"></i>';
-    button.style.cssText = 'width:38px;min-width:38px;height:38px;margin-top:8px;padding:0;display:inline-grid;place-items:center';
+    button.innerHTML = '<i class="ti tabler-cash-register" style="font-size:20px;line-height:1" aria-hidden="true"></i>';
+    button.style.cssText = 'width:36px;min-width:36px;height:36px;min-height:36px;margin:0;padding:0;display:inline-grid;place-items:center';
     button.addEventListener('click', openRepairFeeIncome);
-    serviceFeePayment.closest('label')?.after(button);
+    const footer = modal.querySelector('footer');
+    const saveButton = footer?.querySelector('#repair-save');
+    if (saveButton) footer.insertBefore(button, saveButton);
+    else footer?.append(button);
   }
   const open = () => { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); };
   const close = () => { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); };
