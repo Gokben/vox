@@ -1916,6 +1916,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <style>
 form[action*="cash.php"] section label:has([name="current_account_id"]){grid-column:1/-1!important;grid-row:3!important;width:100%!important;min-width:0!important}
-form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
+form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;height:40px!important;min-height:40px!important;padding:8px 10px!important;box-sizing:border-box!important;visibility:visible!important;opacity:1!important}
 </style>
 <?php patient_footer(); ?>
