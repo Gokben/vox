@@ -2017,13 +2017,13 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   const fixedFields = fields.filter(([, , type]) => type !== 'yesno');
   fields.splice(0, fields.length,
     fixedFields[0], fixedFields[1], fixedFields[2],
-    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno', question.detail_label || '']),
+    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'choice', question.detail_label || '', question.answer_options || 'yes_no']),
     ...fixedFields.slice(3)
   );
   const editableTextFields = <?=json_encode($anamnesisTextFields, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
   fields = [
     ...editableTextFields.filter(field => Number(field.sort_order) < 50).map(field => [field.field_key, field.name, field.field_type]),
-    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno', question.detail_label || '']),
+    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'choice', question.detail_label || '', question.answer_options || 'yes_no']),
     ...editableTextFields.filter(field => Number(field.sort_order) >= 50).map(field => [field.field_key, field.name, field.field_type])
   ];
   const modal = document.createElement('div');
@@ -2050,25 +2050,26 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     modal.style.setProperty('--anamnesis-' + key + '-y', String(position.y ?? 0) + '%');
   });
   const grid = modal.querySelector('.anamnesis-grid');
-  fields.forEach(([key, label, type, detailLabel = '']) => {
+  fields.forEach(([key, label, type, detailLabel = '', answerOptions = 'yes_no']) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
     if (key === 'complaint' || key === 'profession') row.classList.add('anamnesis-wide');
     const caption = document.createElement('span'); caption.textContent = label;
     let control;
-    if (type === 'yesno') {
-      const yes = document.createElement('span'); yes.className = 'anamnesis-yes';
-      control = document.createElement('input'); control.type = 'checkbox'; control.checked = saved[key] === true || saved[key] === 'Evet';
-      yes.append(control, document.createTextNode(' Evet')); control = yes;
+    if (type === 'choice') {
+      control = document.createElement('select');
+      const options = answerOptions === 'var_yok' ? ['Var', 'Yok'] : ['Evet', 'Hayır'];
+      control.append(new Option('Seçiniz', ''), ...options.map(option => new Option(option, option)));
+      control.value = saved[key] || '';
     }
     else if (type === 'area') control = document.createElement('textarea');
     else { control = document.createElement('input'); control.type = 'text'; }
     const field = control.matches?.('input,textarea,select') ? control : control.querySelector('input');
     field.name = key;
-    if (field.type !== 'checkbox') field.value = saved[key] || '';
+    if (field.type !== 'checkbox' && type !== 'choice') field.value = saved[key] || '';
     if (key === 'complaint') field.maxLength = 512;
     if (key === 'duration') field.maxLength = 2;
     row.append(caption, control);
-    if (type === 'yesno' && detailLabel) {
+    if (type === 'choice' && detailLabel) {
       const detailCaption = document.createElement('span');
       detailCaption.className = 'anamnesis-detail-caption'; detailCaption.textContent = detailLabel;
       const detail = document.createElement('input');

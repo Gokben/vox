@@ -10,6 +10,7 @@ function anamnesis_question_definitions(): array
         : 'CREATE TABLE IF NOT EXISTS anamnesis_question_definitions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(512) NOT NULL UNIQUE, active TINYINT(1) NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
     $columns = $sqlite ? array_column($pdo->query('PRAGMA table_info(anamnesis_question_definitions)')->fetchAll(), 'name') : array_column($pdo->query('SHOW COLUMNS FROM anamnesis_question_definitions')->fetchAll(), 'Field');
     if (!in_array('detail_label', $columns, true)) $pdo->exec('ALTER TABLE anamnesis_question_definitions ADD COLUMN detail_label VARCHAR(190) NULL');
+    if (!in_array('answer_options', $columns, true)) $pdo->exec("ALTER TABLE anamnesis_question_definitions ADD COLUMN answer_options VARCHAR(20) NOT NULL DEFAULT 'yes_no'");
     $defaults = [
         'Gürültülü ortamlarda çalıştınız mı?', 'Yüksek ses eşiği maruz kalır mısınız?', 'Çocukken ateşli hastalık geçirdiniz mi?',
         'Ailede işitme kaybı olan birisi var mı?', 'Daha önce kulak ameliyatı oldunuz mu?', 'Teşhisi konmuş kronik bir kulak hastalığınız var mı?',
