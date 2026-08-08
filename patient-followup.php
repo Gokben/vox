@@ -1928,7 +1928,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const amountField = cashForm.querySelector('[name="amount"]');
       setLabel('amount', true, '2 / 3', '2');
       setTitle('amount', 'Toplam');
-      if (amountField && fee.trim() !== '') amountField.value = fee;
+      if (fee.trim() !== '') {
+        if (amountField) amountField.value = fee;
+        const firstInstallment = cashForm.querySelector('[data-primary-term-amount]');
+        if (firstInstallment) firstInstallment.value = fee;
+      }
     }
   };
   cashForm.addEventListener('repair-payment-change', () => [0, 80, 250, 500, 800].forEach(delay => setTimeout(refreshRepairPayment, delay)));
