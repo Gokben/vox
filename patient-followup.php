@@ -1059,6 +1059,7 @@ document.addEventListener('click',async event=>{
   if(!saveButton)return;
   const form=document.getElementById('service-card-form'),modal=document.getElementById('sales-details-modal');
   if(!form||!modal)return;
+  if(<?=json_encode((bool)($saleEditLinks['sale'] && ($saleEditLinks['cash'] || $saleEditLinks['stock'])))?>&&!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return;
   if(modal.dataset.salesLocked==='1'){alert('Satış bilgileri kilitli. Yalnız yönetici kilidi açabilir.');return;}
   event.preventDefault();
   event.stopImmediatePropagation();
@@ -1068,6 +1069,7 @@ document.addEventListener('click',async event=>{
   data.set('service_name','Satış');
   data.set('save_sales_details','1');
   data.set('return_to_sales_details','1');
+  data.set('confirm_linked_sale_change','1');
   data.set('sales_details',JSON.stringify(salesDetails));
   saveButton.disabled=true;
   try{
