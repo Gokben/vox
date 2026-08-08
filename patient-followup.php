@@ -1155,7 +1155,6 @@ document.addEventListener('click',async event=>{
     let repairId = Number(form.querySelector('[name="edit_id"]')?.value || 0);
     formatServiceFee();
     const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
-    if (amount <= 0) { alert('Önce hizmet bedelini giriniz.'); serviceFee?.focus(); return; }
     if (!serviceFeePayment?.value) { alert('Ödeme şeklini seçiniz.'); serviceFeePayment?.focus(); return; }
     persist();
     try {
@@ -1198,7 +1197,7 @@ document.addEventListener('click',async event=>{
       if (!payment) return;
       payment.value = selectedPaymentType;
       payment.dispatchEvent(new Event('change', {bubbles:true}));
-      if (cashAmount) cashAmount.value = serviceFee?.value || '';
+      if (cashAmount) cashAmount.value = amount > 0 ? (serviceFee?.value || '') : '';
       cashForm.dispatchEvent(new CustomEvent('repair-payment-change', {bubbles:true}));
     };
     applyRepairPaymentType();
@@ -1222,7 +1221,7 @@ document.addEventListener('click',async event=>{
     serviceFeePayment.addEventListener('change', () => {
       syncIncomeButton();
       const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
-      if (['Kredi Kartı', 'Mail Order', 'Vadeli'].includes(serviceFeePayment.value) && amount > 0) {
+      if (['Kredi Kartı', 'Mail Order', 'Vadeli'].includes(serviceFeePayment.value)) {
         setTimeout(openRepairFeeIncome, 0);
       }
     });
