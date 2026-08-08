@@ -62,15 +62,15 @@ function anamnesis_print_settings(): array
     $defaults = [
         'title' => 'VOX İ.M. - HASTA KARTI', 'header_color' => '#14843c',
         'font_size' => '11', 'question_font_size' => '11',
-        'page_margin' => '20', 'question_width' => '48', 'yes_width' => '8',
-        'detail_width' => '22', 'row_height' => '27', 'notes_height' => '37',
+        'page_margin' => '0', 'question_width' => '50', 'yes_width' => '6',
+        'detail_width' => '18', 'row_height' => '23', 'notes_height' => '30',
         'footer_height' => '34', 'line_width' => '1',
         'layout' => '{"header":{"x":8,"y":7},"meta":{"x":8,"y":17},"questions":{"x":8,"y":27},"footer":{"x":8,"y":91}}'
     ];
     $statement = $pdo->query('SELECT setting_key,setting_value FROM anamnesis_print_settings');
     foreach ($statement->fetchAll(PDO::FETCH_KEY_PAIR) as $key => $value) if (array_key_exists($key, $defaults)) $defaults[$key] = (string)$value;
     // Önceki varsayılan sütun ölçülerini yeni, daha dar Evet alanına taşı.
-    foreach (['yes_width' => ['12', '8'], 'question_width' => ['46', '48'], 'detail_width' => ['20', '22']] as $key => [$old, $new]) {
+    foreach (['page_margin' => ['20', '0'], 'yes_width' => ['8', '6'], 'question_width' => ['48', '50'], 'detail_width' => ['22', '18'], 'row_height' => ['27', '23'], 'notes_height' => ['37', '30']] as $key => [$old, $new]) {
         if ($defaults[$key] === $old) { $pdo->prepare('UPDATE anamnesis_print_settings SET setting_value=? WHERE setting_key=?')->execute([$new, $key]); $defaults[$key] = $new; }
     }
     return $defaults;
