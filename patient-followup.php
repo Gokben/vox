@@ -119,6 +119,38 @@ if (!$ayseKurunRestoreCheck->fetchColumn()) {
 
 // Hasta Kartındaki eski Hizmet Yeri bilgisini bir kez Hizmet Kartlarına taşır.
 // İşlem tekrarlanabilir: kartı olan hastaya ikinci kart açılmaz.
+// Geri yuklenen satis kartinin kaynak kayittaki urun ve garanti bilgilerini bir kez tamamlar.
+$ayseKurunSalesDetailsKey = '20260808_restore_ayse_kurun_sales_details_v2';
+$ayseKurunSalesDetailsCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+$ayseKurunSalesDetailsCheck->execute([$ayseKurunSalesDetailsKey]);
+if (!$ayseKurunSalesDetailsCheck->fetchColumn()) {
+    $ayseKurunPatientId = $pdo->prepare('SELECT id FROM patients WHERE national_id=? LIMIT 1');
+    $ayseKurunPatientId->execute(['34738959750']);
+    $ayseKurunId = (int)$ayseKurunPatientId->fetchColumn();
+    if ($ayseKurunId > 0) {
+        $ayseKurunServiceId = $pdo->prepare('SELECT id FROM patient_services WHERE patient_id=? AND service_date=? ORDER BY id LIMIT 1');
+        $ayseKurunServiceId->execute([$ayseKurunId, '2023-09-23']);
+        $serviceId = (int)$ayseKurunServiceId->fetchColumn();
+        if ($serviceId > 0) {
+            $salesDetails = json_encode([
+                'sales_brand'=>'Resound', 'sales_model'=>'KE488', 'sales_device_serial'=>'2356902633',
+                'sales_device_sgk'=>'3.028,00 TL', 'sales_device_discount_rate'=>'',
+                'sales_device_net_price'=>'15.472,00 TL',
+                'sales_device_2_brand'=>'Resound', 'sales_device_2_model'=>'KE488',
+                'sales_device_2_serial'=>'2356902622', 'sales_device_2_sgk'=>'3.028,00 TL',
+                'sales_device_2_discount_rate'=>'', 'sales_device_2_net_price'=>'15.472,00 TL',
+                'sales_sale_date'=>'2023-09-23', 'sales_warranty_start'=>'2023-10-03',
+                'sales_warranty_end'=>'2028-10-03', 'sales_invoice_no'=>'1991',
+                'sales_payment_type'=>'Mail Order', 'sales_total_discount_rate'=>'12.444,00 TL',
+                'sales_payment_amount'=>'18.500,00 TL'
+            ], JSON_UNESCAPED_UNICODE);
+            $pdo->prepare('UPDATE patient_services SET service_name=?,sales_details=? WHERE id=?')
+                ->execute(['Satis', $salesDetails, $serviceId]);
+        }
+    }
+    $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$ayseKurunSalesDetailsKey]);
+}
+
 $patientColumns = $sqlite
     ? array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name')
     : array_column($pdo->query('SHOW COLUMNS FROM patients')->fetchAll(), 'Field');
