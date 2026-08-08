@@ -1629,6 +1629,18 @@ document.addEventListener('DOMContentLoaded',()=>{const formatTotal=()=>{const f
 document.addEventListener('DOMContentLoaded',()=>{const form=document.querySelector('form[action*="cash.php"]');if(!form)return;form.addEventListener('submit',async event=>{if(event.defaultPrevented)return;event.preventDefault();const data=new FormData(form),amount=data.get('amount');if(typeof amount==='string'){const raw=amount.replace(/[^0-9,.-]/g,''),parsed=Number(raw.includes(',')?raw.replaceAll('.','').replace(',','.'):raw);if(Number.isFinite(parsed))data.set('amount',String(parsed));}data.set('ajax','1');const button=form.querySelector('footer button:not([data-cash-close])');if(button)button.disabled=true;try{const response=await fetch(new URL(form.getAttribute('action')||'cash.php',location.href),{method:'POST',body:data,credentials:'same-origin'}),result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Kayıt işlemi tamamlanamadı.');}catch(error){alert(error.message||'Kayıt işlemi tamamlanamadı.');}finally{if(button)button.disabled=false;}},false);});
 window.addEventListener('click',event=>{const button=event.target.closest('form[action*="cash.php"] footer button');if(!button||button.dataset.incomeUpdate==='1'||button.matches('[data-cash-close]')||button.matches('[aria-label="Bir gelir kaydı daha ekle"]'))return;const form=button.closest('form');if(!form)return;event.preventDefault();event.stopImmediatePropagation();form.requestSubmit();},true);
 </script>
+<script>
+(() => {
+  const cleanCurrentAccountLabels = () => {
+    document.querySelectorAll('select[name="current_account_id"] option').forEach(option => {
+      const label = option.text.replace(/^\s*[^—]+—\s*/, '');
+      if (label !== option.text) option.text = label;
+    });
+  };
+  cleanCurrentAccountLabels();
+  new MutationObserver(cleanCurrentAccountLabels).observe(document.body, {childList:true, subtree:true});
+})();
+</script>
 <style>
 form[action*="cash.php"]>footer{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important}
 form[action*="cash.php"].repair-dialog>footer{padding:16px 24px 20px!important;min-height:0!important}
