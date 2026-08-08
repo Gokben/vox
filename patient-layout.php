@@ -433,7 +433,8 @@ const settingsPages={
   'social-securities.php':['<?=url('social-securities.php')?>','Sosyal Güvence'],
   'sources.php':['<?=url('sources.php')?>','Başvuru Kaynağı'],
   'complaints.php':['<?=url('complaints.php')?>','Şikayet / Arıza'],
-  'banks.php':['<?=url('banks.php')?>','Bankalar']
+  'banks.php':['<?=url('banks.php')?>','Bankalar'],
+  'anamnesis-questions.php':['<?=url('anamnesis-questions.php')?>','Anamnez']
 };
 const currentSettingsPage=location.pathname.split('/').pop()||'index.php';
 if(settingsPages[currentSettingsPage]){

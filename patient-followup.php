@@ -7,6 +7,7 @@ require __DIR__ . '/service-type-bootstrap.php';
 require __DIR__ . '/service-name-bootstrap.php';
 require __DIR__ . '/service-action-bootstrap.php';
 require __DIR__ . '/complaint-bootstrap.php';
+require __DIR__ . '/anamnesis-bootstrap.php';
 require __DIR__ . '/cash-bootstrap.php';
 require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/employee-patient-link.php';
@@ -44,6 +45,7 @@ try {
 ensure_patient_source_schema();
 ensure_patient_staff_yeliz_schema();
 $staffNames = patient_staff_names(true);
+$anamnesisQuestions = array_values(array_filter(anamnesis_question_definitions(), static fn(array $question): bool => (int)$question['active'] === 1));
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS patient_services (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER NOT NULL, service_date TEXT NOT NULL, service_status TEXT NOT NULL, performed_action TEXT, action_date TEXT, opened_by TEXT, branch_name TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
@@ -2009,6 +2011,13 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     ['device_user_nearby','Çevrenizde işitme cihazı kullanan birisi var mı?','yesno'], ['device_prejudice','İşitme cihazı ile ilgili ön yargılarınız veya endişeleriniz var mı?','yesno'],
     ['city','Memleketiniz ve yaşadığınız şehir','text'], ['otoscopic','ODY otoskopik inceleme sonucu','area'], ['advice','ODY görüş ve tavsiyesi','area']
   ];
+  const editableQuestionLabels = <?=json_encode($anamnesisQuestions, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const fixedFields = fields.filter(([, , type]) => type !== 'yesno');
+  fields.splice(0, fields.length,
+    fixedFields[0], fixedFields[1], fixedFields[2],
+    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno']),
+    ...fixedFields.slice(3)
+  );
   const modal = document.createElement('div');
   modal.id = 'anamnesis-card-modal'; modal.hidden = true;
   modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print">Yazdır</button><button type="button" class="button anamnesis-apply">Formu Aktar</button></footer></section>`;
