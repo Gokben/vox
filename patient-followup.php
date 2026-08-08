@@ -212,6 +212,16 @@ if (!$ayseKurunSalesRelationCheck->fetchColumn()) {
     $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$ayseKurunSalesRelationKey]);
 }
 
+// Eski aktarimlarda ASCII olarak kalmis Satis hizmet adini standartlastirir.
+$salesServiceNameFixKey = '20260808_normalize_ascii_sales_service_name_v4';
+$salesServiceNameFixCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+$salesServiceNameFixCheck->execute([$salesServiceNameFixKey]);
+if (!$salesServiceNameFixCheck->fetchColumn()) {
+    $pdo->prepare("UPDATE patient_services SET service_name=? WHERE service_name='Satis' AND COALESCE(sales_details,'')<>''")
+        ->execute(['Satış']);
+    $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$salesServiceNameFixKey]);
+}
+
 $patientColumns = $sqlite
     ? array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name')
     : array_column($pdo->query('SHOW COLUMNS FROM patients')->fetchAll(), 'Field');
