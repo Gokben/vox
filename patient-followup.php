@@ -92,6 +92,31 @@ $serviceMigrationCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migra
 $serviceMigrationCheck->execute([$serviceMigrationKey]);
 $needsServiceMigration = !$serviceMigrationCheck->fetchColumn();
 
+// 2023 aktarımında ödeme kaydı bulunan Ayşe Kürün'ün satış hizmet kartı
+// eksik kaldıysa, kaydı bir kez ve mevcut bir karta dokunmadan geri oluşturur.
+$ayseKurunRestoreKey = '20260808_restore_ayse_kurun_sales_service_v1';
+$ayseKurunRestoreCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+$ayseKurunRestoreCheck->execute([$ayseKurunRestoreKey]);
+if (!$ayseKurunRestoreCheck->fetchColumn()) {
+    $ayseKurunPatient = $pdo->prepare('SELECT p.id,p.branch_id,b.name AS branch_name FROM patients p LEFT JOIN branches b ON b.id=p.branch_id WHERE p.national_id=? LIMIT 1');
+    $ayseKurunPatient->execute(['34738959750']);
+    $ayseKurun = $ayseKurunPatient->fetch();
+    if ($ayseKurun) {
+        $ayseKurunServiceCheck = $pdo->prepare('SELECT 1 FROM patient_services WHERE patient_id=? LIMIT 1');
+        $ayseKurunServiceCheck->execute([(int)$ayseKurun['id']]);
+        if (!$ayseKurunServiceCheck->fetchColumn()) {
+            $historicalRecordNo = 'VK-1453';
+            $recordNoCheck = $pdo->prepare('SELECT 1 FROM patient_services WHERE record_no=? LIMIT 1');
+            $recordNoCheck->execute([$historicalRecordNo]);
+            if ($recordNoCheck->fetchColumn()) $historicalRecordNo = next_service_record_no($pdo);
+            $salesDetails = json_encode(['sales_sale_date'=>'2023-09-23','sales_payment_type'=>'Mail Order','sales_payment_amount'=>'18.500,00 ₺'], JSON_UNESCAPED_UNICODE);
+            $restoreService = $pdo->prepare('INSERT INTO patient_services(patient_id,service_date,service_status,opened_by,branch_name,record_no,appointment_date,start_time,end_time,service_type,branch_id,contact_person,appointment_status,service_name,result_name,satisfaction,related_personnel,sales_details) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $restoreService->execute([(int)$ayseKurun['id'], '2023-09-23', 'Onay', 'Sistem', (string)($ayseKurun['branch_name'] ?? ''), $historicalRecordNo, '2023-09-24', '09:00', '12:00', 'Ev Hizmeti', (int)($ayseKurun['branch_id'] ?? 0), 'Yeliz', 'Beklemede', 'Satış', 'Onay', 0, 'Yeliz', $salesDetails]);
+        }
+    }
+    $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$ayseKurunRestoreKey]);
+}
+
 // Hasta Kartındaki eski Hizmet Yeri bilgisini bir kez Hizmet Kartlarına taşır.
 // İşlem tekrarlanabilir: kartı olan hastaya ikinci kart açılmaz.
 $patientColumns = $sqlite
