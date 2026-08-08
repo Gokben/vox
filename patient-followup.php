@@ -2066,6 +2066,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   fields.forEach(([key, label, type, detailLabel = '', answerOptions = 'yes_no']) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
     if (key === 'complaint' || key === 'profession') row.classList.add('anamnesis-wide');
+    if (type !== 'choice') row.classList.add('anamnesis-free-text');
     const caption = document.createElement('span'); caption.textContent = label;
     let control;
     if (type === 'choice') {
@@ -2133,7 +2134,18 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     } catch (error) { alert(error.message || 'Anamnez kaydedilemedi.'); }
     finally { button.disabled = false; }
   });
-  modal.querySelector('.anamnesis-print').addEventListener('click', () => { hidden.value = JSON.stringify(collectWithDetails()); window.print(); });
+  modal.querySelector('.anamnesis-print').addEventListener('click', () => {
+    hidden.value = JSON.stringify(collectWithDetails());
+    const restores = [];
+    modal.querySelectorAll('.anamnesis-free-text').forEach(row => {
+      const caption = row.querySelector('span'), field = row.querySelector('input,textarea');
+      if (!caption || !field) return;
+      restores.push([caption, caption.textContent]);
+      caption.textContent = caption.textContent + (field.value.trim() ? ' — ' + field.value.trim() : '');
+    });
+    window.print();
+    setTimeout(() => restores.forEach(([caption, text]) => { caption.textContent = text; }), 500);
+  });
 })();
 </script>
 <style>
@@ -2180,7 +2192,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-apply i{font-size:18px;line-height:1}
 #anamnesis-card-modal .anamnesis-dialog{width:min(210mm,96vw,calc(70.7vh - 28px))!important;height:min(297mm,calc(100vh - 40px));max-height:calc(100vh - 40px)!important;display:flex;flex-direction:column;overflow:hidden}
 #anamnesis-card-modal .anamnesis-grid{flex:1 1 auto;overflow:hidden}
-@page{size:A4 portrait;margin:8mm}
+@page{size:A4 portrait;margin:0}
 @media print{#anamnesis-card-modal .anamnesis-dialog{width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;display:block!important}#anamnesis-card-modal .anamnesis-grid{overflow:visible!important;zoom:1!important}}
+@media print{#anamnesis-card-modal .anamnesis-row.anamnesis-free-text{grid-template-columns:1fr!important;min-height:24px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>span{grid-column:1!important;border-right:0!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>input,#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>textarea{display:none!important}}
 </style>
 <?php patient_footer(); ?>
