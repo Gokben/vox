@@ -21,6 +21,7 @@ if (trim((string)($sale['sales_device_2_model'] ?? '')) !== '') $hearingDeviceTo
 $hearingDeviceTotalText = $hearingDeviceTotal > 0 ? number_format($hearingDeviceTotal, 2, ',', '.') . ' ₺' : '—';
 $singleHearingDevicePrice = $moneyNumber($sale['sales_device_net_price'] ?? 0);
 $singleHearingDevicePriceText = $singleHearingDevicePrice > 0 ? number_format($singleHearingDevicePrice, 2, ',', '.') . ' ₺' : '—';
+$socialSecurity = trim((string)($patient['social_security'] ?? ''));
 $anamnesis = trim((string)($latest['complaint'] ?? $patient['anamnesis'] ?? $patient['notes'] ?? ''));
 patient_header('Hasta Bilgi Formu');
 ?>
@@ -76,5 +77,13 @@ patient_header('Hasta Bilgi Formu');
 
   const firstHeader = salesTable.querySelector('.sales-head > span:first-child');
   if (firstHeader) firstHeader.textContent = 'SATIŞ BİLGİSİ';
+
+  const socialSecurityRow = salesTable.querySelector(':scope > div:nth-child(4)');
+  if (socialSecurityRow) {
+    const cells = socialSecurityRow.children;
+    cells[0].textContent = 'Sosyal Güvence';
+    cells[1].textContent = <?= json_encode($socialSecurity ?: '—', JSON_UNESCAPED_UNICODE) ?>;
+    cells[2].textContent = '—';
+  }
 })();
 </script>
