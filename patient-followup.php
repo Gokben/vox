@@ -2419,6 +2419,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row>.anamnesis-yes>.anamnesis-yes-label{display:block!important;grid-column:2!important;grid-row:1!important;padding:0!important;border:0!important;font-size:inherit!important;line-height:1!important}
 #anamnesis-card-modal .anamnesis-row:has(textarea){min-height:36px!important}
 #anamnesis-card-modal .anamnesis-row textarea{height:36px!important;min-height:36px!important;resize:none!important}
+#anamnesis-card-modal .anamnesis-company-logo{display:flex;justify-content:center;align-items:center;padding:8px 0}
+#anamnesis-card-modal .anamnesis-company-logo img{display:block;width:var(--anamnesis-company-logo-width,28mm);max-width:45%;height:auto;max-height:52px;object-fit:contain}
 #anamnesis-card-modal .anamnesis-apply{display:inline-grid!important;place-items:center;min-width:42px;padding:10px!important}
 #anamnesis-card-modal .anamnesis-apply i{font-size:18px;line-height:1}
 #anamnesis-card-modal .anamnesis-dialog footer button{display:inline-grid!important;place-items:center!important;width:36px!important;min-width:36px!important;height:36px!important;min-height:36px!important;padding:0!important}
