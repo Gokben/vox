@@ -29,6 +29,28 @@ function anamnesis_question_definitions(): array
     return $pdo->query('SELECT * FROM anamnesis_question_definitions ORDER BY sort_order,name')->fetchAll();
 }
 
+function anamnesis_text_field_definitions(): array
+{
+    $pdo = db();
+    $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+    $pdo->exec($sqlite
+        ? 'CREATE TABLE IF NOT EXISTS anamnesis_text_field_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, field_key VARCHAR(80) NOT NULL UNIQUE, name VARCHAR(512) NOT NULL, field_type VARCHAR(12) NOT NULL DEFAULT "text", active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0)'
+        : 'CREATE TABLE IF NOT EXISTS anamnesis_text_field_definitions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, field_key VARCHAR(80) NOT NULL UNIQUE, name VARCHAR(512) NOT NULL, field_type VARCHAR(12) NOT NULL DEFAULT "text", active TINYINT(1) NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    $defaults = [
+        ['complaint', 'ŞİKAYETİNİZ NEDİR ?', 'text', 1],
+        ['duration', 'KAÇ YILDIR ŞİKAYETİNİZ VAR', 'text', 2],
+        ['profession', 'MESLEĞİNİZİ ÖĞRENEBİLİR MİYİZ', 'text', 3],
+        ['city', 'MEMLEKETİNİZ VE YAŞADIĞINIZ ŞEHİR', 'text', 90],
+        ['otoscopic', 'ODY OTOSKOPİK İNCELEME SONUCU', 'area', 91],
+        ['advice', 'ODY GÖRÜŞ VE TAVSİYESİ', 'area', 92],
+    ];
+    if ((int)$pdo->query('SELECT COUNT(*) FROM anamnesis_text_field_definitions')->fetchColumn() === 0) {
+        $insert = $pdo->prepare('INSERT INTO anamnesis_text_field_definitions(field_key,name,field_type,active,sort_order) VALUES(?,?,?,?,?)');
+        foreach ($defaults as [$key, $name, $type, $sort]) $insert->execute([$key, $name, $type, 1, $sort]);
+    }
+    return $pdo->query('SELECT * FROM anamnesis_text_field_definitions ORDER BY sort_order,name')->fetchAll();
+}
+
 function anamnesis_print_settings(): array
 {
     $pdo = db();

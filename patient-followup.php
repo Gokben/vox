@@ -46,6 +46,7 @@ ensure_patient_source_schema();
 ensure_patient_staff_yeliz_schema();
 $staffNames = patient_staff_names(true);
 $anamnesisQuestions = array_values(array_filter(anamnesis_question_definitions(), static fn(array $question): bool => (int)$question['active'] === 1));
+$anamnesisTextFields = array_values(array_filter(anamnesis_text_field_definitions(), static fn(array $field): bool => (int)$field['active'] === 1));
 $anamnesisPrintSettings = anamnesis_print_settings();
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 $pdo->exec($sqlite
@@ -2001,7 +2002,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 
   let saved = {};
   try { saved = JSON.parse(<?=json_encode((string)$form['anamnesis_form'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?> || '{}') || {}; } catch (_) {}
-  const fields = [
+  let fields = [
     ['complaint','Şikayetiniz nedir?','text'], ['duration','Kaç yıldır şikayetiniz var?','text'],
     ['profession','Mesleğinizi öğrenebilir miyiz?','text'], ['noise','Gürültülü ortamlarda çalıştınız mı?','yesno'],
     ['loud_noise','Yüksek ses eşiği maruz kalır mısınız?','yesno'], ['childhood','Çocukken ateşli hastalık geçirdiniz mi?','yesno'],
@@ -2019,6 +2020,12 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno', question.detail_label || '']),
     ...fixedFields.slice(3)
   );
+  const editableTextFields = <?=json_encode($anamnesisTextFields, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  fields = [
+    ...editableTextFields.filter(field => Number(field.sort_order) < 50).map(field => [field.field_key, field.name, field.field_type]),
+    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno', question.detail_label || '']),
+    ...editableTextFields.filter(field => Number(field.sort_order) >= 50).map(field => [field.field_key, field.name, field.field_type])
+  ];
   const modal = document.createElement('div');
   modal.id = 'anamnesis-card-modal'; modal.hidden = true;
   modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print">Yazdır</button><button type="button" class="button anamnesis-apply">Formu Aktar</button></footer></section>`;
