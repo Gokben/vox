@@ -25,6 +25,11 @@ $socialSecurity = trim((string)($patient['social_security'] ?? ''));
 $socialSecuritySupport = $moneyNumber($sale['sales_device_sgk'] ?? 0);
 if (trim((string)($sale['sales_device_2_model'] ?? '')) !== '') $socialSecuritySupport += $moneyNumber($sale['sales_device_2_sgk'] ?? 0);
 $socialSecuritySupportText = $socialSecuritySupport > 0 ? number_format($socialSecuritySupport, 2, ',', '.') . ' ₺' : '—';
+$sgkExcludingTotal = max(0, $hearingDeviceTotal - $socialSecuritySupport);
+$sgkExcludingTotalText = $sgkExcludingTotal > 0 ? number_format($sgkExcludingTotal, 2, ',', '.') . ' ₺' : '—';
+$discountTotal = $moneyNumber($sale['sales_total_discount_rate'] ?? $sale['sales_device_discount_rate'] ?? 0);
+$pureDeviceTotal = max(0, $sgkExcludingTotal - $discountTotal);
+$pureDeviceTotalText = $pureDeviceTotal > 0 ? number_format($pureDeviceTotal, 2, ',', '.') . ' ₺' : '—';
 $anamnesis = trim((string)($latest['complaint'] ?? $patient['anamnesis'] ?? $patient['notes'] ?? ''));
 patient_header('Hasta Bilgi Formu');
 ?>
@@ -87,6 +92,20 @@ patient_header('Hasta Bilgi Formu');
     cells[0].textContent = 'Sosyal Güvence';
     cells[1].textContent = <?= json_encode($socialSecurity ?: '—', JSON_UNESCAPED_UNICODE) ?>;
     cells[2].textContent = <?= json_encode($socialSecuritySupportText, JSON_UNESCAPED_UNICODE) ?>;
+  }
+
+  const sgkExcludingRow = salesTable.querySelector(':scope > div:nth-child(5)');
+  if (sgkExcludingRow) {
+    const cells = sgkExcludingRow.children;
+    cells[1].textContent = 'SGK (Hariç)';
+    cells[2].textContent = <?= json_encode($sgkExcludingTotalText, JSON_UNESCAPED_UNICODE) ?>;
+  }
+
+  const salesTotal = document.querySelector('.sales-total-summary');
+  if (salesTotal) {
+    const cells = salesTotal.children;
+    cells[0].textContent = 'Salt Cihaz';
+    cells[1].textContent = <?= json_encode($pureDeviceTotalText, JSON_UNESCAPED_UNICODE) ?>;
   }
 })();
 </script>
