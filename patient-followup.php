@@ -57,7 +57,7 @@ if ((int)$pdo->query('SELECT COUNT(*) FROM service_card_type_definitions')->fetc
 }
 $serviceCardTypes = $pdo->query('SELECT * FROM service_card_type_definitions WHERE active=1 ORDER BY sort_order,name')->fetchAll();
 
-$extraColumns = ['record_no VARCHAR(60) NULL','appointment_date DATE NULL','start_time VARCHAR(10) NULL','end_time VARCHAR(10) NULL','service_type VARCHAR(150) NULL','service_location VARCHAR(150) NULL','branch_id INT NULL','contact_person VARCHAR(190) NULL','appointment_status VARCHAR(100) NULL','complaint TEXT NULL','observation TEXT NULL','service_name VARCHAR(150) NULL','stock_id BIGINT NULL','sales_details TEXT NULL','sales_locked TINYINT(1) NOT NULL DEFAULT 0','result_name VARCHAR(100) NULL','related_personnel TEXT NULL','satisfaction TINYINT NULL','action_name VARCHAR(150) NULL','repair_details TEXT NULL','description TEXT NULL'];
+$extraColumns = ['record_no VARCHAR(60) NULL','appointment_date DATE NULL','start_time VARCHAR(10) NULL','end_time VARCHAR(10) NULL','service_type VARCHAR(150) NULL','service_location VARCHAR(150) NULL','branch_id INT NULL','contact_person VARCHAR(190) NULL','appointment_status VARCHAR(100) NULL','complaint TEXT NULL','anamnesis_form TEXT NULL','observation TEXT NULL','service_name VARCHAR(150) NULL','stock_id BIGINT NULL','sales_details TEXT NULL','sales_locked TINYINT(1) NOT NULL DEFAULT 0','result_name VARCHAR(100) NULL','related_personnel TEXT NULL','satisfaction TINYINT NULL','action_name VARCHAR(150) NULL','repair_details TEXT NULL','description TEXT NULL'];
 $knownColumns = $sqlite ? array_column($pdo->query('PRAGMA table_info(patient_services)')->fetchAll(), 'name') : array_column($pdo->query('SHOW COLUMNS FROM patient_services')->fetchAll(), 'Field');
 foreach ($extraColumns as $definition) {
     $column = explode(' ', $definition, 2)[0];
@@ -684,7 +684,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'start_time'=>(string)($_POST['start_time'] ?? ''), 'end_time'=>(string)($_POST['end_time'] ?? ''),
         'service_type'=>trim((string)($_POST['service_type'] ?? '')), 'service_location'=>trim((string)($_POST['service_location'] ?? '')),
         'branch_id'=>(int)($_POST['branch_id'] ?? 0), 'contact_person'=>trim((string)($_POST['contact_person'] ?? '')),
-        'appointment_status'=>trim((string)($_POST['appointment_status'] ?? '')), 'complaint'=>trim((string)($_POST['complaint'] ?? '')),
+        'appointment_status'=>trim((string)($_POST['appointment_status'] ?? '')), 'complaint'=>trim((string)($_POST['complaint'] ?? '')), 'anamnesis_form'=>(string)($_POST['anamnesis_form'] ?? ''),
         'observation'=>trim((string)($_POST['observation'] ?? '')), 'service_name'=>$postedServiceName, 'stock_id'=>$postedServiceName === 'Satış' && $postedStockId > 0 ? $postedStockId : null,
         'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
         'action_name'=>trim((string)($_POST['action_name'] ?? '')), 'repair_details'=>$postedRepairDetailsJson, 'sales_details'=>$postedServiceName === 'Satış' ? $postedSalesDetailsJson : null, 'description'=>trim((string)($_POST['description'] ?? '')),
@@ -870,7 +870,7 @@ patient_header('Hizmetler', 'patients');
 if ($serviceIntegrityError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>alert(<?=json_encode($serviceIntegrityError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0));</script><?php endif;
 if ($incomeValidationError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const openIncome=()=>{const form=document.querySelector('form[action*="cash.php"]'),modal=form?.parentElement;if(!modal){setTimeout(openIncome,50);return;}modal.hidden=false;modal.style.display='grid';setTimeout(()=>alert(<?=json_encode($incomeValidationError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0);};openIncome();},350));</script><?php endif;
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
-$form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
+$form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'anamnesis_form'=>'','observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
 if ($form['result_name'] === 'Red') $form['result_name'] = 'Ret';
 if ($editId && trim((string)$form['service_location']) === '') $form['service_location'] = (string)($patient['service_location'] ?? '');
 if ($editId && trim((string)$form['complaint']) === '') $form['complaint'] = (string)($patient['anamnesis'] ?? '');
@@ -1988,4 +1988,54 @@ form[action*="cash.php"] section label:has([name="current_account_id"]){grid-col
 form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;height:40px!important;min-height:40px!important;padding:8px 10px!important;box-sizing:border-box!important;visibility:visible!important;opacity:1!important}
 form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minmax(0,1fr) minmax(280px,1fr)!important}
 </style>
+<?php if ($showForm): ?>
+<script>
+(() => {
+  const serviceForm = document.getElementById('service-card-form');
+  const complaint = serviceForm?.querySelector('[name="complaint"]');
+  const anamnesisIcon = complaint?.closest('.service-input-with-icon')?.querySelector('.service-input-icon');
+  if (!serviceForm || !complaint || !anamnesisIcon) return;
+
+  let saved = {};
+  try { saved = JSON.parse(<?=json_encode((string)$form['anamnesis_form'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?> || '{}') || {}; } catch (_) {}
+  const fields = [
+    ['complaint','Şikayetiniz nedir?','text'], ['duration','Kaç yıldır şikayetiniz var?','text'],
+    ['profession','Mesleğinizi öğrenebilir miyiz?','text'], ['noise','Gürültülü ortamlarda çalıştınız mı?','yesno'],
+    ['loud_noise','Yüksek ses eşiği maruz kalır mısınız?','yesno'], ['childhood','Çocukken ateşli hastalık geçirdiniz mi?','yesno'],
+    ['family','Ailede işitme kaybı olan birisi var mı?','yesno'], ['ear_operation','Daha önce kulak ameliyatı oldunuz mu?','yesno'],
+    ['chronic_ear','Teşhisi konmuş kronik bir kulak hastalığınız var mı?','yesno'], ['chronic_other','Kronik başka bir hastalığınız var mı?','yesno'],
+    ['tremor','Ellerinizde titremesi veya görme bozukluğunuz var mı?','yesno'], ['daily_help','Günlük işlerinizde size yardımcı olan birisi var mı?','yesno'],
+    ['doctor_referral','İşitme cihazı için danıştınız mı?','yesno'], ['previous_device','Daha önce işitme cihazı kullandınız mı?','yesno'],
+    ['device_user_nearby','Çevrenizde işitme cihazı kullanan birisi var mı?','yesno'], ['device_prejudice','İşitme cihazı ile ilgili ön yargılarınız veya endişeleriniz var mı?','yesno'],
+    ['city','Memleketiniz ve yaşadığınız şehir','text'], ['otoscopic','ODY otoskopik inceleme sonucu','area'], ['advice','ODY görüş ve tavsiyesi','area']
+  ];
+  const modal = document.createElement('div');
+  modal.id = 'anamnesis-card-modal'; modal.hidden = true;
+  modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print">Yazdır</button><button type="button" class="button anamnesis-apply">Formu Aktar</button></footer></section>`;
+  document.body.append(modal);
+  const grid = modal.querySelector('.anamnesis-grid');
+  fields.forEach(([key, label, type]) => {
+    const row = document.createElement('label'); row.className = 'anamnesis-row';
+    const caption = document.createElement('span'); caption.textContent = label;
+    let control;
+    if (type === 'yesno') { control = document.createElement('select'); control.innerHTML = '<option value="">Seçiniz</option><option>Evet</option><option>Hayır</option>'; }
+    else if (type === 'area') control = document.createElement('textarea');
+    else { control = document.createElement('input'); control.type = 'text'; }
+    control.name = key; control.value = saved[key] || ''; row.append(caption, control); grid.append(row);
+  });
+  const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'anamnesis_form'; hidden.value = JSON.stringify(saved);
+  serviceForm.append(hidden);
+  const close = () => { modal.hidden = true; };
+  const collect = () => Object.fromEntries(fields.map(([key]) => [key, modal.querySelector(`[name="${key}"]`)?.value.trim() || '']));
+  anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
+  anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; });
+  modal.querySelectorAll('header button,.anamnesis-cancel,.anamnesis-backdrop').forEach(button => button.addEventListener('click', close));
+  modal.querySelector('.anamnesis-apply').addEventListener('click', () => { hidden.value = JSON.stringify(collect()); modal.hidden = true; });
+  modal.querySelector('.anamnesis-print').addEventListener('click', () => { hidden.value = JSON.stringify(collect()); window.print(); });
+})();
+</script>
+<style>
+#anamnesis-card-modal[hidden]{display:none!important}#anamnesis-card-modal{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;padding:20px}.anamnesis-backdrop{position:absolute;inset:0;background:rgba(28,30,40,.56)}.anamnesis-dialog{position:relative;width:min(900px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:8px;color:#182438;box-shadow:0 18px 46px rgba(0,0,0,.28)}.anamnesis-dialog header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #d9dde5}.anamnesis-dialog h2{margin:0;color:#14843c;font-size:21px}.anamnesis-dialog header button{border:0;background:transparent;font-size:28px;color:#777;cursor:pointer}.anamnesis-meta{display:flex;justify-content:space-between;padding:14px 24px;background:#f7faf8}.anamnesis-grid{padding:20px 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}.anamnesis-row{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;align-items:center;font-size:13px}.anamnesis-row span{line-height:1.25}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #bfc6d2;border-radius:4px;padding:6px;font:inherit}.anamnesis-row textarea{height:60px;resize:vertical}.anamnesis-row:has(textarea){grid-column:1/-1;grid-template-columns:220px minmax(0,1fr)}.anamnesis-dialog footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid #d9dde5}.anamnesis-dialog footer button{border:0;border-radius:5px;padding:10px 15px;cursor:pointer}.anamnesis-print{background:#30435d;color:#fff}.anamnesis-cancel{background:#e6525d;color:#fff}@media(max-width:680px){.anamnesis-grid{grid-template-columns:1fr}.anamnesis-row:has(textarea){grid-column:auto;grid-template-columns:1fr}.anamnesis-meta{gap:8px;flex-direction:column}}@media print{body>*{display:none!important}#anamnesis-card-modal{position:static!important;display:block!important;padding:0!important}#anamnesis-card-modal .anamnesis-backdrop,#anamnesis-card-modal header button,#anamnesis-card-modal footer{display:none!important}.anamnesis-dialog{width:100%!important;max-height:none!important;box-shadow:none!important;border-radius:0!important}.anamnesis-grid{gap:6px 10px!important;padding:12px!important}.anamnesis-row{font-size:11px!important}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{border:1px solid #222!important;border-radius:0!important}}
+</style>
+<?php endif; ?>
 <?php patient_footer(); ?>
