@@ -2028,6 +2028,13 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   modal.style.setProperty('--anamnesis-header-color', printSettings.header_color || '#14843c');
   modal.style.setProperty('--anamnesis-font-size', String(printSettings.font_size || 11) + 'px');
   modal.style.setProperty('--anamnesis-question-font-size', String(printSettings.question_font_size || 11) + 'px');
+  let printLayout = {};
+  try { printLayout = JSON.parse(printSettings.layout || '{}') || {}; } catch (_) {}
+  ['header', 'meta', 'questions'].forEach(key => {
+    const position = printLayout[key] || {};
+    modal.style.setProperty('--anamnesis-' + key + '-x', String(position.x ?? 0) + '%');
+    modal.style.setProperty('--anamnesis-' + key + '-y', String(position.y ?? 0) + '%');
+  });
   const grid = modal.querySelector('.anamnesis-grid');
   fields.forEach(([key, label, type]) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
@@ -2070,5 +2077,6 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-dialog h2{color:var(--anamnesis-header-color,#14843c)!important}
 #anamnesis-card-modal .anamnesis-dialog{font-size:var(--anamnesis-font-size,11px)}
 #anamnesis-card-modal .anamnesis-row{font-size:var(--anamnesis-question-font-size,11px)}
+@media print{#anamnesis-card-modal .anamnesis-dialog{position:relative!important;min-height:297mm!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:absolute!important;width:84%!important;margin:0!important}#anamnesis-card-modal .anamnesis-dialog>header{left:var(--anamnesis-header-x,0)!important;top:var(--anamnesis-header-y,0)!important}#anamnesis-card-modal .anamnesis-meta{left:var(--anamnesis-meta-x,0)!important;top:var(--anamnesis-meta-y,0)!important}#anamnesis-card-modal .anamnesis-grid{left:var(--anamnesis-questions-x,0)!important;top:var(--anamnesis-questions-y,0)!important}}
 </style>
 <?php patient_footer(); ?>

@@ -31,7 +31,7 @@ function anamnesis_print_settings(): array
     $pdo->exec($sqlite
         ? 'CREATE TABLE IF NOT EXISTS anamnesis_print_settings (setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NULL)'
         : 'CREATE TABLE IF NOT EXISTS anamnesis_print_settings (setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
-    $defaults = ['title' => 'VOX İ.M. - HASTA KARTI', 'header_color' => '#14843c', 'font_size' => '11', 'question_font_size' => '11'];
+    $defaults = ['title' => 'VOX İ.M. - HASTA KARTI', 'header_color' => '#14843c', 'font_size' => '11', 'question_font_size' => '11', 'layout' => '{"header":{"x":8,"y":7},"meta":{"x":8,"y":17},"questions":{"x":8,"y":27},"footer":{"x":8,"y":91}}'];
     $statement = $pdo->query('SELECT setting_key,setting_value FROM anamnesis_print_settings');
     foreach ($statement->fetchAll(PDO::FETCH_KEY_PAIR) as $key => $value) if (array_key_exists($key, $defaults)) $defaults[$key] = (string)$value;
     return $defaults;
