@@ -1164,6 +1164,7 @@ document.addEventListener('click',async event=>{
       if (!payment) return;
       payment.value = selectedPaymentType;
       payment.dispatchEvent(new Event('change', {bubbles:true}));
+      cashForm.dispatchEvent(new CustomEvent('repair-payment-change', {bubbles:true}));
     };
     applyRepairPaymentType();
     // Ortak gelir penceresinin satışa ait yerleşim betikleri çalıştıktan sonra da
@@ -1427,7 +1428,7 @@ const initializeSalesScreen=()=>{
   const syncPaymentFields=(scope,paymentType)=>{if(!scope)return;const extra=scope.matches?.('[data-extra-income]'),prefix=extra?'extra_':'',row=value=>String(Number(value)+(extra?1:0));const setLabel=(name,title,column,rowNumber,visible=true)=>{const field=scope.querySelector(`[name="${prefix}${name}"]`),label=field?.closest('label');if(!label)return;const textNode=[...label.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);if(textNode&&title)textNode.nodeValue=title;label.style.display=visible?'flex':'none';if(visible){label.style.gridColumn=column;label.style.gridRow=rowNumber;label.style.flexDirection='column';label.style.gap='5px';}};if(extra){const heading=scope.querySelector('strong');if(heading){heading.style.gridColumn='1/-1';heading.style.gridRow='1';}setLabel('payment_type','Ödeme Şekli','1/-1','2');}setLabel('bank_name','Banka','1/2',row(2),paymentType==='credit_card'||paymentType==='mail_order');setLabel('current_account_id','Cari Hesap','2/3',row(2),paymentType==='mail_order');setLabel('installment_count',paymentType==='term'?'Vade Sayısı':'KK Taksit Sayısı',paymentType==='term'?'1/2':'2/3',row(2),paymentType==='credit_card'||paymentType==='term');setLabel('commission_rate',paymentType==='term'?'Aylık Ödeme':'Komisyon Oranı',paymentType==='term'?'2/3':'2/3',row(paymentType==='term'?2:3),paymentType==='credit_card'||paymentType==='term');setLabel('amount',paymentType==='term'?'Toplam':'Tutar',paymentType==='credit_card'?'1/2':'1/-1',row(paymentType==='credit_card'?3:3),true);};
   const salesPaymentToCashType=value=>({'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'}[value]||'');
   const hidePrimaryTermMonthlyField=()=>{if(paymentSelect?.value!=='Vadeli')return;commissionLabel?.remove();const section=cashSourceForm?.querySelector('section'),totalLabel=cashSourceForm?.querySelector('[name="amount"]')?.closest('label');if(section)section.style.setProperty('grid-template-columns','repeat(2,minmax(0,1fr))','important');if(totalLabel){const textNode=[...totalLabel.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);if(textNode)textNode.nodeValue='Toplam';totalLabel.style.setProperty('display','flex','important');totalLabel.style.setProperty('grid-column','2 / 3','important');totalLabel.style.setProperty('grid-row','2','important');}};paymentSelect?.addEventListener('change',()=>setTimeout(hidePrimaryTermMonthlyField,0));setTimeout(hidePrimaryTermMonthlyField,0);
-  const syncPrimaryPaymentFields=()=>{const type=cashPaymentSelect?.value||salesPaymentToCashType(paymentSelect?.value||'')||'cash';syncPaymentFields(cashSourceForm,type);};
+  const syncPrimaryPaymentFields=()=>{const type=cashSourceForm?.dataset.forcedPaymentType||cashPaymentSelect?.value||salesPaymentToCashType(paymentSelect?.value||'')||'cash';syncPaymentFields(cashSourceForm,type);};
   paymentSelect?.addEventListener('change',syncPrimaryPaymentFields);cashIconLink?.addEventListener('click',()=>setTimeout(syncPrimaryPaymentFields,0));cashSourceForm?.addEventListener('change',event=>{if(event.target.matches('[name="extra_payment_type"]'))syncPaymentFields(event.target.closest('[data-extra-income]'),event.target.value);});new MutationObserver(()=>{const extraPayment=cashSourceForm?.querySelector('[name="extra_payment_type"]');if(extraPayment)syncPaymentFields(extraPayment.closest('[data-extra-income]'),extraPayment.value);}).observe(cashSourceForm||document.body,{childList:true,subtree:true});syncPrimaryPaymentFields();
   const alignExtraPaymentFields=()=>{const extraSection=cashSourceForm?.querySelector('[data-extra-income]');if(!extraSection)return;extraSection.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';syncPaymentFields(extraSection,extraSection.querySelector('[name="extra_payment_type"]')?.value||'cash');const description=extraSection.querySelector('[name="extra_description"]');if(description&&(description.value.trim()===''||description.value.trim()==='Satış tahsilatı'))description.value=<?=json_encode($patient['full_name'] . ' — Satış tahsilatı', JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;};new MutationObserver(alignExtraPaymentFields).observe(cashSourceForm||document.body,{childList:true,subtree:true});alignExtraPaymentFields();
   const placeExtraAmountBeforeDescription=()=>{const extraSection=cashSourceForm?.querySelector('[data-extra-income]');if(!extraSection)return;const type=extraSection.querySelector('[name="extra_payment_type"]')?.value||'cash',amountLabel=extraSection.querySelector('[name="extra_amount"]')?.closest('label'),descriptionLabel=extraSection.querySelector('[name="extra_description"]')?.closest('label');if(amountLabel){amountLabel.style.gridColumn='1/-1';amountLabel.style.gridRow=type==='cash'?'3':'4';}if(descriptionLabel){descriptionLabel.style.gridColumn='1/-1';descriptionLabel.style.gridRow=type==='cash'?'4':'5';}};new MutationObserver(placeExtraAmountBeforeDescription).observe(cashSourceForm||document.body,{childList:true,subtree:true});cashSourceForm?.addEventListener('change',event=>{if(event.target.matches('[name="extra_payment_type"]'))placeExtraAmountBeforeDescription();});placeExtraAmountBeforeDescription();
@@ -1820,5 +1821,36 @@ document.addEventListener('click',event=>{
   modal.hidden=true;
   modal.setAttribute('aria-hidden','true');
 },true);
+</script>
+<script>
+// Teknik servis tahsilatında, satış ekranının kredi kartı yerleşimi geçerli değildir.
+// Ortak gelir penceresini seçilen tahsilat türüne göre son kez düzenler.
+document.addEventListener('DOMContentLoaded', () => {
+  const cashForm = document.querySelector('form[action*="cash.php"]');
+  if (!cashForm) return;
+  const refreshRepairPayment = () => {
+    const type = cashForm.dataset.forcedPaymentType;
+    if (!type) return;
+    const payment = cashForm.querySelector('[name="payment_type"]');
+    if (payment) payment.value = type;
+    const setLabel = (name, visible, column, row) => {
+      const label = cashForm.querySelector(`[name="${name}"]`)?.closest('label');
+      if (!label) return;
+      label.hidden = !visible;
+      label.style.setProperty('display', visible ? 'flex' : 'none', 'important');
+      if (visible) {
+        label.style.setProperty('grid-column', column, 'important');
+        label.style.setProperty('grid-row', row, 'important');
+      }
+    };
+    setLabel('bank_name', type === 'mail_order' || type === 'credit_card', '1 / 2', '2');
+    setLabel('current_account_id', type === 'mail_order', '2 / 3', '2');
+    setLabel('installment_count', type === 'credit_card' || type === 'term', type === 'term' ? '1 / 2' : '2 / 3', '2');
+    setLabel('commission_rate', type === 'credit_card' || type === 'term', '2 / 3', '3');
+    setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', type === 'credit_card' ? '3' : '3');
+    setLabel('description', true, '1 / -1', '4');
+  };
+  cashForm.addEventListener('repair-payment-change', () => [0, 80, 250].forEach(delay => setTimeout(refreshRepairPayment, delay)));
+});
 </script>
 <?php patient_footer(); ?>
