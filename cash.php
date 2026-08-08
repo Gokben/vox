@@ -2,10 +2,12 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
-// Kasa yalnızca BB Yönetim Paneli'nden açılır. Doğrudan Vox URL'si kullanılamaz.
+// Ana Kasa yalnızca BB Yönetim Paneli'nden açılır; Ön Kasa kendi ekranını korur.
 $cashRequestedFromBb = str_ends_with(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/bb/cash.php');
-if (!$cashRequestedFromBb) redirect('bb/cash.php');
-require_admin();
+$preCashRequested = str_ends_with(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/cash-pre.php');
+if (!$cashRequestedFromBb && !$preCashRequested) redirect('bb/cash.php');
+if ($cashRequestedFromBb) require_admin();
+else require_login();
 require __DIR__ . '/cash-bootstrap.php';
 require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
