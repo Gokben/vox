@@ -405,6 +405,16 @@ $saleProductDeleteLocked = $serviceNameLocked;
 $savedCashPaymentType = '';
 $savedCashRecord = [];
 $savedCashRecords = [];
+$savedRepairFeeCash = false;
+if ($editId > 0 && trim((string)($serviceCard['service_name'] ?? '')) === 'Tamir') {
+    try {
+        $repairCashStatement = $pdo->prepare("SELECT 1 FROM cash_transactions WHERE source_url=? AND transaction_type='income' LIMIT 1");
+        $repairCashStatement->execute([url('patient-followup.php?id=' . $id) . '&repair=' . $editId]);
+        $savedRepairFeeCash = (bool)$repairCashStatement->fetchColumn();
+    } catch (Throwable $exception) {
+        $savedRepairFeeCash = false;
+    }
+}
 if (trim((string)($serviceCard['service_name'] ?? '')) === 'Satış') {
     try {
         $cashPaymentStatement = $pdo->prepare("SELECT id,transaction_date,amount,description,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule FROM cash_transactions WHERE source_url=? AND transaction_type='income' ORDER BY transaction_date,id");
@@ -1172,6 +1182,7 @@ document.addEventListener('click',async event=>{
       if (!payment) return;
       payment.value = selectedPaymentType;
       payment.dispatchEvent(new Event('change', {bubbles:true}));
+      if (cashAmount) cashAmount.value = serviceFee?.value || '';
       cashForm.dispatchEvent(new CustomEvent('repair-payment-change', {bubbles:true}));
     };
     applyRepairPaymentType();
@@ -1212,6 +1223,7 @@ document.addEventListener('click',async event=>{
   const restore = () => { try { const values = JSON.parse(details.value || '{}'); controls.forEach(control => { const value = values[control.name]; if (control.type === 'checkbox') control.checked = Array.isArray(value) ? value.includes(control.value) : Boolean(value); else if (value !== undefined) control.value = value; }); } catch (_) {} };
   const persist = () => { const values = {}; controls.forEach(control => { if (control.type === 'checkbox') { if (control.name.endsWith('[]')) { (values[control.name] ||= []); if (control.checked) values[control.name].push(control.value); } else values[control.name] = control.checked; } else values[control.name] = control.value; }); details.value = JSON.stringify(values); };
   restore();
+  if (!<?=json_encode($savedRepairFeeCash)?> && serviceFee) serviceFee.value = '';
   syncRepairTechnician();
   formatServiceFee();
   serviceName.addEventListener('change', () => { if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open(); });
