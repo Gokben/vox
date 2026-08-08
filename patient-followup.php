@@ -1169,7 +1169,6 @@ document.addEventListener('click',async event=>{
         repairId = savedEditId;
         const editInput = form.querySelector('[name="edit_id"]');
         if (editInput) editInput.value = String(savedEditId);
-        history.replaceState(null, '', responseUrl.pathname + responseUrl.search);
       }
     } catch (error) { alert(error.message || 'Hizmet bedeli kaydedilemedi.'); return; }
     if (!repairId) { alert('Tamir kartı kaydedilemedi. Lütfen tekrar deneyin.'); return; }
