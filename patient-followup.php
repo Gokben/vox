@@ -1186,7 +1186,9 @@ document.addEventListener('click',async event=>{
     serviceFeePayment.addEventListener('change', () => {
       syncIncomeButton();
       const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
-      if (serviceFeePayment.value === 'Kredi Kartı' && amount > 0) openRepairFeeIncome();
+      if (['Kredi Kartı', 'Mail Order', 'Vadeli'].includes(serviceFeePayment.value) && amount > 0) {
+        setTimeout(openRepairFeeIncome, 0);
+      }
     });
     syncIncomeButton();
     const footer = modal.querySelector('footer');
