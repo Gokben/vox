@@ -1154,7 +1154,7 @@ document.addEventListener('click',async event=>{
       label.append(input); deliveryTab.insertBefore(label, deliveryTab.querySelector('.repair-grid'));
       controls.push(input);
     };
-    addDateField('repair_service_return_date', 'Servisten Gelme');
+    addDateField('repair_service_return_date', 'Servisten Dönüş');
     addDateField('repair_patient_delivery_date', 'Hasta Teslim');
   }
   const warrantyLabel = deliveryTab?.querySelector('[name="repair_warranty"]')?.closest('label');
