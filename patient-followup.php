@@ -2028,6 +2028,13 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   modal.style.setProperty('--anamnesis-header-color', printSettings.header_color || '#14843c');
   modal.style.setProperty('--anamnesis-font-size', String(printSettings.font_size || 11) + 'px');
   modal.style.setProperty('--anamnesis-question-font-size', String(printSettings.question_font_size || 11) + 'px');
+  modal.style.setProperty('--anamnesis-page-margin', String(printSettings.page_margin || 20) + 'mm');
+  modal.style.setProperty('--anamnesis-question-width', String(printSettings.question_width || 46) + '%');
+  modal.style.setProperty('--anamnesis-yes-width', String(printSettings.yes_width || 12) + '%');
+  modal.style.setProperty('--anamnesis-detail-width', String(printSettings.detail_width || 20) + '%');
+  modal.style.setProperty('--anamnesis-row-height', String(printSettings.row_height || 27) + 'px');
+  modal.style.setProperty('--anamnesis-notes-height', String(printSettings.notes_height || 37) + 'px');
+  modal.style.setProperty('--anamnesis-line-width', String(printSettings.line_width || 1) + 'px');
   let printLayout = {};
   try { printLayout = JSON.parse(printSettings.layout || '{}') || {}; } catch (_) {}
   ['header', 'meta', 'questions'].forEach(key => {
@@ -2112,5 +2119,13 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row textarea{grid-column:2!important;width:100%!important;height:auto!important;min-height:65px!important;border:0!important;border-radius:0!important;padding:6px!important}
 @media print{#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:static!important;width:auto!important;margin:0!important}#anamnesis-card-modal .anamnesis-dialog{min-height:0!important;width:100%!important;border:1px solid #222!important}#anamnesis-card-modal .anamnesis-row{font-size:9px!important}#anamnesis-card-modal .anamnesis-row>span{font-size:9px!important}}
 @media print{#anamnesis-card-modal .anamnesis-dialog{position:relative!important;min-height:297mm!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:absolute!important;width:84%!important;margin:0!important}#anamnesis-card-modal .anamnesis-dialog>header{left:var(--anamnesis-header-x,0)!important;top:var(--anamnesis-header-y,0)!important}#anamnesis-card-modal .anamnesis-meta{left:var(--anamnesis-meta-x,0)!important;top:var(--anamnesis-meta-y,0)!important}#anamnesis-card-modal .anamnesis-grid{left:var(--anamnesis-questions-x,0)!important;top:var(--anamnesis-questions-y,0)!important}}
+/* Tablo tasarım panelinden gelen baskı ölçüleri. Eski serbest blok konumları baskıda kullanılmaz. */
+#anamnesis-card-modal .anamnesis-dialog{border-width:var(--anamnesis-line-width,1px)!important}
+#anamnesis-card-modal .anamnesis-dialog>header{border-bottom-width:calc(var(--anamnesis-line-width,1px) * 2)!important}
+#anamnesis-card-modal .anamnesis-meta{border-bottom-width:var(--anamnesis-line-width,1px)!important}
+#anamnesis-card-modal .anamnesis-row{grid-template-columns:var(--anamnesis-question-width,48%) var(--anamnesis-yes-width,12%) var(--anamnesis-detail-width,20%) minmax(0,1fr)!important;min-height:var(--anamnesis-row-height,34px)!important;border-bottom-width:var(--anamnesis-line-width,1px)!important}
+#anamnesis-card-modal .anamnesis-row>span{border-right-width:var(--anamnesis-line-width,1px)!important}
+#anamnesis-card-modal .anamnesis-row:has(textarea){min-height:var(--anamnesis-notes-height,65px)!important}
+@media print{#anamnesis-card-modal{padding:var(--anamnesis-page-margin,20mm)!important;box-sizing:border-box!important}#anamnesis-card-modal .anamnesis-dialog{position:static!important;min-height:0!important;width:100%!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:static!important;width:auto!important;margin:0!important}}
 </style>
 <?php patient_footer(); ?>
