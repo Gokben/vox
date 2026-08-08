@@ -2016,17 +2016,30 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   const grid = modal.querySelector('.anamnesis-grid');
   fields.forEach(([key, label, type]) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
+    if (key === 'complaint' || key === 'profession') row.classList.add('anamnesis-wide');
     const caption = document.createElement('span'); caption.textContent = label;
     let control;
-    if (type === 'yesno') { control = document.createElement('select'); control.innerHTML = '<option value="">Seçiniz</option><option>Evet</option><option>Hayır</option>'; }
+    if (type === 'yesno') {
+      const yes = document.createElement('span'); yes.className = 'anamnesis-yes';
+      control = document.createElement('input'); control.type = 'checkbox'; control.checked = saved[key] === true || saved[key] === 'Evet';
+      yes.append(control, document.createTextNode(' Evet')); control = yes;
+    }
     else if (type === 'area') control = document.createElement('textarea');
     else { control = document.createElement('input'); control.type = 'text'; }
-    control.name = key; control.value = saved[key] || ''; row.append(caption, control); grid.append(row);
+    const field = control.matches?.('input,textarea,select') ? control : control.querySelector('input');
+    field.name = key;
+    if (field.type !== 'checkbox') field.value = saved[key] || '';
+    if (key === 'complaint') field.maxLength = 512;
+    if (key === 'duration') field.maxLength = 2;
+    row.append(caption, control); grid.append(row);
   });
   const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'anamnesis_form'; hidden.value = JSON.stringify(saved);
   serviceForm.append(hidden);
   const close = () => { modal.hidden = true; };
-  const collect = () => Object.fromEntries(fields.map(([key]) => [key, modal.querySelector(`[name="${key}"]`)?.value.trim() || '']));
+  const collect = () => Object.fromEntries(fields.map(([key]) => {
+    const field = modal.querySelector(`[name="${key}"]`);
+    return [key, field?.type === 'checkbox' ? (field.checked ? 'Evet' : '') : (field?.value.trim() || '')];
+  }));
   anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
   anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; });
   modal.querySelectorAll('header button,.anamnesis-cancel,.anamnesis-backdrop').forEach(button => button.addEventListener('click', close));
@@ -2035,7 +2048,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 })();
 </script>
 <style>
-#anamnesis-card-modal[hidden]{display:none!important}#anamnesis-card-modal{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;padding:20px}.anamnesis-backdrop{position:absolute;inset:0;background:rgba(28,30,40,.56)}.anamnesis-dialog{position:relative;width:min(900px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:8px;color:#182438;box-shadow:0 18px 46px rgba(0,0,0,.28)}.anamnesis-dialog header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #d9dde5}.anamnesis-dialog h2{margin:0;color:#14843c;font-size:21px}.anamnesis-dialog header button{border:0;background:transparent;font-size:28px;color:#777;cursor:pointer}.anamnesis-meta{display:flex;justify-content:space-between;padding:14px 24px;background:#f7faf8}.anamnesis-grid{padding:20px 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}.anamnesis-row{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;align-items:center;font-size:13px}.anamnesis-row span{line-height:1.25}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #bfc6d2;border-radius:4px;padding:6px;font:inherit}.anamnesis-row textarea{height:60px;resize:vertical}.anamnesis-row:has(textarea){grid-column:1/-1;grid-template-columns:220px minmax(0,1fr)}.anamnesis-dialog footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid #d9dde5}.anamnesis-dialog footer button{border:0;border-radius:5px;padding:10px 15px;cursor:pointer}.anamnesis-print{background:#30435d;color:#fff}.anamnesis-cancel{background:#e6525d;color:#fff}@media(max-width:680px){.anamnesis-grid{grid-template-columns:1fr}.anamnesis-row:has(textarea){grid-column:auto;grid-template-columns:1fr}.anamnesis-meta{gap:8px;flex-direction:column}}@media print{body>*{display:none!important}#anamnesis-card-modal{position:static!important;display:block!important;padding:0!important}#anamnesis-card-modal .anamnesis-backdrop,#anamnesis-card-modal header button,#anamnesis-card-modal footer{display:none!important}.anamnesis-dialog{width:100%!important;max-height:none!important;box-shadow:none!important;border-radius:0!important}.anamnesis-grid{gap:6px 10px!important;padding:12px!important}.anamnesis-row{font-size:11px!important}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{border:1px solid #222!important;border-radius:0!important}}
+#anamnesis-card-modal[hidden]{display:none!important}#anamnesis-card-modal{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;padding:20px}.anamnesis-backdrop{position:absolute;inset:0;background:rgba(28,30,40,.56)}.anamnesis-dialog{position:relative;width:min(900px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:8px;color:#182438;box-shadow:0 18px 46px rgba(0,0,0,.28)}.anamnesis-dialog header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #d9dde5}.anamnesis-dialog h2{margin:0;color:#14843c;font-size:21px}.anamnesis-dialog header button{border:0;background:transparent;font-size:28px;color:#777;cursor:pointer}.anamnesis-meta{display:flex;justify-content:space-between;padding:14px 24px;background:#f7faf8}.anamnesis-grid{padding:20px 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}.anamnesis-row{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:8px;align-items:center;font-size:13px}.anamnesis-row span{line-height:1.25}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{box-sizing:border-box;width:100%;min-height:34px;border:1px solid #bfc6d2;border-radius:4px;padding:6px;font:inherit}.anamnesis-row textarea{height:60px;resize:vertical}.anamnesis-row:has(textarea),.anamnesis-row.anamnesis-wide{grid-column:1/-1;grid-template-columns:220px minmax(0,1fr)}.anamnesis-yes{display:inline-flex!important;align-items:center;gap:6px;font-size:14px}.anamnesis-row .anamnesis-yes input{width:16px!important;min-height:16px!important;height:16px!important;margin:0!important;padding:0!important;accent-color:#19a94b}.anamnesis-row:has(input[name="duration"]){grid-template-columns:minmax(0,1fr) 45px}.anamnesis-dialog footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid #d9dde5}.anamnesis-dialog footer button{border:0;border-radius:5px;padding:10px 15px;cursor:pointer}.anamnesis-print{background:#30435d;color:#fff}.anamnesis-cancel{background:#e6525d;color:#fff}@media(max-width:680px){.anamnesis-grid{grid-template-columns:1fr}.anamnesis-row:has(textarea),.anamnesis-row.anamnesis-wide{grid-column:auto;grid-template-columns:1fr}.anamnesis-meta{gap:8px;flex-direction:column}}@media print{body>*{display:none!important}#anamnesis-card-modal{position:static!important;display:block!important;padding:0!important}#anamnesis-card-modal .anamnesis-backdrop,#anamnesis-card-modal header button,#anamnesis-card-modal footer{display:none!important}.anamnesis-dialog{width:100%!important;max-height:none!important;box-shadow:none!important;border-radius:0!important}.anamnesis-grid{gap:6px 10px!important;padding:12px!important}.anamnesis-row{font-size:11px!important}.anamnesis-row input,.anamnesis-row select,.anamnesis-row textarea{border:1px solid #222!important;border-radius:0!important}}
 </style>
 <?php endif; ?>
 <?php patient_footer(); ?>
