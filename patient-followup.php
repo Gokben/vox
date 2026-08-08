@@ -2102,8 +2102,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     return field;
   };
   const renderDesignerLayout = () => {
-    let layout = '';
-    try { layout = localStorage.getItem('vox-anamnesis-layout') || ''; } catch (_) {}
+    let layout = String(printSettings.designer_layout || '');
+    if (!layout) try { layout = localStorage.getItem('vox-anamnesis-layout') || ''; } catch (_) {}
     if (!layout) return false;
     const source = document.createElement('div');
     source.innerHTML = layout;

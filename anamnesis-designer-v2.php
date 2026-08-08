@@ -5,6 +5,13 @@ require __DIR__ . '/config.php';
 require_admin();
 require __DIR__ . '/anamnesis-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $layout = (string)($_POST['designer_layout'] ?? '');
+    if (strlen($layout) > 60000 || trim($layout) === '') { http_response_code(422); header('Content-Type: application/json'); echo json_encode(['success'=>false]); exit; }
+    save_anamnesis_print_settings(['designer_layout' => $layout]);
+    header('Content-Type: application/json'); echo json_encode(['success'=>true]); exit;
+}
 $designerQuestions = array_values(array_filter(anamnesis_question_definitions(), fn($q) => (int)$q['active'] === 1));
 $designerFields = array_values(array_filter(anamnesis_text_field_definitions(), fn($f) => (int)$f['active'] === 1));
 $designerSourceLabels = [];
@@ -66,7 +73,7 @@ body .designer{padding-top:96px!important}
   canvas.addEventListener('click',e=>{const el=e.target.closest('.design-block');if(el)select(el)});
   canvas.addEventListener('pointermove',e=>{if(!drag)return;const r=canvas.getBoundingClientRect(),dx=(e.clientX-drag.sx)/r.width*100,dy=(e.clientY-drag.sy)/r.height*100;if(drag.resize){drag.el.style.width=snap(Math.max(12,drag.w+dx))+'%';drag.el.style.height=snap(Math.max(4,drag.h+dy))+'%'}else{drag.el.style.left=snap(Math.max(0,Math.min(95-drag.w,drag.x+dx)))+'%';drag.el.style.top=snap(Math.max(0,Math.min(95-drag.h,drag.y+dy)) )+'%'}widthInput.value=Math.round(parseFloat(drag.el.style.width));heightInput.value=Math.round(parseFloat(drag.el.style.height))});canvas.addEventListener('pointerup',()=>{if(drag)persist();drag=null});
   document.getElementById('preview').onclick=()=>{const w=window.open('','_blank');const css='@page{size:A4;margin:0}body{margin:0;background:#fff}#a4{width:210mm;height:297mm;position:relative;margin:0 auto;background:#fff}.design-block{position:absolute;box-sizing:border-box;border:1px solid #182438;padding:7px;font:10pt Arial;color:#182438;overflow:hidden}.design-block span{float:right}.title{font-size:20pt;font-weight:700;color:#14843c}.questions{text-align:center;padding-top:25%}.answer{display:flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:700}.logo{text-align:center}.design-block i{display:none}';w.document.write('<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+canvas.outerHTML+'</body></html>');w.document.close()};
-  document.getElementById('save').onclick=()=>{persist();alert('Tasarım bu tarayıcıda kaydedildi.')};const old=localStorage.getItem('vox-anamnesis-layout');if(old)canvas.innerHTML=old;canvas.querySelectorAll('.design-block.questions').forEach(block=>block.remove());const migrated=migrateLegacyBlocks();syncSourceLabels();consumeUsedSources();if(migrated)persist();
+  document.getElementById('save').onclick=async()=>{persist();const data=new URLSearchParams({csrf:<?=json_encode(csrf())?>,designer_layout:canvas.innerHTML});const response=await fetch(location.href,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},body:data});if(!response.ok)throw new Error('Tasarım kaydedilemedi.');alert('Tasarım sunucuda kaydedildi.')};const serverLayout=<?=json_encode((string)anamnesis_print_settings()['designer_layout'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;const old=localStorage.getItem('vox-anamnesis-layout')||serverLayout;if(old)canvas.innerHTML=old;canvas.querySelectorAll('.design-block.questions').forEach(block=>block.remove());const migrated=migrateLegacyBlocks();syncSourceLabels();consumeUsedSources();if(migrated)persist();
 })();
 </script>
 <?php patient_footer(); ?>
