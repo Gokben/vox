@@ -24,6 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'notes_height' => (string)max(28, min(80, (int)($_POST['notes_height'] ?? 37))),
             'footer_height' => (string)max(24, min(80, (int)($_POST['footer_height'] ?? 34))),
             'line_width' => (string)max(1, min(3, (int)($_POST['line_width'] ?? 1))),
+            'company_logo_enabled' => isset($_POST['company_logo_enabled']) ? '1' : '0',
+            'company_logo_path' => mb_substr(trim((string)($_POST['company_logo_path'] ?? '')), 0, 255),
+            'company_logo_width' => (string)max(10, min(80, (int)($_POST['company_logo_width'] ?? 28))),
             'layout' => mb_substr((string)($_POST['layout'] ?? ''), 0, 2000),
         ]);
         $message = 'Yazıcı çıktısı tasarımı kaydedildi.';
@@ -94,6 +97,12 @@ patient_header('Ayarlar - Anamnez', 'settings');
         <label>Not alanı yüksekliği (px)<input type="number" name="notes_height" min="28" max="80" value="<?=e($printSettings['notes_height'])?>"></label>
         <label>Alt bilgi yüksekliği (px)<input type="number" name="footer_height" min="24" max="80" value="<?=e($printSettings['footer_height'])?>"></label>
         <label>Çizgi kalınlığı (px)<input type="number" name="line_width" min="1" max="3" value="<?=e($printSettings['line_width'])?>"></label>
+      </div>
+      <div class="print-settings-panel">
+        <h3>Alt şirket logosu</h3>
+        <label class="personnel-check"><span><input type="checkbox" name="company_logo_enabled" <?=$printSettings['company_logo_enabled']==='1'?'checked':''?>> Çıktının en altında logo göster</span></label>
+        <label>Logo dosya yolu / bağlantısı<input name="company_logo_path" maxlength="255" placeholder="assets/vox-logo-02.png" value="<?=e($printSettings['company_logo_path'])?>"></label>
+        <label>Logo genişliği (mm)<input type="number" name="company_logo_width" min="10" max="80" value="<?=e($printSettings['company_logo_width'])?>"></label>
       </div>
       <p class="designer-help">Değerleri değiştirip <strong>Ön Görüntü</strong> ile A4 sonucunu kontrol edin. Beğendiğiniz sonucu <strong>Tasarımı Kaydet</strong> ile kalıcılaştırın.</p>
       <div class="personnel-actions"><button type="submit">Tasarımı Kaydet</button><button type="button" class="print-preview-button">Ön Görüntü</button></div>
