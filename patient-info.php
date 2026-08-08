@@ -22,6 +22,9 @@ $hearingDeviceTotalText = $hearingDeviceTotal > 0 ? number_format($hearingDevice
 $singleHearingDevicePrice = $moneyNumber($sale['sales_device_net_price'] ?? 0);
 $singleHearingDevicePriceText = $singleHearingDevicePrice > 0 ? number_format($singleHearingDevicePrice, 2, ',', '.') . ' ₺' : '—';
 $socialSecurity = trim((string)($patient['social_security'] ?? ''));
+$socialSecuritySupport = $moneyNumber($sale['sales_device_sgk'] ?? 0);
+if (trim((string)($sale['sales_device_2_model'] ?? '')) !== '') $socialSecuritySupport += $moneyNumber($sale['sales_device_2_sgk'] ?? 0);
+$socialSecuritySupportText = $socialSecuritySupport > 0 ? number_format($socialSecuritySupport, 2, ',', '.') . ' ₺' : '—';
 $anamnesis = trim((string)($latest['complaint'] ?? $patient['anamnesis'] ?? $patient['notes'] ?? ''));
 patient_header('Hasta Bilgi Formu');
 ?>
@@ -83,7 +86,7 @@ patient_header('Hasta Bilgi Formu');
     const cells = socialSecurityRow.children;
     cells[0].textContent = 'Sosyal Güvence';
     cells[1].textContent = <?= json_encode($socialSecurity ?: '—', JSON_UNESCAPED_UNICODE) ?>;
-    cells[2].textContent = '—';
+    cells[2].textContent = <?= json_encode($socialSecuritySupportText, JSON_UNESCAPED_UNICODE) ?>;
   }
 })();
 </script>
