@@ -843,6 +843,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $addExit->execute([$consumableStockId, 'Çıkış', $consumableQuantity, $movementDate, $consumableDescription, $accountId, $invoiceNo ?: null, null]);
             }
     }
+    if ((string)($_POST['ajax'] ?? '') === 'repair_fee_prepare') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => $savedServiceId > 0, 'service_id' => $savedServiceId], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if (isset($_POST['return_to_sales_details']) && $savedServiceId > 0) redirect('patient-followup.php?id=' . $id . '&edit=' . $savedServiceId . '&open_sales_details=1');
     redirect('patient-followup.php?id=' . $id);
 }
@@ -1154,10 +1159,13 @@ document.addEventListener('click',async event=>{
     if (!serviceFeePayment?.value) { alert('Ödeme şeklini seçiniz.'); serviceFeePayment?.focus(); return; }
     persist();
     try {
-      const response = await fetch(form.action || location.href, {method:'POST', body:new FormData(form), credentials:'same-origin'});
+      const requestData = new FormData(form);
+      requestData.set('ajax', 'repair_fee_prepare');
+      const response = await fetch(form.action || location.href, {method:'POST', body:requestData, credentials:'same-origin'});
       if (!response.ok) throw new Error('Hizmet bedeli kaydedilemedi.');
-      const responseUrl = new URL(response.url);
-      const savedEditId = Number(responseUrl.searchParams.get('edit') || 0);
+      const result = await response.json();
+      if (!result.success) throw new Error('Tamir kartı kaydedilemedi.');
+      const savedEditId = Number(result.service_id || 0);
       if (savedEditId) {
         repairId = savedEditId;
         const editInput = form.querySelector('[name="edit_id"]');
@@ -1231,7 +1239,10 @@ document.addEventListener('click',async event=>{
   const restore = () => { try { const values = JSON.parse(details.value || '{}'); controls.forEach(control => { const value = values[control.name]; if (control.type === 'checkbox') control.checked = Array.isArray(value) ? value.includes(control.value) : Boolean(value); else if (value !== undefined) control.value = value; }); } catch (_) {} };
   const persist = () => { const values = {}; controls.forEach(control => { if (control.type === 'checkbox') { if (control.name.endsWith('[]')) { (values[control.name] ||= []); if (control.checked) values[control.name].push(control.value); } else values[control.name] = control.checked; } else values[control.name] = control.value; }); details.value = JSON.stringify(values); };
   restore();
-  if (!<?=json_encode($savedRepairFeeCash)?> && serviceFee) serviceFee.value = '';
+  if (!<?=json_encode($savedRepairFeeCash)?>) {
+    if (serviceFee) serviceFee.value = '';
+    if (serviceFeePayment) serviceFeePayment.value = '';
+  }
   syncRepairTechnician();
   formatServiceFee();
   serviceName.addEventListener('change', () => { if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open(); });
