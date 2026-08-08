@@ -2095,6 +2095,12 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   });
   const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'anamnesis_form'; hidden.value = JSON.stringify(saved);
   serviceForm.append(hidden);
+  const fitToA4 = () => {
+    const dialog = modal.querySelector('.anamnesis-dialog'), header = dialog.querySelector('header'), meta = dialog.querySelector('.anamnesis-meta'), footer = dialog.querySelector('footer');
+    grid.style.zoom = '1';
+    const available = dialog.clientHeight - header.offsetHeight - meta.offsetHeight - footer.offsetHeight;
+    if (grid.scrollHeight > available && available > 0) grid.style.zoom = String(Math.max(.68, available / grid.scrollHeight));
+  };
   const close = () => { modal.hidden = true; };
   const collect = () => Object.fromEntries(fields.map(([key, , type, , answerOptions = 'yes_no']) => {
     const field = modal.querySelector(`[name="${key}"]`);
@@ -2108,7 +2114,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     return values;
   };
   anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
-  anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; });
+  anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; requestAnimationFrame(fitToA4); });
   modal.querySelectorAll('header button,.anamnesis-cancel,.anamnesis-backdrop').forEach(button => button.addEventListener('click', close));
   modal.querySelector('.anamnesis-apply').addEventListener('click', async event => {
     const button = event.currentTarget;
@@ -2172,5 +2178,9 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row textarea{height:36px!important;min-height:36px!important;resize:none!important}
 #anamnesis-card-modal .anamnesis-apply{display:inline-grid!important;place-items:center;min-width:42px;padding:10px!important}
 #anamnesis-card-modal .anamnesis-apply i{font-size:18px;line-height:1}
+#anamnesis-card-modal .anamnesis-dialog{width:min(210mm,96vw,calc(70.7vh - 28px))!important;height:min(297mm,calc(100vh - 40px));max-height:calc(100vh - 40px)!important;display:flex;flex-direction:column;overflow:hidden}
+#anamnesis-card-modal .anamnesis-grid{flex:1 1 auto;overflow:hidden}
+@page{size:A4 portrait;margin:8mm}
+@media print{#anamnesis-card-modal .anamnesis-dialog{width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;display:block!important}#anamnesis-card-modal .anamnesis-grid{overflow:visible!important;zoom:1!important}}
 </style>
 <?php patient_footer(); ?>
