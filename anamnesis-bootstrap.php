@@ -15,10 +15,12 @@ function anamnesis_question_definitions(): array
         'İşitme cihazı için danıştınız mı?', 'Daha önce işitme cihazı kullandınız mı?', 'Çevrenizde işitme cihazı kullanan birisi var mı?',
         'İşitme cihazı ile ilgili ön yargılarınız veya endişeleriniz var mı?'
     ];
-    $insert = $sqlite
-        ? $pdo->prepare('INSERT OR IGNORE INTO anamnesis_question_definitions(name,active,sort_order) VALUES(?,?,?)')
-        : $pdo->prepare('INSERT IGNORE INTO anamnesis_question_definitions(name,active,sort_order) VALUES(?,?,?)');
-    foreach ($defaults as $index => $name) $insert->execute([$name, 1, $index + 1]);
+    // Başlangıç soruları yalnızca boş bir kurulumda eklenir. Daha sonra yapılan
+    // düzenleme ve silme işlemlerinde varsayılan kayıtlar geri oluşturulmaz.
+    if ((int)$pdo->query('SELECT COUNT(*) FROM anamnesis_question_definitions')->fetchColumn() === 0) {
+        $insert = $pdo->prepare('INSERT INTO anamnesis_question_definitions(name,active,sort_order) VALUES(?,?,?)');
+        foreach ($defaults as $index => $name) $insert->execute([$name, 1, $index + 1]);
+    }
     return $pdo->query('SELECT * FROM anamnesis_question_definitions ORDER BY sort_order,name')->fetchAll();
 }
 
