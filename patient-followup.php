@@ -151,6 +151,67 @@ if (!$ayseKurunSalesDetailsCheck->fetchColumn()) {
     $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$ayseKurunSalesDetailsKey]);
 }
 
+// Ayşe Kürün'ün aktarılmış satışında hizmet-kasa-stok bağlarını bir kez düzeltir.
+$ayseKurunSalesRelationKey = '20260808_restore_ayse_kurun_sales_relations_v3';
+$ayseKurunSalesRelationCheck = $pdo->prepare('SELECT 1 FROM app_migrations WHERE migration_key=?');
+$ayseKurunSalesRelationCheck->execute([$ayseKurunSalesRelationKey]);
+if (!$ayseKurunSalesRelationCheck->fetchColumn()) {
+    try {
+        $patientStatement = $pdo->prepare('SELECT id,full_name FROM patients WHERE national_id=? LIMIT 1');
+        $patientStatement->execute(['34738959750']);
+        $ayseKurunPatient = $patientStatement->fetch() ?: [];
+        $patientId = (int)($ayseKurunPatient['id'] ?? 0);
+        if ($patientId > 0) {
+            $serviceStatement = $pdo->prepare('SELECT id,record_no FROM patient_services WHERE patient_id=? AND service_date=? ORDER BY id LIMIT 1');
+            $serviceStatement->execute([$patientId, '2023-09-23']);
+            $ayseKurunSale = $serviceStatement->fetch() ?: [];
+            $serviceId = (int)($ayseKurunSale['id'] ?? 0);
+            $recordNo = trim((string)($ayseKurunSale['record_no'] ?? ''));
+            if ($serviceId > 0 && $recordNo !== '') {
+                $salesDetails = [
+                    'sales_brand'=>'Resound', 'sales_model'=>'KE488', 'sales_device_serial'=>'2356902633',
+                    'sales_device_sgk'=>'3.028,00 ₺', 'sales_device_discount_rate'=>'', 'sales_device_net_price'=>'15.472,00 ₺',
+                    'sales_device_2_brand'=>'Resound', 'sales_device_2_model'=>'KE488', 'sales_device_2_serial'=>'2356902622',
+                    'sales_device_2_sgk'=>'3.028,00 ₺', 'sales_device_2_discount_rate'=>'', 'sales_device_2_net_price'=>'15.472,00 ₺',
+                    'sales_sale_date'=>'2023-09-23', 'sales_warranty_start'=>'2023-10-03', 'sales_warranty_end'=>'2028-10-03',
+                    'sales_invoice_no'=>'1991', 'sales_payment_type'=>'Mail Order',
+                    'sales_total_discount_rate'=>'12.444,00 ₺', 'sales_payment_amount'=>'18.500,00 ₺'
+                ];
+                $stockStatement = $pdo->prepare('SELECT id FROM stock_cards WHERE stock_type=? AND brand=? AND model=? ORDER BY id LIMIT 1');
+                $stockStatement->execute(['İşitme Cihazı', 'Resound', 'KE488']);
+                $stockId = (int)$stockStatement->fetchColumn();
+                $pdo->prepare('UPDATE patient_services SET service_name=?,sales_details=?,stock_id=? WHERE id=? AND patient_id=?')
+                    ->execute(['Satış', json_encode($salesDetails, JSON_UNESCAPED_UNICODE), $stockId ?: null, $serviceId, $patientId]);
+
+                $sourceUrl = url('patient-followup.php?id=' . $patientId);
+                $cashStatement = $pdo->prepare("SELECT id FROM cash_transactions WHERE source_url=? AND transaction_type='income' LIMIT 1");
+                $cashStatement->execute([$sourceUrl]);
+                if (!$cashStatement->fetchColumn()) {
+                    $cashLinkStatement = $pdo->prepare("SELECT id FROM cash_transactions WHERE transaction_type='income' AND payment_type='mail_order' AND amount=18500 AND description LIKE ? LIMIT 1");
+                    $cashLinkStatement->execute(['%' . (string)$ayseKurunPatient['full_name'] . '%']);
+                    $cashId = (int)$cashLinkStatement->fetchColumn();
+                    if ($cashId > 0) $pdo->prepare('UPDATE cash_transactions SET source_url=? WHERE id=?')->execute([$sourceUrl, $cashId]);
+                    else $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,source_url,cash_register) VALUES(?,?,?,?,?,?,?,?)')
+                        ->execute(['2023-09-23', (string)$ayseKurunPatient['full_name'] . ' — Satış tahsilatı', 'income', 18500, 'mail_order', 1, $sourceUrl, 'pre']);
+                }
+
+                if ($stockId > 0) {
+                    $description = 'Hizmet kartı satışı: ' . $recordNo;
+                    $existsExit = $pdo->prepare("SELECT 1 FROM stock_movements WHERE movement_type='Çıkış' AND invoice_no=? AND serial_numbers LIKE ? LIMIT 1");
+                    $insertExit = $pdo->prepare('INSERT INTO stock_movements(stock_id,movement_type,quantity,movement_date,description,invoice_no,serial_numbers) VALUES(?,?,?,?,?,?,?)');
+                    foreach (['2356902633', '2356902622'] as $serial) {
+                        $existsExit->execute(['1991', '%"' . $serial . '"%']);
+                        if (!$existsExit->fetchColumn()) $insertExit->execute([$stockId, 'Çıkış', 1, '2023-09-23', $description, '1991', json_encode([$serial], JSON_UNESCAPED_UNICODE)]);
+                    }
+                }
+            }
+        }
+    } catch (Throwable $exception) {
+        // Kasa veya stok altyapısı henüz yoksa hizmet kartı yine de açılabilir kalır.
+    }
+    $pdo->prepare('INSERT INTO app_migrations(migration_key) VALUES(?)')->execute([$ayseKurunSalesRelationKey]);
+}
+
 $patientColumns = $sqlite
     ? array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name')
     : array_column($pdo->query('SHOW COLUMNS FROM patients')->fetchAll(), 'Field');
