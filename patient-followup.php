@@ -2055,10 +2055,12 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     if (key === 'duration') field.maxLength = 2;
     row.append(caption, control);
     if (type === 'yesno' && detailLabel) {
+      const detailCaption = document.createElement('span');
+      detailCaption.className = 'anamnesis-detail-caption'; detailCaption.textContent = detailLabel;
       const detail = document.createElement('input');
       detail.type = 'text'; detail.name = key + '_detail'; detail.maxLength = 190; detail.placeholder = detailLabel;
       detail.value = saved[detail.name] || ''; detail.dataset.anamnesisDetail = '1';
-      row.classList.add('anamnesis-with-detail'); row.append(detail);
+      row.classList.add('anamnesis-with-detail'); row.append(detailCaption, detail);
     }
     grid.append(row);
   });
@@ -2092,6 +2094,23 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row{font-size:var(--anamnesis-question-font-size,11px)}
 #anamnesis-card-modal .anamnesis-row.anamnesis-with-detail{grid-template-columns:minmax(0,1fr) 72px 150px}
 #anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>input{min-width:0}
+#anamnesis-card-modal .anamnesis-dialog{width:min(900px,100%);border:1px solid #222;border-radius:0;font-family:Arial,sans-serif}
+#anamnesis-card-modal .anamnesis-dialog>header{padding:10px;border-bottom:2px solid #222}
+#anamnesis-card-modal .anamnesis-meta{padding:8px 10px;border-bottom:1px solid #222;background:#fff}
+#anamnesis-card-modal .anamnesis-grid{display:block;padding:0}
+#anamnesis-card-modal .anamnesis-row{display:grid;grid-template-columns:48% 12% 20% 20%;gap:0;min-height:34px;border-bottom:1px solid #222;align-items:stretch}
+#anamnesis-card-modal .anamnesis-row>span{display:flex;align-items:center;padding:6px 8px;border-right:1px solid #222;font-size:11px;text-transform:uppercase}
+#anamnesis-card-modal .anamnesis-row>.anamnesis-yes{grid-column:2;justify-content:center;text-transform:none}
+#anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>.anamnesis-detail-caption{grid-column:3;justify-content:center;text-align:center}
+#anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>input{grid-column:4;width:100%!important;min-height:0!important;border:0!important;border-radius:0!important;padding:6px!important}
+#anamnesis-card-modal .anamnesis-row:not(.anamnesis-with-detail)>input{grid-column:2/-1;width:100%!important;min-height:0!important;border:0!important;border-radius:0!important;padding:6px!important}
+#anamnesis-card-modal .anamnesis-row.anamnesis-wide{grid-template-columns:48% 52%}
+#anamnesis-card-modal .anamnesis-row.anamnesis-wide>span{grid-column:1}
+#anamnesis-card-modal .anamnesis-row.anamnesis-wide>input{grid-column:2!important}
+#anamnesis-card-modal .anamnesis-row:has(textarea){grid-template-columns:48% 52%;min-height:66px}
+#anamnesis-card-modal .anamnesis-row:has(textarea)>span{grid-column:1}
+#anamnesis-card-modal .anamnesis-row textarea{grid-column:2!important;width:100%!important;height:auto!important;min-height:65px!important;border:0!important;border-radius:0!important;padding:6px!important}
+@media print{#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:static!important;width:auto!important;margin:0!important}#anamnesis-card-modal .anamnesis-dialog{min-height:0!important;width:100%!important;border:1px solid #222!important}#anamnesis-card-modal .anamnesis-row{font-size:9px!important}#anamnesis-card-modal .anamnesis-row>span{font-size:9px!important}}
 @media print{#anamnesis-card-modal .anamnesis-dialog{position:relative!important;min-height:297mm!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:absolute!important;width:84%!important;margin:0!important}#anamnesis-card-modal .anamnesis-dialog>header{left:var(--anamnesis-header-x,0)!important;top:var(--anamnesis-header-y,0)!important}#anamnesis-card-modal .anamnesis-meta{left:var(--anamnesis-meta-x,0)!important;top:var(--anamnesis-meta-y,0)!important}#anamnesis-card-modal .anamnesis-grid{left:var(--anamnesis-questions-x,0)!important;top:var(--anamnesis-questions-y,0)!important}}
 </style>
 <?php patient_footer(); ?>
