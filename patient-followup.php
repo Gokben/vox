@@ -1893,7 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTitle('commission_rate', type === 'term' ? 'Aylık Ödeme' : 'Komisyon Oranı');
     setTitle('amount', type === 'term' ? 'Toplam' : 'Tutar');
     setLabel('bank_name', type === 'mail_order' || type === 'credit_card', '1 / 2', '2');
-    setLabel('current_account_id', type === 'mail_order', '2 / 3', '2');
+    setLabel('current_account_id', type === 'mail_order', '1 / -1', '3');
     const accountField = cashForm.querySelector('[name="current_account_id"]');
     const accountLabel = accountField?.closest('label');
     if (accountField && accountLabel) {
@@ -1905,8 +1905,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setLabel('installment_count', type === 'credit_card' || type === 'term', type === 'term' ? '1 / 2' : '2 / 3', '2');
     setLabel('commission_rate', type === 'credit_card' || type === 'term', '2 / 3', '3');
-    setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', type === 'credit_card' ? '3' : '3');
-    setLabel('description', true, '1 / -1', '4');
+    setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', type === 'mail_order' ? '4' : '3');
+    setLabel('description', true, '1 / -1', type === 'mail_order' ? '5' : '4');
   };
   cashForm.addEventListener('repair-payment-change', () => [0, 80, 250, 500, 800].forEach(delay => setTimeout(refreshRepairPayment, delay)));
 });
