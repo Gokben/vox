@@ -1897,6 +1897,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountField = cashForm.querySelector('[name="current_account_id"]');
     const accountLabel = accountField?.closest('label');
     if (accountField && accountLabel) {
+      [...accountField.options].forEach(option => {
+        option.text = option.text.replace(/^\s*[^—]+—\s*/, '');
+      });
       accountLabel.style.setProperty('width', '100%', 'important');
       accountLabel.style.setProperty('min-width', '220px', 'important');
       accountField.style.setProperty('display', 'block', 'important');
@@ -1911,4 +1914,8 @@ document.addEventListener('DOMContentLoaded', () => {
   cashForm.addEventListener('repair-payment-change', () => [0, 80, 250, 500, 800].forEach(delay => setTimeout(refreshRepairPayment, delay)));
 });
 </script>
+<style>
+form[action*="cash.php"] section label:has([name="current_account_id"]){grid-column:1/-1!important;grid-row:3!important;width:100%!important;min-width:0!important}
+form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
+</style>
 <?php patient_footer(); ?>
