@@ -2016,7 +2016,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   const fixedFields = fields.filter(([, , type]) => type !== 'yesno');
   fields.splice(0, fields.length,
     fixedFields[0], fixedFields[1], fixedFields[2],
-    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno']),
+    ...editableQuestionLabels.map(question => ['question_' + question.id, question.name, 'yesno', question.detail_label || '']),
     ...fixedFields.slice(3)
   );
   const modal = document.createElement('div');
@@ -2036,7 +2036,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     modal.style.setProperty('--anamnesis-' + key + '-y', String(position.y ?? 0) + '%');
   });
   const grid = modal.querySelector('.anamnesis-grid');
-  fields.forEach(([key, label, type]) => {
+  fields.forEach(([key, label, type, detailLabel = '']) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
     if (key === 'complaint' || key === 'profession') row.classList.add('anamnesis-wide');
     const caption = document.createElement('span'); caption.textContent = label;
@@ -2053,7 +2053,14 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     if (field.type !== 'checkbox') field.value = saved[key] || '';
     if (key === 'complaint') field.maxLength = 512;
     if (key === 'duration') field.maxLength = 2;
-    row.append(caption, control); grid.append(row);
+    row.append(caption, control);
+    if (type === 'yesno' && detailLabel) {
+      const detail = document.createElement('input');
+      detail.type = 'text'; detail.name = key + '_detail'; detail.maxLength = 190; detail.placeholder = detailLabel;
+      detail.value = saved[detail.name] || ''; detail.dataset.anamnesisDetail = '1';
+      row.classList.add('anamnesis-with-detail'); row.append(detail);
+    }
+    grid.append(row);
   });
   const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'anamnesis_form'; hidden.value = JSON.stringify(saved);
   serviceForm.append(hidden);
@@ -2062,11 +2069,17 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     const field = modal.querySelector(`[name="${key}"]`);
     return [key, field?.type === 'checkbox' ? (field.checked ? 'Evet' : '') : (field?.value.trim() || '')];
   }));
+  const baseCollect = collect;
+  const collectWithDetails = () => {
+    const values = baseCollect();
+    modal.querySelectorAll('[data-anamnesis-detail]').forEach(field => { values[field.name] = field.value.trim(); });
+    return values;
+  };
   anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
   anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; });
   modal.querySelectorAll('header button,.anamnesis-cancel,.anamnesis-backdrop').forEach(button => button.addEventListener('click', close));
-  modal.querySelector('.anamnesis-apply').addEventListener('click', () => { hidden.value = JSON.stringify(collect()); modal.hidden = true; });
-  modal.querySelector('.anamnesis-print').addEventListener('click', () => { hidden.value = JSON.stringify(collect()); window.print(); });
+  modal.querySelector('.anamnesis-apply').addEventListener('click', () => { hidden.value = JSON.stringify(collectWithDetails()); modal.hidden = true; });
+  modal.querySelector('.anamnesis-print').addEventListener('click', () => { hidden.value = JSON.stringify(collectWithDetails()); window.print(); });
 })();
 </script>
 <style>
@@ -2077,6 +2090,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-dialog h2{color:var(--anamnesis-header-color,#14843c)!important}
 #anamnesis-card-modal .anamnesis-dialog{font-size:var(--anamnesis-font-size,11px)}
 #anamnesis-card-modal .anamnesis-row{font-size:var(--anamnesis-question-font-size,11px)}
+#anamnesis-card-modal .anamnesis-row.anamnesis-with-detail{grid-template-columns:minmax(0,1fr) 72px 150px}
+#anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>input{min-width:0}
 @media print{#anamnesis-card-modal .anamnesis-dialog{position:relative!important;min-height:297mm!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:absolute!important;width:84%!important;margin:0!important}#anamnesis-card-modal .anamnesis-dialog>header{left:var(--anamnesis-header-x,0)!important;top:var(--anamnesis-header-y,0)!important}#anamnesis-card-modal .anamnesis-meta{left:var(--anamnesis-meta-x,0)!important;top:var(--anamnesis-meta-y,0)!important}#anamnesis-card-modal .anamnesis-grid{left:var(--anamnesis-questions-x,0)!important;top:var(--anamnesis-questions-y,0)!important}}
 </style>
 <?php patient_footer(); ?>
