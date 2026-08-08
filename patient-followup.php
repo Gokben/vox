@@ -943,7 +943,7 @@ if ($currentContactPerson !== '') {
 .faces input:checked+label{outline:3px solid #19a94b!important;box-shadow:0 0 0 5px rgba(25,169,75,.16)!important}.action-box .action-add-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:44px!important;min-width:44px!important;padding:0!important;font-size:24px!important;font-weight:400!important;line-height:1!important}
 .action-box{display:block!important;margin:14px 0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.action-box .service-field{grid-template-columns:150px minmax(0,1fr)!important;margin:14px 0!important}
 .service-form-head{display:flex!important;align-items:center!important;justify-content:space-between!important}.service-form-actions{display:flex!important;align-items:center!important;gap:12px!important}.service-back-link{color:var(--muted)!important;text-decoration:none!important;font-size:14px!important;white-space:nowrap}.service-back-link:hover{color:#19a94b!important}
-.service-input-with-icon{display:flex!important;align-items:stretch!important;grid-column:2!important;min-height:40px!important;border:1px solid #d5d3de!important;border-radius:6px!important;background:var(--card)!important;overflow:hidden!important}.service-input-icon{display:grid!important;place-items:center!important;flex:0 0 46px!important;width:46px!important;color:#686574!important;font-size:17px!important}.service-input-with-icon input,.service-input-with-icon select,.service-input-with-icon textarea{width:100%!important;min-width:0!important;height:38px!important;min-height:38px!important;margin:0!important;padding:8px 12px 8px 0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.service-input-with-icon textarea{height:76px!important;padding-top:10px!important}
+.service-input-with-icon{display:flex!important;align-items:stretch!important;grid-column:2!important;min-height:40px!important;border:1px solid #d5d3de!important;border-radius:6px!important;background:var(--card)!important;overflow:hidden!important}.service-input-icon{display:grid!important;place-items:center!important;flex:0 0 46px!important;width:46px!important;color:#686574!important;font-size:17px!important}.service-input-with-icon:has(textarea[name="complaint"]) .service-input-icon{color:#14843c!important}.service-input-with-icon:has(textarea[name="complaint"]) .service-input-icon i{display:grid!important;place-items:center!important;width:27px!important;height:27px!important;border:2px solid #e04f55!important;border-radius:50%!important}.service-input-with-icon input,.service-input-with-icon select,.service-input-with-icon textarea{width:100%!important;min-width:0!important;height:38px!important;min-height:38px!important;margin:0!important;padding:8px 12px 8px 0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}.service-input-with-icon textarea{height:76px!important;padding-top:10px!important}
 .service-name-locked{display:flex!important;align-items:center!important;gap:8px!important;grid-column:2!important}.service-name-locked input{grid-column:auto!important;flex:1!important;background:#f4f4f6!important;color:#6d6b78!important;cursor:not-allowed!important}.service-name-income-slot{display:flex!important;align-items:center!important;gap:8px!important;grid-column:2!important;width:100%!important;min-width:0!important}.service-name-income-slot select,.service-name-income-slot>.service-input-with-icon{grid-column:auto!important;flex:1 1 auto!important;width:100%!important;min-width:0!important}.service-detail-button,.sales-details-link{display:inline-grid!important;place-items:center!important;flex:0 0 40px!important;width:40px!important;height:40px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#19a94b!important;color:#fff!important;cursor:pointer!important;font-size:19px!important}.sales-details-link{text-decoration:none!important}.service-detail-button:hover,.sales-details-link:hover{background:#14833d!important}.sales-income-link{display:inline-grid!important;place-items:center!important;flex:0 0 40px!important;width:40px!important;height:40px!important;margin:0!important;padding:0!important;border-radius:6px!important;background:#19a94b!important;color:#fff!important;text-decoration:none!important;font-size:19px!important}.sales-income-link:hover{background:#14833d!important}
 .service-detail-button,.sales-details-link{box-sizing:border-box!important;align-self:center!important;flex-basis:36px!important;width:36px!important;min-width:36px!important;max-width:36px!important;height:36px!important;min-height:36px!important;max-height:36px!important;font-size:18px!important}
 @media(max-width:720px){.services-page{max-width:none!important;padding:92px 14px 30px!important}.services-head{padding-right:170px!important}.services-head .button{right:16px}.service-form-head{padding-right:16px!important}.action-box .service-field{grid-template-columns:1fr!important}.service-input-with-icon{grid-column:1!important}}
@@ -2043,7 +2043,11 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   modal.id = 'anamnesis-card-modal'; modal.hidden = true;
   modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><div class="anamnesis-company-logo" hidden><img alt="Şirket logosu"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print" title="Yazdır" aria-label="Yazdır"><i class="ti tabler-printer"></i></button><button type="button" class="button anamnesis-apply" title="Anketi kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy"></i></button></footer></section>`;
   document.body.append(modal);
+  modal.querySelectorAll('.anamnesis-meta > strong, .anamnesis-meta > span').forEach(item => {
+    item.style.setProperty('font-size', 'calc(1em + 2px)', 'important');
+  });
   const printSettings = <?=json_encode($anamnesisPrintSettings, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const visualPrintProject = String(printSettings.grapesjs_project || '');
   modal.querySelector('#anamnesis-card-title').textContent = printSettings.title || 'VOX İ.M. - HASTA KARTI';
   modal.style.setProperty('--anamnesis-header-color', printSettings.header_color || '#14843c');
   modal.style.setProperty('--anamnesis-font-size', String(printSettings.font_size || 11) + 'px');
@@ -2070,7 +2074,167 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     modal.style.setProperty('--anamnesis-' + key + '-y', String(position.y ?? 0) + '%');
   });
   const grid = modal.querySelector('.anamnesis-grid');
-  fields.forEach(([key, label, type, detailLabel = '', answerOptions = 'yes_no']) => {
+  const designerSourceMap = {};
+  editableQuestionLabels.forEach(question => {
+    const key = 'question_' + question.id;
+    designerSourceMap['question-' + question.id] = {key, label: question.name, type: 'choice', answerOptions: question.answer_options || 'yes_no'};
+    if (String(question.detail_label || '').trim()) designerSourceMap['question-' + question.id + '-detail'] = {key: key + '_detail', label: question.detail_label, type: 'detail-label', detail: true};
+  });
+  editableTextFields.forEach(field => {
+    designerSourceMap['field-' + field.id] = {key: field.field_key, label: field.name, type: field.field_type || 'text'};
+  });
+  const normalizeDesignerText = value => String(value || '').toLocaleUpperCase('tr-TR').replace(/[^\p{L}\p{N}]+/gu, '');
+  const isVarYok = answerOptions => String(answerOptions || '').trim().toLowerCase() === 'var_yok';
+  const legacyDesignerSource = block => {
+    const copy = block.cloneNode(true);
+    copy.querySelectorAll('i,input,textarea,select').forEach(node => node.remove());
+    const text = normalizeDesignerText(copy.textContent);
+    return Object.values(designerSourceMap).find(item => normalizeDesignerText(item.label) === text) || null;
+  };
+  const buildField = (descriptor) => {
+    const field = descriptor.type === 'area' ? document.createElement('textarea') : document.createElement('input');
+    if (field.tagName === 'INPUT') field.type = 'text';
+    field.name = descriptor.key;
+    field.value = saved[descriptor.key] || '';
+    if (descriptor.key === 'complaint') field.maxLength = 512;
+    if (descriptor.key === 'duration') field.maxLength = 2;
+    if (descriptor.detail) field.dataset.anamnesisDetail = '1';
+    return field;
+  };
+  const renderDesignerLayout = () => {
+    let layout = '';
+    try { layout = localStorage.getItem('vox-anamnesis-layout') || ''; } catch (_) {}
+    if (!layout) return false;
+    const source = document.createElement('div');
+    source.innerHTML = layout;
+    const blocks = [...source.querySelectorAll('.design-block')];
+    if (!blocks.length) return false;
+    const sheet = document.createElement('div');
+    sheet.className = 'anamnesis-designer-sheet';
+    sheet.innerHTML = source.innerHTML;
+    let previousQuestion = null;
+    let pendingEntry = null;
+    let answerIndex = 0;
+    [...sheet.querySelectorAll('.design-block')]
+      .sort((a, b) => (parseFloat(a.style.top) || 0) - (parseFloat(b.style.top) || 0) || (parseFloat(a.style.left) || 0) - (parseFloat(b.style.left) || 0))
+      .forEach(block => {
+        block.classList.remove('selected');
+        block.querySelectorAll('i').forEach(handle => handle.remove());
+        const sourceKey = block.dataset.sourceKey || '';
+        const descriptor = designerSourceMap[sourceKey] || legacyDesignerSource(block);
+        const type = block.dataset.type || '';
+        if (type === 'title') {
+          block.textContent = printSettings.title || block.textContent.trim() || 'VOX İ.M. - HASTA KARTI';
+          return;
+        }
+        if (type === 'patient') {
+          block.textContent = '';
+          const name = document.createElement('strong'); name.textContent = <?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>;
+          const date = document.createElement('span'); date.textContent = 'Tarih: ' + new Date().toLocaleDateString('tr-TR');
+          name.style.setProperty('font-size', 'calc(1em + 2px)', 'important');
+          date.style.setProperty('font-size', 'calc(1em + 2px)', 'important');
+          block.append(name, date);
+          return;
+        }
+        if (type === 'logo') {
+          block.textContent = '';
+          if (!companyLogo.hidden && companyLogoImage.src) {
+            const image = companyLogoImage.cloneNode(true); image.alt = 'Şirket logosu'; block.append(image);
+          } else block.textContent = 'Şirket Logosu';
+          return;
+        }
+        if (descriptor) {
+          block.textContent = '';
+          if (descriptor.type === 'choice') {
+            block.classList.add('designer-question-label');
+            block.textContent = descriptor.label;
+            previousQuestion = descriptor;
+          } else if (descriptor.type === 'area') {
+            // Not alanında başlık sabit kalır; veri, aynı bloğun altındaki textarea'ya yazılır.
+            block.classList.add('designer-area-field');
+            block.style.setProperty('display', 'flex', 'important');
+            block.style.setProperty('flex-direction', 'column', 'important');
+            const title = document.createElement('span');
+            title.className = 'designer-field-label'; title.textContent = descriptor.label;
+            title.style.setProperty('flex', '0 0 auto', 'important');
+            title.style.setProperty('float', 'none', 'important');
+            const field = buildField(descriptor);
+            field.setAttribute('aria-label', descriptor.label);
+            field.style.setProperty('display', 'block', 'important');
+            field.style.setProperty('flex', '1 1 auto', 'important');
+            field.style.setProperty('width', '100%', 'important');
+            field.style.setProperty('min-height', '0', 'important');
+            field.style.setProperty('margin-top', '4px', 'important');
+            field.style.setProperty('border', '0', 'important');
+            field.style.setProperty('resize', 'none', 'important');
+            block.append(title, field);
+            pendingEntry = null;
+          } else if (descriptor.type === 'detail-label') {
+            // Açıklama alanı, tasarımda bir başlıktır; veri giriş kutusu değildir.
+            block.classList.add('designer-detail-label');
+            block.textContent = descriptor.label;
+            pendingEntry = descriptor;
+          } else {
+            // Kaynak alan önce başlıktır; onu takip eden "Metin Alanı" veri girişidir.
+            block.classList.add('designer-field-label');
+            block.textContent = descriptor.label;
+            pendingEntry = descriptor;
+          }
+          return;
+        }
+        if (type === 'text' && pendingEntry) {
+          block.classList.add('designer-entry-field');
+          block.textContent = '';
+          const field = buildField(pendingEntry);
+          field.setAttribute('aria-label', pendingEntry.label);
+          block.append(field);
+          pendingEntry = null;
+          return;
+        }
+        if (type === 'answer') {
+          // Eski şablonlarda soru bloğunun kaynak anahtarı bulunmayabilir.
+          // Bu durumda cevap kutusunu soru sırasına göre doğru seçenekle eşleştir.
+          const answerQuestion = previousQuestion || editableQuestionLabels[answerIndex];
+          answerIndex += 1;
+          if (!answerQuestion) { previousQuestion = null; return; }
+          const originalAnswerText = block.textContent;
+          block.classList.add('designer-answer-field');
+          block.textContent = '';
+          const answerKey = answerQuestion.key || ('question_' + answerQuestion.id);
+          const answerOptions = answerQuestion.answerOptions || answerQuestion.answer_options || 'yes_no';
+          const templateUsesVar = normalizeDesignerText(originalAnswerText).includes('VAR');
+          const effectiveAnswerOptions = templateUsesVar ? 'var_yok' : answerOptions;
+          const positive = isVarYok(effectiveAnswerOptions) ? 'Var' : 'Evet';
+          const input = document.createElement('input'); input.type = 'checkbox'; input.name = answerKey;
+          input.dataset.answerOptions = effectiveAnswerOptions;
+          input.checked = saved[answerKey] === true || saved[answerKey] === positive;
+          const answerText = document.createElement('span'); answerText.textContent = positive;
+          block.style.setProperty('display', 'flex', 'important');
+          block.style.setProperty('align-items', 'center', 'important');
+          block.style.setProperty('justify-content', 'center', 'important');
+          block.style.setProperty('gap', '4px', 'important');
+          block.style.setProperty('white-space', 'nowrap', 'important');
+          input.style.setProperty('display', 'block', 'important');
+          input.style.setProperty('flex', '0 0 15px', 'important');
+          input.style.setProperty('width', '15px', 'important');
+          input.style.setProperty('height', '15px', 'important');
+          input.style.setProperty('margin', '0', 'important');
+          answerText.style.setProperty('display', 'inline-block', 'important');
+          answerText.style.setProperty('white-space', 'nowrap', 'important');
+          block.append(input, answerText);
+          return;
+        }
+        previousQuestion = null;
+      });
+    grid.replaceChildren(sheet);
+    grid.classList.add('designer-active');
+    modal.classList.add('designer-layout-active');
+    // Tasarımcıdaki logo bloğu kullanılır; eski sabit logo alanı ikinci kez görünmesin.
+    companyLogo.hidden = true;
+    return true;
+  };
+  const usingDesignerLayout = renderDesignerLayout();
+  if (!usingDesignerLayout) fields.forEach(([key, label, type, detailLabel = '', answerOptions = 'yes_no']) => {
     const row = document.createElement('label'); row.className = 'anamnesis-row';
     if (key === 'complaint' || key === 'profession') row.classList.add('anamnesis-wide');
     if (type !== 'choice') row.classList.add('anamnesis-free-text');
@@ -2078,11 +2242,27 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     const caption = document.createElement('span'); caption.textContent = label;
     let control;
     if (type === 'choice') {
-      const positive = answerOptions === 'var_yok' ? 'Var' : 'Evet';
+      const positive = isVarYok(answerOptions) ? 'Var' : 'Evet';
       const choice = document.createElement('span'); choice.className = 'anamnesis-yes';
+      choice.style.setProperty('display', 'flex', 'important');
+      choice.style.setProperty('align-items', 'center', 'important');
+      choice.style.setProperty('justify-content', 'center', 'important');
+      choice.style.setProperty('gap', '4px', 'important');
+      choice.style.setProperty('flex-wrap', 'nowrap', 'important');
       control = document.createElement('input'); control.type = 'checkbox';
+      control.dataset.answerOptions = answerOptions;
       control.checked = saved[key] === true || saved[key] === positive;
-      choice.append(control, document.createTextNode(' ' + positive)); control = choice;
+      const choiceText = document.createElement('span');
+      choiceText.className = 'anamnesis-yes-label'; choiceText.textContent = positive;
+      choiceText.style.setProperty('display', 'inline-block', 'important');
+      choiceText.style.setProperty('white-space', 'nowrap', 'important');
+      control.style.setProperty('display', 'block', 'important');
+      control.style.setProperty('flex', '0 0 15px', 'important');
+      control.style.setProperty('width', '15px', 'important');
+      control.style.setProperty('height', '15px', 'important');
+      control.style.setProperty('min-height', '15px', 'important');
+      control.style.setProperty('margin', '0', 'important');
+      choice.append(control, choiceText); control = choice;
     }
     else if (type === 'area') control = document.createElement('textarea');
     else { control = document.createElement('input'); control.type = 'text'; }
@@ -2113,7 +2293,10 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   const close = () => { modal.hidden = true; };
   const collect = () => Object.fromEntries(fields.map(([key, , type, , answerOptions = 'yes_no']) => {
     const field = modal.querySelector(`[name="${key}"]`);
-    if (field?.type === 'checkbox') return [key, field.checked ? (answerOptions === 'var_yok' ? 'Var' : 'Evet') : (answerOptions === 'var_yok' ? 'Yok' : 'Hayır')];
+    if (field?.type === 'checkbox') {
+      const effectiveAnswerOptions = field.dataset.answerOptions || answerOptions;
+      return [key, field.checked ? (isVarYok(effectiveAnswerOptions) ? 'Var' : 'Evet') : (isVarYok(effectiveAnswerOptions) ? 'Yok' : 'Hayır')];
+    }
     return [key, field?.value.trim() || ''];
   }));
   const baseCollect = collect;
@@ -2121,6 +2304,27 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     const values = baseCollect();
     modal.querySelectorAll('[data-anamnesis-detail]').forEach(field => { values[field.name] = field.value.trim(); });
     return values;
+  };
+  const escapePrintHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+  const openVisualPrint = values => {
+    let project;
+    try { project = JSON.parse(visualPrintProject); } catch (_) { return false; }
+    if (!project || typeof project !== 'object') return false;
+    const questionRows = fields.filter(([, , type]) => type === 'choice').map(([key, label, , detailLabel = '', answerOptions = 'yes_no']) => {
+      const answer = values[key] || (isVarYok(answerOptions) ? 'Yok' : 'Hayır');
+      return '<tr><td>'+escapePrintHtml(label)+'</td><td style="width:9%;text-align:center">'+escapePrintHtml(answer)+'</td><td style="width:20%">'+escapePrintHtml(detailLabel)+'</td><td>'+escapePrintHtml(values[key + '_detail'] || '')+'</td></tr>';
+    }).join('');
+    const payload = {
+      project,
+      patientName: <?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>,
+      date: new Date().toLocaleDateString('tr-TR'),
+      questionsHtml: '<table class="question-table">'+questionRows+'</table>',
+      companyLogo: String(printSettings.company_logo_enabled) === '1' && String(printSettings.company_logo_path || '').trim() !== '' ? <?=json_encode(rtrim(url(''), '/'), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?> + '/' + String(printSettings.company_logo_path).replace(/^\/+/, '') : ''
+    };
+    const popup = window.open('', '_blank'); if (!popup) { alert('Yazdırma penceresi açılamadı. Tarayıcı açılır pencere izni verin.'); return true; }
+    const encoded = JSON.stringify(payload).replace(/</g, '\\u003c');
+    popup.document.write('<!doctype html><html><head><meta charset="utf-8"><script src="<?=url('assets/vendor/grapesjs/grapes.min.js')?>"><\\/script><script src="<?=url('assets/vendor/pagedjs/paged.polyfill.js')?>"><\\/script><style>@page{size:A4 portrait;margin:10mm}body{font-family:Arial,sans-serif;color:#182438}.question-table{width:100%;border-collapse:collapse}.question-table td{border:1px solid #222;padding:6px;font-size:11px}.a4-sheet{box-sizing:border-box;width:100%}</style></head><body><div id="render"></div><script>window.addEventListener("load",function(){const data='+encoded+';const editor=grapesjs.init({container:"#render",height:"auto",storageManager:false,fromElement:false,panels:{defaults:[]}});editor.loadProjectData(data.project);setTimeout(function(){let html=editor.getHtml(),css=editor.getCss();html=html.replaceAll("{{patient_name}}",data.patientName).replaceAll("{{date}}",data.date).replaceAll("{{anamnesis_questions}}",data.questionsHtml).replaceAll("{{company_logo}}",data.companyLogo);document.head.insertAdjacentHTML("beforeend","<style>"+css+"<\\/style>");document.getElementById("render").innerHTML=html;const print=function(){window.print()};window.PagedPolyfill?window.PagedPolyfill.preview().then(print).catch(print):print()},350)})<\\/script></body></html>');
+    popup.document.close(); return true;
   };
   anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
   anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; requestAnimationFrame(fitToA4); });
@@ -2144,7 +2348,17 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   });
   modal.querySelector('.anamnesis-print').addEventListener('click', () => {
     hidden.value = JSON.stringify(collectWithDetails());
+    if (visualPrintProject && openVisualPrint(collectWithDetails())) return;
     const restores = [];
+    modal.querySelectorAll('.anamnesis-yes,.designer-answer-field').forEach(answer => {
+      const checkbox = answer.querySelector('input[type="checkbox"]');
+      if (!checkbox) return;
+      const answerOptions = checkbox.dataset.answerOptions || 'yes_no';
+      const selectedText = isVarYok(answerOptions) ? 'Var' : 'Evet';
+      const emptyText = isVarYok(answerOptions) ? 'Yok' : 'Hayır';
+      restores.push([answer, [...answer.childNodes]]);
+      answer.replaceChildren(document.createTextNode(checkbox.checked ? selectedText : emptyText));
+    });
     modal.querySelectorAll('.anamnesis-free-text').forEach(row => {
       const caption = row.querySelector('span'), field = row.querySelector('input,textarea');
       if (!caption || !field) return;
@@ -2152,7 +2366,10 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       caption.textContent = caption.textContent + (field.value.trim() ? ' — ' + field.value.trim() : '');
     });
     window.print();
-    setTimeout(() => restores.forEach(([caption, text]) => { caption.textContent = text; }), 500);
+    setTimeout(() => restores.forEach(([target, content]) => {
+      if (Array.isArray(content)) target.replaceChildren(...content);
+      else target.textContent = content;
+    }), 500);
   });
 })();
 </script>
@@ -2174,7 +2391,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row>span{display:flex;align-items:center;padding:6px 8px;border-right:1px solid #222;font-size:11px;text-transform:uppercase}
 #anamnesis-card-modal .anamnesis-row>.anamnesis-yes{grid-column:2;justify-content:center;text-transform:none}
 #anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>.anamnesis-detail-caption{grid-column:3;justify-content:center;text-align:center}
-#anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>input{grid-column:4;width:100%!important;min-height:0!important;border:0!important;border-radius:0!important;padding:6px!important}
+#anamnesis-card-modal .anamnesis-row.anamnesis-with-detail>input{grid-column:4;width:100%!important;min-height:0!important;border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;padding:6px!important}
 #anamnesis-card-modal .anamnesis-row:not(.anamnesis-with-detail)>input{grid-column:2/-1;width:100%!important;min-height:0!important;border:0!important;border-radius:0!important;padding:6px!important}
 #anamnesis-card-modal .anamnesis-row.anamnesis-wide{grid-template-columns:48% 52%}
 #anamnesis-card-modal .anamnesis-row.anamnesis-wide>span{grid-column:1}
@@ -2193,17 +2410,45 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-row:has(textarea){min-height:var(--anamnesis-notes-height,65px)!important}
 @media print{#anamnesis-card-modal{padding:var(--anamnesis-page-margin,20mm)!important;box-sizing:border-box!important}#anamnesis-card-modal .anamnesis-dialog{position:static!important;min-height:0!important;width:100%!important}#anamnesis-card-modal .anamnesis-dialog>header,#anamnesis-card-modal .anamnesis-meta,#anamnesis-card-modal .anamnesis-grid{position:static!important;width:auto!important;margin:0!important}}
 @media print{#anamnesis-card-modal .anamnesis-row>.anamnesis-yes input{display:none!important}}
+@media print{#anamnesis-card-modal .anamnesis-designer-sheet .designer-answer-field input[type="checkbox"]{display:none!important}}
 #anamnesis-card-modal .anamnesis-row:has(input[name="complaint"]){grid-column:1/-1!important;width:100%!important;grid-template-columns:35% minmax(0,1fr)!important}
+#anamnesis-card-modal .anamnesis-meta>strong,#anamnesis-card-modal .anamnesis-meta>span{font-size:calc(1em + 2px)!important}
+/* Tablo düzeninde kutu ve cevap aynı satırda, kutu solda kalır. */
+#anamnesis-card-modal .anamnesis-row>.anamnesis-yes{display:grid!important;grid-template-columns:15px max-content!important;place-content:center!important;align-items:center!important;column-gap:4px!important;white-space:nowrap!important;font-size:inherit!important}
+#anamnesis-card-modal .anamnesis-row>.anamnesis-yes>input[type="checkbox"]{display:block!important;grid-column:1!important;grid-row:1!important;width:15px!important;height:15px!important;min-width:15px!important;min-height:15px!important;margin:0!important;padding:0!important}
+#anamnesis-card-modal .anamnesis-row>.anamnesis-yes>.anamnesis-yes-label{display:block!important;grid-column:2!important;grid-row:1!important;padding:0!important;border:0!important;font-size:inherit!important;line-height:1!important}
 #anamnesis-card-modal .anamnesis-row:has(textarea){min-height:36px!important}
 #anamnesis-card-modal .anamnesis-row textarea{height:36px!important;min-height:36px!important;resize:none!important}
 #anamnesis-card-modal .anamnesis-apply{display:inline-grid!important;place-items:center;min-width:42px;padding:10px!important}
 #anamnesis-card-modal .anamnesis-apply i{font-size:18px;line-height:1}
+#anamnesis-card-modal .anamnesis-dialog footer button{display:inline-grid!important;place-items:center!important;width:36px!important;min-width:36px!important;height:36px!important;min-height:36px!important;padding:0!important}
+#anamnesis-card-modal .anamnesis-dialog footer button i{font-size:16px!important;line-height:1!important}
+#anamnesis-card-modal.designer-layout-active .anamnesis-dialog>header{position:absolute!important;z-index:3;right:0;top:0;padding:3px 10px;border:0!important;background:transparent}
+#anamnesis-card-modal.designer-layout-active .anamnesis-dialog>header h2,#anamnesis-card-modal.designer-layout-active .anamnesis-meta{display:none!important}
+#anamnesis-card-modal.designer-layout-active .anamnesis-company-logo{display:none!important}
+#anamnesis-card-modal .anamnesis-grid.designer-active{display:block!important;padding:0!important;overflow:auto!important;background:#eef1f4}
+#anamnesis-card-modal .anamnesis-designer-sheet{position:relative;box-sizing:border-box;width:100%;aspect-ratio:210/297;margin:0 auto;background:#fff;color:#182438;overflow:hidden}
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block{position:absolute;box-sizing:border-box;display:block;border:1px solid #182438;background:#fff;color:#182438;padding:6px;font:11px Arial,sans-serif;overflow:hidden}
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block.title{font-size:22px;font-weight:700;color:#14843c}
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block span{float:right}
+/* Hasta adı ve tarih, tasarımdaki blok yazısından iki punto daha büyük okunur. */
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block[data-type="patient"] strong,#anamnesis-card-modal .anamnesis-designer-sheet .design-block[data-type="patient"] span{font-size:calc(1em + 2px)}
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block.logo{display:flex;align-items:center;justify-content:center;border:0!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block.logo img{width:52%;max-width:100%;max-height:100%;object-fit:contain}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field{padding:0}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field{display:block;position:absolute}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-field-label,#anamnesis-card-modal .anamnesis-designer-sheet .designer-detail-label{font-weight:400!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field input,#anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field textarea{display:block;width:100%;height:100%;min-height:0;border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;box-sizing:border-box;padding:5px 6px;font:inherit;resize:none;background:transparent!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-answer-field{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;flex-wrap:nowrap;font-size:11px!important;font-weight:400!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-answer-field input{display:block;flex:0 0 15px;width:15px!important;height:15px!important;min-width:15px!important;min-height:15px!important;margin:0!important;accent-color:#19a94b}
 #anamnesis-card-modal .anamnesis-dialog{width:min(210mm,96vw,calc(70.7vh - 28px))!important;height:min(297mm,calc(100vh - 40px));max-height:calc(100vh - 40px)!important;display:flex;flex-direction:column;overflow:hidden}
+#anamnesis-card-modal.designer-layout-active .anamnesis-dialog{height:calc(100vh - 40px)!important;max-height:calc(100vh - 40px)!important}
 #anamnesis-card-modal .anamnesis-grid{flex:1 1 auto;overflow:hidden}
 @page{size:A4 portrait;margin:0}
 @media print{#anamnesis-card-modal .anamnesis-dialog{width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;display:block!important}#anamnesis-card-modal .anamnesis-grid{overflow:visible!important;zoom:1!important}}
 @media print{#anamnesis-card-modal .anamnesis-row>.anamnesis-yes{white-space:nowrap!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text{grid-template-columns:1fr!important;min-height:24px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>span{grid-column:1!important;border-right:0!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>input,#anamnesis-card-modal .anamnesis-row.anamnesis-free-text>textarea{display:none!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field{min-height:78px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field>span{align-items:flex-start!important;padding-top:8px!important}}
 /* A4 baskıda kullanılmayan yüksekliği form satırlarına dağıt. */
 @media print{#anamnesis-card-modal .anamnesis-dialog{height:auto!important;min-height:0!important;display:block!important;box-sizing:border-box!important;break-inside:auto!important;page-break-inside:auto!important}#anamnesis-card-modal .anamnesis-grid{display:block!important;height:auto!important;min-height:0!important;overflow:visible!important;break-inside:auto!important;page-break-inside:auto!important}#anamnesis-card-modal .anamnesis-row{display:grid!important;flex:none!important;border-bottom:var(--anamnesis-line-width,1px) solid #222!important;box-shadow:inset 0 calc(-1 * var(--anamnesis-line-width,1px)) 0 #222!important;break-inside:avoid!important;page-break-inside:avoid!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text{min-height:24px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field{min-height:78px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field>span{padding-top:8px!important}#anamnesis-card-modal .anamnesis-company-logo{position:fixed!important;right:0!important;bottom:4mm!important;left:0!important;display:flex!important;justify-content:center!important;align-items:center!important}#anamnesis-card-modal .anamnesis-company-logo[hidden]{display:none!important}#anamnesis-card-modal .anamnesis-company-logo img{display:block!important;width:var(--anamnesis-company-logo-width,28mm)!important;height:auto!important;max-height:18mm!important;object-fit:contain!important}}
+@media print{#anamnesis-card-modal.designer-layout-active{padding:0!important}#anamnesis-card-modal.designer-layout-active .anamnesis-dialog{width:210mm!important;height:297mm!important;min-height:297mm!important;border:0!important;overflow:hidden!important}#anamnesis-card-modal.designer-layout-active .anamnesis-grid.designer-active{display:block!important;overflow:hidden!important;background:#fff!important}#anamnesis-card-modal .anamnesis-designer-sheet{width:210mm!important;height:297mm!important;aspect-ratio:auto!important}.anamnesis-designer-sheet .design-block{font-size:10pt!important}.anamnesis-designer-sheet .design-block.title{font-size:20pt!important}}
 </style>
 <?php patient_footer(); ?>

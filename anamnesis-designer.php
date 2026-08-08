@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+header('Location: anamnesis-designer-v2.php', true, 302);
+exit;
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 require __DIR__ . '/config.php';
 require_admin();
 require __DIR__ . '/anamnesis-bootstrap.php';
@@ -31,16 +35,25 @@ patient_header('Anamnez Görsel Tasarımcı', 'settings');
 (() => {
   const stored = <?=json_encode((string)$settings['grapesjs_project'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
   const baseCss = `@page { size:A4 portrait; margin:10mm; } body{font-family:Arial,sans-serif;color:#182438}.a4-sheet{width:190mm;min-height:277mm;box-sizing:border-box;margin:auto}.title{color:#14843c;font-size:22px;font-weight:bold}.field{border:1px solid #222;padding:7px}.question-table{width:100%;border-collapse:collapse}.question-table td{border:1px solid #222;padding:6px;font-size:11px}`;
-  const initialContent = '<section class="a4-sheet"><div class="title">VOX İ.M. - HASTA KARTI</div><div class="field">{{patient_name}} <span style="float:right">{{date}}</span></div><div class="field">ŞİKAYETİNİZ NEDİR?</div><table class="question-table"><tr><td>GÜRÜLTÜLÜ ORTAMLARDA ÇALIŞTINIZ MI?</td><td style="width:12%;text-align:center">{{answer}}</td><td style="width:24%">NE KADAR SÜRE?</td><td></td></tr></table><div class="field" style="min-height:60px">ODY GÖRÜŞ VE TAVSİYESİ</div><div style="text-align:center;margin-top:15px"><img src="<?=url('assets/vox-logo-02.png')?>" style="max-width:110px"></div></section>';
+  const initialContent = '<section class="a4-sheet"><div class="title">VOX İ.M. - HASTA KARTI</div><div class="field">{{patient_name}} <span style="float:right">{{date}}</span></div><div class="field">{{anamnesis_questions}}</div><div class="field" style="min-height:60px">ODY GÖRÜŞ VE TAVSİYESİ</div><div style="text-align:center;margin-top:15px"><img src="{{company_logo}}" style="max-width:110px"></div></section>';
   const editor = grapesjs.init({container:'#gjs',height:'100%',storageManager:false,fromElement:false,components:initialContent,blockManager:{appendTo:'#gjs-blocks',blocks:[
     {id:'a4',label:'A4 Sayfa',category:'Anamnez',content:'<section class="a4-sheet"><div class="title">VOX İ.M. - HASTA KARTI</div></section>'},
     {id:'patient',label:'Hasta / Tarih',category:'Anamnez',content:'<div class="field">{{patient_name}} <span style="float:right">{{date}}</span></div>'},
-    {id:'question',label:'Soru Satırı',category:'Anamnez',content:'<table class="question-table"><tr><td>{{question}}</td><td style="width:12%;text-align:center">{{answer}}</td><td style="width:24%">{{detail}}</td><td></td></tr></table>'},
+    {id:'question',label:'Tüm Anamnez Soruları',category:'Anamnez',content:'<div>{{anamnesis_questions}}</div>'},
     {id:'text',label:'Metin Alanı',category:'Anamnez',content:'<div class="field">{{text_field}}</div>'},
-    {id:'logo',label:'Şirket Logosu',category:'Anamnez',content:'<div style="text-align:center"><img src="<?=url('assets/vox-logo-02.png')?>" style="max-width:110px"></div>'}
+    {id:'logo',label:'Şirket Logosu',category:'Anamnez',content:'<div style="text-align:center"><img src="{{company_logo}}" style="max-width:110px"></div>'}
   ]}});
   editor.setStyle(baseCss);
-  if (stored) { try { editor.loadProjectData(JSON.parse(stored)); } catch (_) {} }
+  if (stored) {
+    try {
+      editor.loadProjectData(JSON.parse(stored));
+      // Önceden kaydedilmiş boş bir proje, tasarım alanını boşaltmamalı.
+      if (!editor.getHtml().replace(/<[^>]*>|\s+/g, '')) throw new Error('Boş tasarım');
+    } catch (_) {
+      editor.setComponents(initialContent);
+      editor.setStyle(baseCss);
+    }
+  }
   const form = document.getElementById('visual-designer-form');
   form.addEventListener('submit', () => document.getElementById('grapesjs-project').value = JSON.stringify(editor.getProjectData()));
   document.getElementById('paged-preview').addEventListener('click', () => {
