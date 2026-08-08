@@ -1893,7 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTitle('commission_rate', type === 'term' ? 'Aylık Ödeme' : 'Komisyon Oranı');
     setTitle('amount', type === 'term' ? 'Toplam' : 'Tutar');
     setLabel('bank_name', type === 'mail_order' || type === 'credit_card', '1 / 2', '2');
-    setLabel('current_account_id', type === 'mail_order', '1 / -1', '3');
+    setLabel('current_account_id', type === 'mail_order', '2 / 3', '2');
     const accountField = cashForm.querySelector('[name="current_account_id"]');
     const accountLabel = accountField?.closest('label');
     if (accountField && accountLabel) {
@@ -1908,14 +1908,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setLabel('installment_count', type === 'credit_card' || type === 'term', type === 'term' ? '1 / 2' : '2 / 3', '2');
     setLabel('commission_rate', type === 'credit_card' || type === 'term', '2 / 3', '3');
-    setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', type === 'mail_order' ? '4' : '3');
-    setLabel('description', true, '1 / -1', type === 'mail_order' ? '5' : '4');
+    setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', '3');
+    setLabel('description', true, '1 / -1', '4');
   };
   cashForm.addEventListener('repair-payment-change', () => [0, 80, 250, 500, 800].forEach(delay => setTimeout(refreshRepairPayment, delay)));
 });
 </script>
 <style>
-form[action*="cash.php"] section label:has([name="current_account_id"]){grid-column:1/-1!important;grid-row:3!important;width:100%!important;min-width:0!important}
+form[action*="cash.php"] section label:has([name="current_account_id"]){grid-column:2/3!important;grid-row:2!important;width:100%!important;min-width:0!important}
 form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;height:40px!important;min-height:40px!important;padding:8px 10px!important;box-sizing:border-box!important;visibility:visible!important;opacity:1!important}
 </style>
 <?php patient_footer(); ?>
