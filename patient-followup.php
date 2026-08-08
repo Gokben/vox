@@ -1863,6 +1863,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setTitle('amount', type === 'term' ? 'Toplam' : 'Tutar');
     setLabel('bank_name', type === 'mail_order' || type === 'credit_card', '1 / 2', '2');
     setLabel('current_account_id', type === 'mail_order', '2 / 3', '2');
+    const accountField = cashForm.querySelector('[name="current_account_id"]');
+    const accountLabel = accountField?.closest('label');
+    if (accountField && accountLabel) {
+      accountLabel.style.setProperty('width', '100%', 'important');
+      accountLabel.style.setProperty('min-width', '220px', 'important');
+      accountField.style.setProperty('display', 'block', 'important');
+      accountField.style.setProperty('width', '100%', 'important');
+      accountField.style.setProperty('min-width', '220px', 'important');
+    }
     setLabel('installment_count', type === 'credit_card' || type === 'term', type === 'term' ? '1 / 2' : '2 / 3', '2');
     setLabel('commission_rate', type === 'credit_card' || type === 'term', '2 / 3', '3');
     setLabel('amount', true, type === 'credit_card' ? '1 / 2' : '1 / -1', type === 'credit_card' ? '3' : '3');
