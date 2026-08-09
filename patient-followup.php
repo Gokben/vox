@@ -648,6 +648,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['service_integrity_error'] = 'Bu satışa bağlı ' . ($linkedSaleState['cash'] ? 'kasa tahsilatı' : '') . (($linkedSaleState['cash'] && $linkedSaleState['stock']) ? ' ve ' : '') . ($linkedSaleState['stock'] ? 'stok çıkışı' : '') . ' bulunuyor. Bağlantının kopmaması için önce tahsilatı iptal edip stok iadesini tamamlayın; satış kartı bu işlemler yapılmadan silinemez.';
             redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
         }
+        if ($savedServiceName === 'Tamir') {
+            try {
+                $repairPayment = $pdo->prepare("SELECT 1 FROM cash_transactions WHERE source_url=? AND transaction_type='income' LIMIT 1");
+                $repairPayment->execute([url('patient-followup.php?id=' . $id) . '&repair=' . $postedEditId]);
+                if ($repairPayment->fetchColumn()) {
+                    $_SESSION['service_integrity_error'] = 'Bu Tamir kartı için hastadan tahsilat yapılmış. Önce tahsilatı iptal etmeden kart silinemez.';
+                    redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+                }
+            } catch (Throwable $exception) {
+                error_log('repair delete payment check: ' . $exception->getMessage());
+            }
+        }
         $pdo->prepare('DELETE FROM patient_services WHERE id=? AND patient_id=?')->execute([$postedEditId, $id]);
         redirect('patient-followup.php?id=' . $id);
     }
@@ -678,17 +690,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $postedStockId = (int)($_POST['stock_id'] ?? 0);
     $postedRepairDetails = json_decode((string)($_POST['repair_details'] ?? ''), true);
+    $repairReceivedBy = '';
     if (is_array($postedRepairDetails)) {
-        foreach (['repair_accessories[]', 'repair_customer_issues[]', 'repair_technician_issues[]'] as $repairListKey) {
+        foreach (['repair_accessories[]', 'repair_customer_issues[]', 'repair_technician_issues[]', 'repair_selected_device_serials[]'] as $repairListKey) {
             if (!isset($postedRepairDetails[$repairListKey]) || !is_array($postedRepairDetails[$repairListKey])) continue;
             $postedRepairDetails[$repairListKey] = array_values(array_unique(array_filter(array_map('trim', $postedRepairDetails[$repairListKey]), static fn(string $item): bool => $item !== '')));
         }
-        $receivedBy = trim((string)($postedRepairDetails['repair_received_by'] ?? ''));
-        if ($receivedBy !== '' && !in_array($receivedBy, patient_staff_names(), true)) $postedRepairDetails['repair_received_by'] = '';
+        $repairReceivedBy = trim((string)($postedRepairDetails['repair_received_by'] ?? ''));
+        if ($repairReceivedBy !== '' && !in_array($repairReceivedBy, patient_staff_names(), true)) {
+            $postedRepairDetails['repair_received_by'] = '';
+            $repairReceivedBy = '';
+        }
+        if (array_key_exists('repair_patient_device_quantity', $postedRepairDetails)) {
+            $postedRepairDetails['repair_patient_device_quantity'] = (string)max(1, min(2, (int)$postedRepairDetails['repair_patient_device_quantity']));
+        }
+        if (isset($postedRepairDetails['repair_selected_device_serials[]'])) {
+            $maximumSelectedSerials = (int)($postedRepairDetails['repair_patient_device_quantity'] ?? 1);
+            $postedRepairDetails['repair_selected_device_serials[]'] = array_slice($postedRepairDetails['repair_selected_device_serials[]'], 0, max(1, min(2, $maximumSelectedSerials)));
+        }
+        if ($postedServiceName === 'Tamir') {
+            $requiredSerialCount = max(1, min(2, (int)($postedRepairDetails['repair_patient_device_quantity'] ?? 1)));
+            $selectedSerialCount = count((array)($postedRepairDetails['repair_selected_device_serials[]'] ?? []));
+            if ($selectedSerialCount !== $requiredSerialCount) {
+                $_SESSION['service_integrity_error'] = 'Tamir kaydını kaydetmek için adet bilgisine uygun seri numarası seçmelisiniz.';
+                redirect('patient-followup.php?id=' . $id . ($postedEditId ? '&edit=' . $postedEditId : '&new=1'));
+            }
+        }
+    }
+    $isRepair = $postedServiceName === 'Tamir';
+    $recordDate = (string)($_POST['record_date'] ?? date('Y-m-d'));
+    if ($isRepair) {
+        if (!is_array($postedRepairDetails)) $postedRepairDetails = [];
+        $branchDeliveryDate = trim((string)($postedRepairDetails['repair_branch_delivery_date'] ?? ''));
+        if ($branchDeliveryDate !== '') $recordDate = $branchDeliveryDate;
+        else $postedRepairDetails['repair_branch_delivery_date'] = $recordDate;
     }
     $postedRepairDetailsJson = is_array($postedRepairDetails)
         ? json_encode($postedRepairDetails, JSON_UNESCAPED_UNICODE)
         : (string)($_POST['repair_details'] ?? '');
+    $contactPerson = trim((string)($_POST['contact_person'] ?? ''));
+    if ($postedServiceName === 'Tamir' && $repairReceivedBy !== '') $contactPerson = $repairReceivedBy;
+    $appointmentDate = $isRepair ? $recordDate : (string)($_POST['appointment_date'] ?? '');
+    $serviceType = $isRepair ? 'Yüz yüze' : trim((string)($_POST['service_type'] ?? ''));
     $values = [
         'record_no'=>trim((string)($_POST['record_no'] ?? '')),
         'service_date'=>(string)($_POST['record_date'] ?? date('Y-m-d')),
@@ -697,10 +740,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'action_date'=>(string)($_POST['action_date'] ?? ''),
         'opened_by'=>(string)($_SESSION['user']['name'] ?? ''),
         'branch_name'=>$branchNamesById[(int)($_POST['branch_id'] ?? 0)] ?? '',
-        'appointment_date'=>(string)($_POST['appointment_date'] ?? ''),
+        'appointment_date'=>$appointmentDate,
         'start_time'=>(string)($_POST['start_time'] ?? ''), 'end_time'=>(string)($_POST['end_time'] ?? ''),
-        'service_type'=>trim((string)($_POST['service_type'] ?? '')), 'service_location'=>trim((string)($_POST['service_location'] ?? '')),
-        'branch_id'=>(int)($_POST['branch_id'] ?? 0), 'contact_person'=>trim((string)($_POST['contact_person'] ?? '')),
+        'service_type'=>$serviceType, 'service_location'=>trim((string)($_POST['service_location'] ?? '')),
+        'branch_id'=>(int)($_POST['branch_id'] ?? 0), 'contact_person'=>$contactPerson,
         'appointment_status'=>trim((string)($_POST['appointment_status'] ?? '')), 'complaint'=>trim((string)($_POST['complaint'] ?? '')), 'anamnesis_form'=>(string)($_POST['anamnesis_form'] ?? ''),
         'observation'=>trim((string)($_POST['observation'] ?? '')), 'service_name'=>$postedServiceName, 'stock_id'=>$postedServiceName === 'Satış' && $postedStockId > 0 ? $postedStockId : null,
         'result_name'=>trim((string)($_POST['result_name'] ?? '')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? '')), 'related_personnel'=>trim((string)($_POST['related_personnel'] ?? '')), 'satisfaction'=>(int)($_POST['satisfaction'] ?? 0),
@@ -872,6 +915,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $servicesStatement = $pdo->prepare('SELECT * FROM patient_services WHERE patient_id=? ORDER BY service_date DESC,id DESC');
 $servicesStatement->execute([$id]);
 $services = $servicesStatement->fetchAll();
+$latestDeviceBrandModel = '';
+$latestDeviceQuantity = 0;
+$latestDeviceSerials = [];
+$latestDeviceInvoiceNo = '';
+$latestDeviceSaleDate = '';
+$latestDeviceWarrantyEnd = '';
+foreach ($services as $service) {
+    $saleDetails = json_decode((string)($service['sales_details'] ?? ''), true);
+    if (!is_array($saleDetails)) continue;
+    $latestDeviceModel = trim((string)($saleDetails['sales_model'] ?? ''));
+    if ($latestDeviceModel === '') continue;
+    $latestDeviceBrandModel = trim((string)($saleDetails['sales_brand'] ?? '') . ' ' . $latestDeviceModel);
+    $latestDeviceInvoiceNo = trim((string)($saleDetails['sales_invoice_no'] ?? ''));
+    $latestDeviceSaleDate = trim((string)($saleDetails['sales_sale_date'] ?? ''));
+    $latestDeviceWarrantyEnd = trim((string)($saleDetails['sales_warranty_end'] ?? ''));
+    $latestDeviceQuantity = 1;
+    $latestDeviceSerials[] = trim((string)($saleDetails['sales_device_serial'] ?? ''));
+    for ($deviceNumber = 2; $deviceNumber <= 4; $deviceNumber++) {
+        if (trim((string)($saleDetails["sales_device_{$deviceNumber}_model"] ?? '')) !== '') {
+            $latestDeviceQuantity++;
+            $latestDeviceSerials[] = trim((string)($saleDetails["sales_device_{$deviceNumber}_serial"] ?? ''));
+        }
+    }
+    break;
+}
 foreach ($services as &$service) {
     if (trim((string)($service['branch_name'] ?? '')) === '') $service['branch_name'] = $branchNamesById[(int)($service['branch_id'] ?? 0)] ?? '';
 }
@@ -888,6 +956,7 @@ if ($serviceIntegrityError !== ''): ?><script>window.addEventListener('DOMConten
 if ($incomeValidationError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const openIncome=()=>{const form=document.querySelector('form[action*="cash.php"]'),modal=form?.parentElement;if(!modal){setTimeout(openIncome,50);return;}modal.hidden=false;modal.style.display='grid';setTimeout(()=>alert(<?=json_encode($incomeValidationError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0);};openIncome();},350));</script><?php endif;
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
 $form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>'','contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'anamnesis_form'=>'','observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
+$showRepairDetailsButton = $showForm && trim((string)$form['service_name']) === 'Tamir' && trim((string)$form['repair_details']) !== '';
 if ($form['result_name'] === 'Red') $form['result_name'] = 'Ret';
 if ($editId && trim((string)$form['service_location']) === '') $form['service_location'] = (string)($patient['service_location'] ?? '');
 if ($editId && trim((string)$form['complaint']) === '') $form['complaint'] = (string)($patient['anamnesis'] ?? '');
@@ -975,10 +1044,18 @@ if ($currentContactPerson !== '') {
 <div class="satisfaction"><label>Memnuniyet</label><div class="faces"><?php foreach(['🙂','😐','🙁','😡'] as $score=>$face):?><input id="s<?=$score+1?>" type="radio" name="satisfaction" value="<?=$score+1?>" <?=((int)$form['satisfaction']===$score+1)?'checked':''?>><label for="s<?=$score+1?>"><?=$face?></label><?php endforeach?></div></div>
 <label class="service-field service-wide">Açıklama<textarea name="description"><?=e((string)$form['description'])?></textarea></label><footer><button class="button"><?=$editId ? 'Güncelle' : 'Kaydet'?></button><a class="cancel-link" href="<?=e(url('patient-followup.php?id='.$id))?>">İptal</a></footer></form>
 <script>(()=>{const iconByField={record_no:'tabler-hash',record_date:'tabler-calendar',appointment_date:'tabler-calendar-event',start_time:'tabler-clock',end_time:'tabler-clock',service_type:'tabler-phone',service_location:'tabler-building',branch_id:'tabler-building-community',contact_person:'tabler-user',appointment_status:'tabler-calendar-check',complaint:'tabler-notes',observation:'tabler-eye',service_name:'tabler-clipboard-list',result_name:'tabler-circle-check',action_name:'tabler-bolt',action_date:'tabler-calendar-event',description:'tabler-file-text'};document.querySelectorAll('.service-form input[name],.service-form select[name],.service-form textarea[name]').forEach(field=>{if(field.type==='hidden'||field.closest('.service-input-with-icon'))return;const icon=iconByField[field.name];if(!icon)return;const wrapper=document.createElement('span');wrapper.className='service-input-with-icon';const iconSlot=document.createElement('span');iconSlot.className='service-input-icon';iconSlot.innerHTML=`<i class="ti ${icon}" aria-hidden="true"></i>`;field.parentNode.insertBefore(wrapper,field);wrapper.append(iconSlot,field);});})();</script>
-<script>document.addEventListener('DOMContentLoaded',()=>{const openSalesDetails=()=>{const modal=document.getElementById('sales-details-modal');if(!modal)return;modal.hidden=false;modal.setAttribute('aria-hidden','false');};document.getElementById('service-detail-button')?.addEventListener('click',openSalesDetails);document.getElementById('sales-details-link')?.addEventListener('click',openSalesDetails);});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const openSalesDetails=()=>{const modal=document.getElementById('sales-details-modal');if(!modal)return;modal.hidden=false;modal.setAttribute('aria-hidden','false');};document.getElementById('service-detail-button')?.addEventListener('click',openSalesDetails);document.getElementById('sales-details-link')?.addEventListener('click',openSalesDetails);if(<?=json_encode($showRepairDetailsButton)?>){const slot=document.querySelector('.service-name-income-slot');if(slot&&!document.getElementById('repair-details-link')){const button=document.createElement('button');button.type='button';button.id='repair-details-link';button.className='sales-details-link';button.title='Tamir detaylarını aç';button.setAttribute('aria-label','Tamir detaylarını aç');button.innerHTML='<i class="ti tabler-tools"></i>';button.addEventListener('click',()=>{const modal=document.getElementById('repair-modal');if(modal){modal.hidden=false;modal.setAttribute('aria-hidden','false');}});slot.append(button);}}});</script>
 <?php else: ?><header class="services-head"><h2>Hasta Hizmet Kartı Yönetimi - <?=e($patient['full_name'])?></h2><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&new=1'))?>">＋ Yeni Hizmet Kartı Ekle</a></header><div class="services-toolbar"><span>Toplam <?=count($services)?> kayıt</span><span>Ara: <input type="search" placeholder="Ara"></span></div><table class="services-table"><thead><tr><th>SIRA</th><th>TARİH</th><th>DURUM</th><th>YAPILAN İŞLEM</th><th>AKSİYON</th><th>İLGİLENEN</th><th>ŞUBE</th><th>İŞLEM</th></tr></thead><tbody><?php foreach($services as $index=>$service):?><tr data-edit-url="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id']))?>"><td><?=$index+1?></td><td><?=e(format_date_tr($service['service_date']))?></td><td><?=e($service['service_status'])?></td><td><?=e($service['service_name'] ?? '')?:'—'?></td><td><?=e(format_date_tr($service['action_date']))?></td><td><?=e($service['contact_person'] ?? '')?></td><td><?=e($service['branch_name'])?></td><td><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" style="display:inline" onsubmit="return confirm('Bu hizmet kartı silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="edit_id" value="<?=(int)$service['id']?>"><button class="button" style="background:#e04f55" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></td></tr><?php endforeach;if(!$services):?><tr><td colspan="8" class="service-empty">Henüz hizmet kartı bulunmuyor.</td></tr><?php endif?></tbody></table><script>document.querySelectorAll('.services-table tbody tr[data-edit-url]').forEach(row=>{row.style.cursor='pointer';row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});</script><?php endif; ?>
 </section></main>
 <?php if (!$showForm): ?>
+<script>
+document.querySelectorAll('.services-table form').forEach(form => {
+  if (form.querySelector('[name="action"]')?.value !== 'delete') return;
+  const serviceName = form.closest('tr')?.children[3]?.textContent.trim();
+  if (serviceName !== 'Tamir') return;
+  form.onsubmit = () => confirm('Bu Tamir kartını silmek istiyor musunuz? Hastadan tahsilat yapılmadıysa kayıt ve Teknik Servis listesindeki satır silinecektir.');
+});
+</script>
 <script>
 (() => {
   const newServiceButton = document.querySelector('.services-head > .button');
@@ -1057,6 +1134,7 @@ if ($currentContactPerson !== '') {
 @media(max-width:620px){#repair-modal #repair-tab-delivery{grid-template-columns:1fr}}
 @media(max-width:620px){#repair-modal .repair-tab-list{overflow-x:auto}#repair-modal .repair-tab{flex:0 0 auto;padding:12px 14px;font-size:14px}#repair-modal .repair-tab-panel{padding:16px}}
 </style>
+<style>#repair-modal .repair-accessories-title{grid-column:1/-1;margin:0 0 5px;color:#2f2b3d;font-size:15px}#repair-modal .repair-accessories .repair-switch{grid-column:1/3!important;gap:7px!important}#repair-modal .repair-accessories .repair-switch input{width:18px!important;height:18px!important;margin:0!important}#repair-modal .repair-invoice-number{grid-column:3/-1;display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px;white-space:nowrap}#repair-modal .repair-invoice-number input{width:100%;min-width:0!important;min-height:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}#repair-modal .repair-warranty-status{grid-column:1/-1;margin:0;font-size:13px;font-weight:600;color:#dc3545}#repair-modal .repair-warranty-status.is-expired{color:#dc3545}#repair-modal .repair-accessory-options{grid-column:1/-1;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 28px}#repair-modal .repair-accessory-options label{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:7px}#repair-modal #repair-tab-delivery .repair-priority{grid-column:1/-1!important;justify-content:center!important}#repair-modal .repair-accessories .repair-patient-device-model{grid-column:1/3;display:flex!important;flex-direction:column!important;align-items:stretch!important}#repair-modal .repair-accessories .repair-patient-device-quantity{grid-column:3;display:flex!important;flex-direction:column!important;align-items:stretch!important}#repair-modal .repair-accessories .repair-patient-device-sale-date{grid-column:4;display:flex!important;flex-direction:column!important;align-items:stretch!important}#repair-modal .repair-accessories .repair-patient-device-model input,#repair-modal .repair-accessories .repair-patient-device-quantity input,#repair-modal .repair-accessories .repair-patient-device-sale-date input{width:100%;box-sizing:border-box}#repair-modal .repair-patient-device-serials{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#repair-modal .repair-patient-device-serials>label{display:flex!important;flex-direction:column!important;align-items:stretch!important}#repair-modal .repair-patient-device-serials .repair-serial-select{display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px}#repair-modal .repair-patient-device-serials .repair-serial-select input[type="checkbox"]{width:17px!important;height:17px;margin:0;accent-color:#19a94b;flex:0 0 auto}#repair-modal .repair-patient-device-serials .repair-serial-select input[type="text"]{width:100%;box-sizing:border-box;flex:1}</style>
 <div id="repair-modal" class="repair-modal" hidden aria-hidden="true">
   <div class="repair-modal-backdrop" data-repair-close></div>
   <section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="repair-modal-title">
@@ -1153,7 +1231,82 @@ document.addEventListener('click',async event=>{
   const details = document.getElementById('repair_details');
   if (!modal || !form || !serviceName || !details) return;
   const controls = [...modal.querySelectorAll('[name]')];
+  const accessoriesPanel = modal.querySelector('#repair-tab-accessories');
+  modal.querySelector('[data-repair-tab="repair-tab-accessories"]')?.replaceChildren('Garanti');
+  modal.querySelector('[data-repair-tab="repair-tab-delivery"]')?.replaceChildren('Teslim');
+  if (accessoriesPanel && !accessoriesPanel.querySelector('.repair-accessories-title')) {
+    const title = document.createElement('h3');
+    title.className = 'repair-accessories-title';
+    title.textContent = 'Aksesuarlar';
+    accessoriesPanel.prepend(title);
+  }
+  if (accessoriesPanel && !accessoriesPanel.querySelector('.repair-accessory-options')) {
+    const options = [...accessoriesPanel.querySelectorAll('label')].filter(label => label.querySelector('[name="repair_accessories[]"]'));
+    if (options.length) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'repair-accessory-options';
+      options[0].before(wrapper);
+      options.forEach(option => wrapper.append(option));
+    }
+  }
   const deliveryTab = modal.querySelector('#repair-tab-delivery');
+  const patientDeviceBrandModel = <?=json_encode($latestDeviceBrandModel, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const patientDeviceQuantity = <?=json_encode($latestDeviceQuantity)?>;
+  const patientDeviceSerials = <?=json_encode($latestDeviceSerials, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const patientDeviceInvoiceNo = <?=json_encode($latestDeviceInvoiceNo, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const patientDeviceSaleDate = <?=json_encode($latestDeviceSaleDate, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const patientDeviceWarrantyEnd = <?=json_encode($latestDeviceWarrantyEnd, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const repairPaymentLocked = <?=json_encode($savedRepairFeeCash)?>;
+  const receivedByLabel = deliveryTab?.querySelector('[name="repair_received_by"]')?.closest('label');
+  if (receivedByLabel && !deliveryTab.querySelector('.repair-patient-device-model')) {
+    const label = document.createElement('label');
+    label.className = 'repair-patient-device-model';
+    label.textContent = 'Hastanın Cihazı';
+    const input = document.createElement('input');
+    input.type = 'text'; input.name = 'repair_patient_device_model'; input.readOnly = true; input.value = patientDeviceBrandModel || 'Cihaz bilgisi bulunamadı';
+    input.setAttribute('form', 'service-card-form');
+    label.append(input); receivedByLabel.after(label); controls.push(input);
+    const quantityLabel = document.createElement('label');
+    quantityLabel.className = 'repair-patient-device-quantity';
+    quantityLabel.textContent = 'Adet';
+    const quantityInput = document.createElement('input');
+    quantityInput.type = 'number'; quantityInput.name = 'repair_patient_device_quantity'; quantityInput.min = '1'; quantityInput.max = '2'; quantityInput.step = '1'; quantityInput.value = String(Math.min(2, Math.max(1, patientDeviceQuantity || 1)));
+    quantityInput.setAttribute('form', 'service-card-form');
+    quantityLabel.append(quantityInput); label.after(quantityLabel); controls.push(quantityInput);
+    const saleDateLabel = document.createElement('label');
+    saleDateLabel.className = 'repair-patient-device-sale-date';
+    saleDateLabel.textContent = 'Alım Tarihi';
+    const saleDateInput = document.createElement('input');
+    saleDateInput.type = 'text'; saleDateInput.readOnly = true;
+    const saleDateParts = patientDeviceSaleDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    saleDateInput.value = saleDateParts ? `${saleDateParts[3]}.${saleDateParts[2]}.${saleDateParts[1]}` : (patientDeviceSaleDate || 'Alım tarihi bulunamadı');
+    saleDateLabel.append(saleDateInput); quantityLabel.after(saleDateLabel);
+    const serialGroup = document.createElement('div'); serialGroup.className = 'repair-patient-device-serials';
+    const renderSerials = () => {
+      serialGroup.replaceChildren();
+      for (let index = 0; index < 2; index++) {
+        const serial = patientDeviceSerials[index] || '';
+        const serialLabel = document.createElement('label'); serialLabel.textContent = `Seri No ${index + 1}`;
+        const serialSelect = document.createElement('label'); serialSelect.className = 'repair-serial-select';
+        const serialCheckbox = document.createElement('input'); serialCheckbox.type = 'checkbox'; serialCheckbox.name = 'repair_selected_device_serials[]'; serialCheckbox.value = serial; serialCheckbox.disabled = !serial;
+        serialCheckbox.setAttribute('form', 'service-card-form'); controls.push(serialCheckbox);
+        serialCheckbox.addEventListener('change', () => {
+          const maximum = Math.max(1, Math.min(2, Number(quantityInput.value) || 1));
+          const selected = [...serialGroup.querySelectorAll('input[type="checkbox"]:checked')];
+          if (selected.length > maximum) { serialCheckbox.checked = false; alert(`Adet bilgisine göre en fazla ${maximum} seri numarası seçebilirsiniz.`); }
+        });
+        const serialInput = document.createElement('input'); serialInput.type = 'text'; serialInput.readOnly = true; serialInput.value = serial || 'Seri numarası bulunamadı';
+        serialSelect.append(serialCheckbox, serialInput); serialLabel.append(serialSelect); serialGroup.append(serialLabel);
+      }
+    };
+    quantityInput.addEventListener('input', () => {
+      if (quantityInput.value !== '') quantityInput.value = String(Math.max(1, Math.min(2, Number(quantityInput.value) || 1)));
+      const maximum = Math.max(1, Math.min(2, Number(quantityInput.value) || 1));
+      [...serialGroup.querySelectorAll('input[type="checkbox"]:checked')].slice(maximum).forEach(checkbox => { checkbox.checked = false; });
+    });
+    renderSerials();
+    if (accessoriesPanel) accessoriesPanel.append(label, quantityLabel, saleDateLabel, serialGroup);
+  }
   const repairBranchDeliveryLabel = deliveryTab?.querySelector('[name="repair_branch_delivery_date"]')?.closest('label');
   const repairBranchDeliveryTitle = repairBranchDeliveryLabel && [...repairBranchDeliveryLabel.childNodes].find(node => node.nodeType === Node.TEXT_NODE);
   if (repairBranchDeliveryTitle) repairBranchDeliveryTitle.nodeValue = 'Şubeye Teslim';
@@ -1186,6 +1339,46 @@ document.addEventListener('click',async event=>{
       priorities.append(label); controls.push(input);
     });
     warrantyLabel.after(priorities);
+  }
+  if (warrantyLabel && accessoriesPanel) {
+    warrantyLabel.querySelector('span')?.remove();
+    const accessoriesTitle = accessoriesPanel.querySelector('.repair-accessories-title');
+    if (accessoriesTitle) accessoriesPanel.insertBefore(warrantyLabel, accessoriesTitle);
+  }
+  if (accessoriesPanel && !accessoriesPanel.querySelector('.repair-invoice-number')) {
+    const invoiceLabel = document.createElement('label');
+    invoiceLabel.className = 'repair-invoice-number';
+    invoiceLabel.textContent = 'Fatura No:';
+    const invoiceInput = document.createElement('input');
+    invoiceInput.type = 'text'; invoiceInput.readOnly = true; invoiceInput.tabIndex = -1; invoiceInput.style.outline = 'none';
+    invoiceInput.value = patientDeviceInvoiceNo || 'Fatura numarası bulunamadı';
+    invoiceLabel.append(invoiceInput);
+    const accessoriesTitle = accessoriesPanel.querySelector('.repair-accessories-title');
+    if (accessoriesTitle) accessoriesPanel.insertBefore(invoiceLabel, accessoriesTitle);
+    else accessoriesPanel.prepend(invoiceLabel);
+  }
+  if (warrantyLabel && accessoriesPanel && !accessoriesPanel.querySelector('.repair-warranty-status')) {
+    const warrantyStatus = document.createElement('p');
+    warrantyStatus.className = 'repair-warranty-status';
+    const formatDate = value => new Date(`${value}T00:00:00`).toLocaleDateString('tr-TR');
+    const updateWarrantyStatus = () => {
+      if (!warrantyLabel.querySelector('input')?.checked) { warrantyStatus.hidden = true; return; }
+      warrantyStatus.hidden = false;
+      const warrantyEnd = patientDeviceWarrantyEnd ? new Date(`${patientDeviceWarrantyEnd}T00:00:00`) : null;
+      if (!warrantyEnd || Number.isNaN(warrantyEnd.getTime())) { warrantyStatus.classList.add('is-expired'); warrantyStatus.textContent = 'Bu ürün için garanti bitiş tarihi bulunamadı.'; return; }
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (today > warrantyEnd) { warrantyStatus.classList.add('is-expired'); warrantyStatus.textContent = `Bu ürünün garanti süresi bitmiş. Garanti bitiş tarihi: ${formatDate(patientDeviceWarrantyEnd)}`; return; }
+      let months = (warrantyEnd.getFullYear() - today.getFullYear()) * 12 + warrantyEnd.getMonth() - today.getMonth();
+      let cursor = new Date(today); cursor.setMonth(cursor.getMonth() + months);
+      if (cursor > warrantyEnd) { months--; cursor = new Date(today); cursor.setMonth(cursor.getMonth() + months); }
+      const days = Math.round((warrantyEnd - cursor) / 86400000);
+      warrantyStatus.classList.remove('is-expired'); warrantyStatus.textContent = `Garanti bitiş tarihi: ${formatDate(patientDeviceWarrantyEnd)} — Kalan süre: ${months} ay ${days} gün`;
+    };
+    warrantyLabel.querySelector('input')?.addEventListener('change', updateWarrantyStatus);
+    const accessoriesTitle = accessoriesPanel.querySelector('.repair-accessories-title');
+    if (accessoriesTitle) accessoriesPanel.insertBefore(warrantyStatus, accessoriesTitle);
+    else accessoriesPanel.append(warrantyStatus);
+    updateWarrantyStatus();
   }
   deliveryTab?.querySelectorAll('[name="repair_priority[]"]').forEach(input => {
     input.addEventListener('change', () => {
@@ -1299,17 +1492,55 @@ document.addEventListener('click',async event=>{
   const restore = () => { try { const values = JSON.parse(details.value || '{}'); controls.forEach(control => { const value = values[control.name]; if (control.type === 'checkbox') control.checked = Array.isArray(value) ? value.includes(control.value) : Boolean(value); else if (value !== undefined) control.value = value; }); } catch (_) {} };
   const persist = () => { const values = {}; controls.forEach(control => { if (control.type === 'checkbox') { if (control.name.endsWith('[]')) { (values[control.name] ||= []); if (control.checked) values[control.name].push(control.value); } else values[control.name] = control.checked; } else values[control.name] = control.value; }); details.value = JSON.stringify(values); };
   restore();
+  form.querySelector('[name="repair_patient_device_quantity"]')?.dispatchEvent(new Event('input'));
+  if (repairPaymentLocked && serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') {
+    modal.querySelectorAll('.repair-body input,.repair-body select,.repair-body textarea').forEach(field => { field.disabled = true; field.readOnly = true; });
+    const saveButton = document.getElementById('repair-save');
+    if (saveButton) { saveButton.disabled = true; saveButton.title = 'Tahsilat bulunan tamir kaydı değiştirilemez'; }
+    const notice = document.createElement('p');
+    notice.className = 'repair-payment-lock-notice';
+    notice.textContent = 'Bu tamir kaydına ödeme işlendiği için tamir bilgileri değiştirilemez.';
+    modal.querySelector('.repair-body')?.prepend(notice);
+  }
   if (!<?=json_encode($savedRepairFeeCash)?>) {
     if (serviceFee) serviceFee.value = '';
     if (serviceFeePayment) serviceFeePayment.value = '';
   }
   syncRepairTechnician();
   formatServiceFee();
-  serviceName.addEventListener('change', () => { if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open(); });
+  const applyNewRepairDefaults = () => {
+    if (serviceName.value.trim().toLocaleLowerCase('tr-TR') !== 'tamir') return;
+    const recordDateInput = form.querySelector('[name="record_date"]');
+    const recordDate = recordDateInput?.value || '';
+    const appointmentDate = form.querySelector('[name="appointment_date"]');
+    const branchDeliveryDate = deliveryTab?.querySelector('[name="repair_branch_delivery_date"]');
+    const effectiveDate = branchDeliveryDate?.value || recordDate;
+    if (effectiveDate) {
+      if (recordDateInput) recordDateInput.value = effectiveDate;
+      if (appointmentDate) appointmentDate.value = effectiveDate;
+      if (branchDeliveryDate && !branchDeliveryDate.value) branchDeliveryDate.value = effectiveDate;
+    }
+    const serviceType = form.querySelector('[name="service_type"]');
+    const faceToFace = [...(serviceType?.options || [])].find(option => option.textContent.trim().toLocaleLowerCase('tr-TR') === 'yüz yüze');
+    if (serviceType && faceToFace) serviceType.value = faceToFace.value;
+  };
+  deliveryTab?.querySelector('[name="repair_branch_delivery_date"]')?.addEventListener('change', applyNewRepairDefaults);
+  serviceName.addEventListener('change', () => { if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') { applyNewRepairDefaults(); open(); } });
   document.querySelectorAll('[data-repair-close]').forEach(button => button.addEventListener('click', close));
-  document.getElementById('repair-save')?.addEventListener('click', () => { persist(); form.requestSubmit(); });
-  form.addEventListener('submit', () => { formatServiceFee(); persist(); });
-  if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') open();
+  const validateRepairSerialSelection = () => {
+    if (serviceName.value.trim().toLocaleLowerCase('tr-TR') !== 'tamir') return true;
+    const serialCheckboxes = [...modal.querySelectorAll('[name="repair_selected_device_serials[]"]:not(:disabled)')];
+    if (!serialCheckboxes.length) return true;
+    const quantity = Math.max(1, Math.min(2, Number(form.querySelector('[name="repair_patient_device_quantity"]')?.value) || 1));
+    const selected = serialCheckboxes.filter(checkbox => checkbox.checked).length;
+    if (selected === quantity) return true;
+    alert(`Lütfen ${quantity} adet için ${quantity} seri numarası seçin.`);
+    modal.querySelector('[data-repair-tab="repair-tab-accessories"]')?.click();
+    return false;
+  };
+  document.getElementById('repair-save')?.addEventListener('click', () => { if (!validateRepairSerialSelection()) return; persist(); form.requestSubmit(); });
+  form.addEventListener('submit', event => { if (!validateRepairSerialSelection()) { event.preventDefault(); return; } formatServiceFee(); persist(); });
+  if (serviceName.value.trim().toLocaleLowerCase('tr-TR') === 'tamir') { applyNewRepairDefaults(); open(); }
 })();
 </script>
 <script>

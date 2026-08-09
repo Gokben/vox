@@ -29,6 +29,7 @@ try {
 start_patient_staff_ui_link($staffNames, [], $staffOrders);
 
 $q = trim($_GET['q'] ?? '');
+$databaseDriver = db()->getAttribute(PDO::ATTR_DRIVER_NAME);
 $showAll = ($_GET['all'] ?? '') === '1';
 $companyId = max(0, (int)($_GET['company_id'] ?? 0));
 $companyName = '';
@@ -69,7 +70,7 @@ if ($q !== '') {
     foreach ($activeSearchColumns as $column) {
         if ($column === 'no') $addSearch('patients.import_order LIKE ?');
         elseif ($column === 'date') $addSearch('patients.record_date LIKE ?');
-        elseif ($column === 'name') $addSearch('patients.full_name LIKE ?');
+        elseif ($column === 'name') $addSearch($databaseDriver === 'mysql' ? 'patients.full_name COLLATE utf8mb4_turkish_ci LIKE ?' : 'patients.full_name LIKE ?');
         elseif ($column === 'national_id') $addSearch('patients.national_id LIKE ?');
         elseif ($column === 'phone_primary') $addSearch('patients.phone_primary LIKE ?');
         elseif ($column === 'phone_secondary') $addSearch('patients.phone_secondary LIKE ?');
@@ -176,7 +177,7 @@ body .vuexy-actions>a,body .vuexy-actions>form>button{flex:0 0 32px!important;wi
  yearSelect.innerHTML='<option value="all" <?=$showAll?'selected':''?>>Tüm Kayıtlar (<?=$allPatientCount?> kayıt)</option><option value="2023" <?=!$showAll&&$year===2023?'selected':''?>>2023 (<?=(int)($yearCounts[2023]??0)?> kayıt)</option><option value="2024" <?=!$showAll&&$year===2024?'selected':''?>>2024 (<?=(int)($yearCounts[2024]??0)?> kayıt)</option><option value="2025" <?=!$showAll&&$year===2025?'selected':''?>>2025 (<?=(int)($yearCounts[2025]??0)?> kayıt)</option><option value="2026" <?=!$showAll&&$year===2026?'selected':''?>>2026 (<?=(int)($yearCounts[2026]??0)?> kayıt)</option>';
  yearSelect.addEventListener('change',()=>{const url=new URL(window.location.href);url.searchParams.delete('page');if(yearSelect.value==='all'){url.searchParams.set('all','1');url.searchParams.delete('q')}else{url.searchParams.set('year',yearSelect.value);url.searchParams.delete('all');if(!url.searchParams.get('q'))url.searchParams.delete('q')}window.location.href=url.toString()});
  toolbar.insertBefore(yearSelect,toolbar.querySelector('.vuexy-search'));
- document.getElementById('patient-table-filter')?.addEventListener('submit',event=>{const form=event.currentTarget;form.querySelector('input[name="search_columns"]').value=visible.map((isVisible,index)=>isVisible?searchKeys[index]:null).filter(Boolean).join(',');let all=form.querySelector('input[name="all"]');if(!all){all=document.createElement('input');all.type='hidden';all.name='all';form.appendChild(all)}all.value=(form.querySelector('input[name="q"]')?.value.trim()==='')?'1':''});
+ document.getElementById('patient-table-filter')?.addEventListener('submit',event=>{const form=event.currentTarget;form.querySelector('input[name="search_columns"]').value=visible.map((isVisible,index)=>isVisible?searchKeys[index]:null).filter(Boolean).join(',');let all=form.querySelector('input[name="all"]');if(!all){all=document.createElement('input');all.type='hidden';all.name='all';form.appendChild(all)}all.value=yearSelect.value==='all'?'1':''});
  const picker=document.createElement('div');picker.className='column-picker';
  picker.innerHTML='<button type="button" class="column-picker-button">☷ Sütunlar</button><div class="column-picker-menu"><div class="column-picker-actions"><button type="button" data-toggle-all>Tümünü Seç</button><button type="button" data-hide-optional>Sade Görünüm</button><button type="button" data-auto-fit>↔ Otomatik Genişlet: Açık</button></div><div class="column-picker-options"></div></div>';
  toolbar.insertBefore(picker,toolbar.querySelector('.vuexy-search'));
@@ -232,5 +233,19 @@ requestAnimationFrame(() => document.querySelectorAll('.vuexy-actions > a,.vuexy
   ['width','height','min-width','min-height','max-width','max-height','flex-basis'].forEach(property => button.style.setProperty(property, '32px', 'important'));
   button.style.setProperty('padding', '0', 'important');
 }));
+</script>
+<script>
+(() => {
+  const form = document.getElementById('patient-table-filter');
+  const input = form?.querySelector('input[name="q"]');
+  if (!form || !input) return;
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const query = input.value.trim();
+    if (query !== '' && query.length < 3) return;
+    timer = window.setTimeout(() => form.requestSubmit(), 350);
+  });
+})();
 </script>
 <?php patient_footer();
