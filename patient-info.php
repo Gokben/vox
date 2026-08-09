@@ -36,7 +36,7 @@ $anamnesis = trim((string)($latest['complaint'] ?? $patient['anamnesis'] ?? $pat
 patient_header('Hasta Bilgi Formu');
 ?>
 <main class="patient-info-page"><section class="patient-info-card">
-  <header><div><p class="eyebrow">HASTA BİLGİ FORMU</p><h1><?=e((string)$patient['full_name'])?></h1><p><?=e((string)$patient['national_id'])?> · Kayıt: <?=e(format_date_tr((string)$patient['record_date']))?></p></div><a href="<?=e(url('patients.php'))?>" title="Hasta kartlarına dön"><i class="ti tabler-arrow-left"></i></a></header>
+  <header><div><p class="eyebrow">HASTA BİLGİ FORMU</p><h1><?=e((string)$patient['full_name'])?></h1><p>Kayıt No: <?=e((string)$patient['import_order'])?> · Kayıt: <?=e(format_date_tr((string)$patient['record_date']))?></p></div><div class="header-actions no-print"><button type="button" class="patient-print-button" title="Yazdır" aria-label="Yazdır" onclick="window.print()"><i class="ti tabler-printer"></i></button><a href="<?=e(url('patients.php'))?>" title="Hasta kartlarına dön"><i class="ti tabler-arrow-left"></i></a></div></header>
   <section class="info-section"><h2>Hasta Özeti</h2><div class="horizontal-form">
     <div><i class="ti tabler-id"></i><label>T.C. Kimlik No</label><strong><?=e((string)$patient['national_id'])?:'—'?></strong></div><div><i class="ti tabler-calendar"></i><label>Doğum Tarihi</label><strong><?=e(format_date_tr((string)$patient['birth_date']))?:'—'?></strong></div>
     <div><i class="ti tabler-phone"></i><label>Telefon</label><strong><?=e((string)$patient['phone_primary'])?:'—'?></strong></div><div><i class="ti tabler-map-pin"></i><label>Adres</label><strong><?=e((string)$patient['address'])?:'—'?></strong></div>
@@ -77,6 +77,21 @@ patient_header('Hasta Bilgi Formu');
   });
 })();
 </script>
+<style>
+.header-actions{display:flex;gap:9px}.patient-print-button{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:6px;background:#16833d;color:#fff;cursor:pointer;font-size:18px}
+.patient-info-card .eyebrow{font-size:18px!important}
+@media print{
+  @page{size:A4;margin:10mm}
+  body{background:#fff!important}
+  .no-print,.sidebar,.layout-menu,.navbar,.app-brand,.patient-header{display:none!important}
+  .patient-info-page{max-width:none!important;padding:0!important}
+  .patient-info-card{border:0!important;box-shadow:none!important}
+  .patient-info-card>header{padding:16px 0!important}
+  .info-section{padding:15px 0!important}
+  .sales-total-summary{margin-right:0!important}
+  .sales-summary .sales-head,.delivery-table .delivery-head{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+}
+</style>
 <script>
 (() => {
   const salesTable = document.querySelector('.sales-summary');
