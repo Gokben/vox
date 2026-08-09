@@ -465,4 +465,16 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <style>.technical-actions .external-patient-card-link{display:grid;place-items:center;width:40px;height:42px;border-radius:7px;background:#6f42c1;color:#fff;text-decoration:none}.technical-actions .external-patient-card-link .ti{font-size:21px}</style>
 <script>document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>document.querySelectorAll('.technical-card tbody tr').forEach(row=>{const record=row.cells[0]?.textContent.trim()||'';if(!record.startsWith('DS-BEKLEME-'))return;row.dataset.technicalRecordNo=record;row.cells[0].textContent='—';}),500));</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const modal=document.getElementById('technical-form-modal'),form=modal?.querySelector('form'),search=modal?.querySelector('.technical-patient-search'),select=modal?.querySelector('select[name="id"]'),external=modal?.querySelector('input[name="external_patient"]'),button=modal?.querySelector('footer .button');
+  if(!form||!search||!select||!button)return;
+  const key=value=>String(value).toLocaleLowerCase('tr-TR').replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u').replace(/[^a-z0-9]/g,'');
+  const resolve=()=>{if(select.value)return true;const query=key(search.value);if(query.length<3)return false;const option=[...select.options].slice(1).find(item=>key(item.textContent)===query);if(option){select.value=option.value;return true;}return false;};
+  const sync=()=>{const visible=!!external?.checked||resolve()||key(search.value).length>=3;button.hidden=!visible;button.style.setProperty('display',visible?'block':'none','important');};
+  search.addEventListener('input',sync);search.addEventListener('change',sync);select.addEventListener('change',sync);external?.addEventListener('change',sync);
+  form.addEventListener('submit',event=>{if(external?.checked||resolve())return;event.preventDefault();event.stopImmediatePropagation();alert('Lütfen listeden bir hasta seçiniz.');search.focus();},true);
+  sync();
+});
+</script>
 <?php patient_footer(); ?>
