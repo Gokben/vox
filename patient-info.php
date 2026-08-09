@@ -30,6 +30,8 @@ $sgkExcludingTotalText = $sgkExcludingTotal > 0 ? number_format($sgkExcludingTot
 $discountTotal = $moneyNumber($sale['sales_total_discount_rate'] ?? $sale['sales_device_discount_rate'] ?? 0);
 $pureDeviceTotal = max(0, $sgkExcludingTotal - $discountTotal);
 $pureDeviceTotalText = $pureDeviceTotal > 0 ? number_format($pureDeviceTotal, 2, ',', '.') . ' ₺' : '—';
+$grandTotal = $pureDeviceTotal + $socialSecuritySupport;
+$grandTotalText = $grandTotal > 0 ? number_format($grandTotal, 2, ',', '.') . ' ₺' : '—';
 $anamnesis = trim((string)($latest['complaint'] ?? $patient['anamnesis'] ?? $patient['notes'] ?? ''));
 patient_header('Hasta Bilgi Formu');
 ?>
@@ -106,6 +108,10 @@ patient_header('Hasta Bilgi Formu');
     const cells = salesTotal.children;
     cells[0].textContent = 'Salt Cihaz';
     cells[1].textContent = <?= json_encode($pureDeviceTotalText, JSON_UNESCAPED_UNICODE) ?>;
+    cells[2].textContent = 'Rapor';
+    cells[3].textContent = <?= json_encode($socialSecuritySupportText, JSON_UNESCAPED_UNICODE) ?>;
+    cells[4].textContent = 'Toplam';
+    cells[5].textContent = <?= json_encode($grandTotalText, JSON_UNESCAPED_UNICODE) ?>;
   }
 })();
 </script>
