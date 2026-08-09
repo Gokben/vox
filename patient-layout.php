@@ -663,6 +663,27 @@ if(settingsPages[currentSettingsPage]){
     prepareAll(node);
   }))).observe(document.documentElement, {childList:true, subtree:true});
 })();
-</script></body></html>
+</script>
+<script>
+(() => {
+  const addEftOption = select => {
+    if (!(select instanceof HTMLSelectElement) || select.dataset.eftOptionReady === '1') return;
+    const cashOption = [...select.options].find(option => option.textContent.trim() === 'Nakit');
+    if (!cashOption || [...select.options].some(option => option.textContent.trim() === 'EFT / Havale')) return;
+    const value = /^(extra_)?payment_type$/.test(select.name) ? 'eft_transfer' : 'EFT / Havale';
+    cashOption.after(new Option('EFT / Havale', value));
+    select.dataset.eftOptionReady = '1';
+  };
+  const prepare = root => {
+    if (root instanceof HTMLSelectElement) addEftOption(root);
+    root.querySelectorAll?.('select').forEach(addEftOption);
+  };
+  prepare(document);
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) prepare(node);
+  }))).observe(document.documentElement, {childList:true, subtree:true});
+})();
+</script>
+<script>document.querySelectorAll('.cash-table-wrap tbody tr td:nth-child(5)').forEach(cell=>{if(cell.textContent.trim()==='—')cell.textContent='EFT / Havale';});</script></body></html>
 <?php
 }

@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($paymentType === 'term' && $installmentCount > 1 && trim((string)$termSchedule) === '') throw new RuntimeException('Vade planındaki tüm aylık ödeme alanlarını doldurun ve yeniden kaydedin.');
             $cashRecordedAmount = $paymentType === 'term' ? cash_paid_term_total($termSchedule) : $amount;
             $extraPaymentPosted = trim((string)($_POST['extra_payment_type'] ?? ''));
-            $primaryValid = $date !== '' && $description !== '' && in_array($type, ['income', 'expense'], true) && $amount > 0 && in_array($paymentType, ['cash', 'credit_card', 'mail_order', 'term'], true);
+            $primaryValid = $date !== '' && $description !== '' && in_array($type, ['income', 'expense'], true) && $amount > 0 && in_array($paymentType, ['cash', 'eft_transfer', 'credit_card', 'mail_order', 'term'], true);
             if (!$primaryValid && $extraPaymentPosted === '') throw new RuntimeException('İşlem bilgilerini eksiksiz ve geçerli olarak girin.');
             if ($primaryValid) {
                 if ($paymentType === 'mail_order' && !$currentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
@@ -228,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $extraTermSchedule = json_encode($extraPlan, JSON_UNESCAPED_UNICODE);
                 }
-                if ($extraDate === '' || $extraDescription === '' || $extraScheduledAmount <= 0 || !in_array($extraPaymentType, ['cash', 'credit_card', 'mail_order', 'term'], true)) {
+                if ($extraDate === '' || $extraDescription === '' || $extraScheduledAmount <= 0 || !in_array($extraPaymentType, ['cash', 'eft_transfer', 'credit_card', 'mail_order', 'term'], true)) {
                     throw new RuntimeException('İkinci gelir kaydının bilgilerini eksiksiz ve geçerli olarak girin.');
                 }
                 if ($extraPaymentType === 'mail_order' && !$extraCurrentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
@@ -255,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($paymentType === 'term' && trim((string)($_POST['term_schedule_json'] ?? '')) !== '') $termSchedule = (string)$_POST['term_schedule_json'];
             $cashRecordedAmount = $paymentType === 'term' ? cash_paid_term_total($termSchedule) : $amount;
-            if (!$transactionId || $date === '' || $description === '' || $amount <= 0 || !in_array($paymentType, ['cash', 'credit_card', 'mail_order', 'term'], true)) {
+            if (!$transactionId || $date === '' || $description === '' || $amount <= 0 || !in_array($paymentType, ['cash', 'eft_transfer', 'credit_card', 'mail_order', 'term'], true)) {
                 throw new RuntimeException('İşlem bilgilerini eksiksiz ve geçerli olarak girin.');
             }
             if ($paymentType === 'mail_order' && !$currentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
@@ -335,7 +335,7 @@ foreach (($isPreCash ? $pdo->query("SELECT transaction_type,payment_type,amount,
         $totals['income'] += $amount;
         if ($transaction['payment_type'] === 'mail_order') $totals['expense'] += $amount;
     } else $totals['expense'] += $amount;
-    if ($transaction['payment_type'] === 'cash') $totals['cash_total'] += $direction * $amount;
+    if (in_array($transaction['payment_type'], ['cash', 'eft_transfer'], true)) $totals['cash_total'] += $direction * $amount;
     if ($transaction['payment_type'] === 'credit_card') $totals['card_total'] += $direction * $amount;
 }
 $income = (float)$totals['income'];
@@ -428,7 +428,7 @@ patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
         <label>İşlem Türü<select name="transaction_type" required><option value="income">Gelir</option><option value="expense">Gider</option></select></label>
         <label>Açıklama<input name="description" maxlength="255" value="<?=e($_POST['description'] ?? '')?>" required></label>
         <label>Tutar<input type="number" name="amount" min="0.01" step="0.01" value="<?=e($_POST['amount'] ?? '')?>" required></label>
-        <label>Ödeme Türü<select name="payment_type" required><option value="cash">Nakit</option><option value="credit_card">Kredi Kartı</option><option value="mail_order">Mail Order</option><option value="term">Vadeli</option></select></label>
+        <label>Ödeme Türü<select name="payment_type" required><option value="cash">Nakit</option><option value="eft_transfer">EFT / Havale</option><option value="credit_card">Kredi Kartı</option><option value="mail_order">Mail Order</option><option value="term">Vadeli</option></select></label>
         <label>Kategori<select name="category_id"><option value="">Kategorisiz</option><?php foreach ($activeCategories as $category): ?><option value="<?=(int)$category['id']?>"><?=e(($category['parent_name'] ? $category['parent_name'] . ' / ' : '') . $category['name'])?></option><?php endforeach ?></select></label>
         <div class="cash-actions"><button>Kaydet</button></div>
       </form>

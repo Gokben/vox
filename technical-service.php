@@ -16,6 +16,16 @@ try {
         if (!in_array($column, $columns, true)) $pdo->exec('ALTER TABLE patient_services ADD COLUMN ' . $definition);
     }
 } catch (Throwable $exception) { error_log('technical-service schema: ' . $exception->getMessage()); }
+$repairRecordNumbers = $pdo->query("SELECT id, record_no FROM patient_services WHERE service_name='Tamir' AND (record_no LIKE 'VX-%' OR record_no LIKE 'VK-%') ORDER BY id")->fetchAll();
+$lastRepairRecordNumber = 1452;
+foreach ($repairRecordNumbers as $repairRecord) {
+    if (str_starts_with((string)$repairRecord['record_no'], 'VX-')) $lastRepairRecordNumber = max($lastRepairRecordNumber, (int)substr((string)$repairRecord['record_no'], 3));
+}
+$renameRepairRecord = $pdo->prepare('UPDATE patient_services SET record_no=? WHERE id=?');
+foreach ($repairRecordNumbers as $repairRecord) {
+    if (!str_starts_with((string)$repairRecord['record_no'], 'VK-')) continue;
+    $renameRepairRecord->execute(['VX-' . ++$lastRepairRecordNumber, (int)$repairRecord['id']]);
+}
 if (isset($_GET['external_patient'])) {
     $externalName = trim((string)($_GET['external_name'] ?? '')) ?: 'Kayıtsız Hasta';
     $nextOrder = (int)$pdo->query('SELECT COALESCE(MAX(import_order),0)+1 FROM patients')->fetchColumn();
@@ -55,9 +65,81 @@ foreach ($services as $service) {
         $quantity = '1';
         for ($number = 2; $number <= 4; $number++) if (trim((string)($sale["sales_device_{$number}_model"] ?? '')) !== '') $quantity = (string)((int)$quantity + 1);
     }
-    $repairDeviceData[] = ['device' => $device ?: '—', 'quantity' => $quantity ?: '—'];
+    $repairStatus = '—';
+    if (trim((string)($repair['repair_branch_delivery_date'] ?? '')) !== '') $repairStatus = 'Şubede';
+    if (trim((string)($repair['repair_delivery_date'] ?? '')) !== '') $repairStatus = 'Serviste';
+    if (trim((string)($repair['repair_service_return_date'] ?? '')) !== '') $repairStatus = 'Teslim Bekliyor';
+    if (trim((string)($repair['repair_patient_delivery_date'] ?? '')) !== '') $repairStatus = 'Teslim Edildi';
+    $repairDeviceData[] = ['record_no' => (string)$service['record_no'], 'device' => $device ?: '—', 'quantity' => $quantity ?: '—', 'status' => $repairStatus];
 }
 $patients=$pdo->query('SELECT id,full_name,phone_primary FROM patients ORDER BY full_name')->fetchAll();
+$pdo->exec($sqlite
+    ? 'CREATE TABLE IF NOT EXISTS external_technical_patients (id INTEGER PRIMARY KEY AUTOINCREMENT, branch_id INTEGER NULL, record_date TEXT NOT NULL, full_name TEXT NOT NULL, national_id TEXT NULL, birth_date TEXT NULL, phone_primary TEXT NULL, phone_secondary TEXT NULL, address TEXT NULL, rating INTEGER NULL, comment TEXT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+    : 'CREATE TABLE IF NOT EXISTS external_technical_patients (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, branch_id INT UNSIGNED NULL, record_date DATE NOT NULL, full_name VARCHAR(190) NOT NULL, national_id VARCHAR(30) NULL, birth_date DATE NULL, phone_primary VARCHAR(50) NULL, phone_secondary VARCHAR(50) NULL, address TEXT NULL, rating TINYINT NULL, comment TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+$externalTechnicalPatients = $pdo->query('SELECT id,full_name,phone_primary,phone_secondary FROM external_technical_patients ORDER BY full_name')->fetchAll();
+$pdo->exec($sqlite
+    ? 'CREATE TABLE IF NOT EXISTS external_technical_services (id INTEGER PRIMARY KEY AUTOINCREMENT, external_patient_id INTEGER NOT NULL, record_no TEXT NOT NULL, service_date TEXT NOT NULL, device TEXT NULL, serial_no TEXT NULL, complaint TEXT NULL, technician_note TEXT NULL, delivery_date TEXT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+    : 'CREATE TABLE IF NOT EXISTS external_technical_services (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, external_patient_id INT UNSIGNED NOT NULL, record_no VARCHAR(60) NOT NULL, service_date DATE NOT NULL, device VARCHAR(190) NULL, serial_no VARCHAR(190) NULL, complaint TEXT NULL, technician_note TEXT NULL, delivery_date DATE NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+$externalRecordNumbers = $pdo->query("SELECT id, record_no FROM external_technical_services WHERE record_no LIKE 'DS-%' OR record_no LIKE 'DT-%' ORDER BY id")->fetchAll();
+$lastExternalRecordNumber = 1452;
+foreach ($externalRecordNumbers as $externalRecord) {
+    if (str_starts_with((string)$externalRecord['record_no'], 'DS-')) $lastExternalRecordNumber = max($lastExternalRecordNumber, (int)substr((string)$externalRecord['record_no'], 3));
+}
+$renameExternalRecord = $pdo->prepare('UPDATE external_technical_services SET record_no=? WHERE id=?');
+foreach ($externalRecordNumbers as $externalRecord) {
+    if (!str_starts_with((string)$externalRecord['record_no'], 'DT-')) continue;
+    $renameExternalRecord->execute(['DS-' . ++$lastExternalRecordNumber, (int)$externalRecord['id']]);
+}
+$externalServices = $pdo->query('SELECT s.*, p.full_name FROM external_technical_services s JOIN external_technical_patients p ON p.id=s.external_patient_id ORDER BY s.service_date DESC, s.id DESC')->fetchAll();
+foreach ($externalServices as $externalService) {
+    $externalRepairDetails = json_decode((string)($externalService['repair_details'] ?? ''), true);
+    if (!is_array($externalRepairDetails)) $externalRepairDetails = [];
+    $externalIssues = $externalRepairDetails['repair_customer_issues'] ?? (string)($externalService['complaint'] ?? '');
+    $externalStatus = '—';
+    if (trim((string)($externalRepairDetails['branch_delivery_date'] ?? '')) !== '') $externalStatus = 'Şubede';
+    if (trim((string)($externalService['delivery_date'] ?? '')) !== '') $externalStatus = 'Serviste';
+    if (trim((string)($externalRepairDetails['return_date'] ?? '')) !== '') $externalStatus = 'Teslim Bekliyor';
+    if (trim((string)($externalRepairDetails['patient_delivery_date'] ?? '')) !== '') $externalStatus = 'Teslim Edildi';
+    $services[] = [
+        'id' => (int)$externalService['id'],
+        'patient_id' => (int)$externalService['external_patient_id'],
+        'record_no' => (string)$externalService['record_no'],
+        'service_date' => (string)$externalService['service_date'],
+        'full_name' => (string)$externalService['full_name'] . ' (Dış Hasta)',
+        'repair_details' => json_encode([
+            'repair_device' => (string)($externalService['device'] ?? ''),
+            'repair_customer_issues[]' => $externalIssues,
+            'repair_branch_delivery_date' => (string)($externalService['delivery_date'] ?? ''),
+            'external_technical_service' => true,
+        ], JSON_UNESCAPED_UNICODE),
+    ];
+    $repairDeviceData[] = [
+        'record_no' => (string)$externalService['record_no'],
+        'device' => trim((string)($externalService['device'] ?? '')) ?: '—',
+        'quantity' => (string)($externalRepairDetails['repair_quantity'] ?? '1'),
+        'status' => $externalStatus,
+    ];
+}
+$externalPatientsWithoutService = $pdo->query('SELECT p.* FROM external_technical_patients p WHERE NOT EXISTS(SELECT 1 FROM external_technical_services s WHERE s.external_patient_id=p.id) ORDER BY p.record_date DESC,p.id DESC')->fetchAll();
+foreach ($externalPatientsWithoutService as $externalPatientWithoutService) {
+    $pendingRecordNo = 'DS-BEKLEME-' . (int)$externalPatientWithoutService['id'];
+    $services[] = [
+        'id' => 0,
+        'patient_id' => (int)$externalPatientWithoutService['id'],
+        'record_no' => $pendingRecordNo,
+        'service_date' => (string)($externalPatientWithoutService['record_date'] ?? ''),
+        'full_name' => (string)$externalPatientWithoutService['full_name'] . ' (Dış Hasta)',
+        'repair_details' => json_encode(['external_technical_service' => true], JSON_UNESCAPED_UNICODE),
+    ];
+    $repairDeviceData[] = [
+        'record_no' => $pendingRecordNo,
+        'device' => '—',
+        'quantity' => '—',
+        'status' => 'Teknik Servis Formu Bekliyor',
+    ];
+}
+$repairStatusByRecord = [];
+foreach ($repairDeviceData as $repairDevice) $repairStatusByRecord[(string)($repairDevice['record_no'] ?? '')] = (string)($repairDevice['status'] ?? '—');
 function repair_value(string $details,string $key): string {$data=json_decode($details,true);if($key==='repair_delivery_date')$key='repair_branch_delivery_date';$value=is_array($data)?($data[$key]??''):'';return is_array($value)?implode(', ', array_values(array_unique(array_filter(array_map('trim', $value), static fn(string $item): bool => $item !== '')))):(string)$value;}
 if (($_GET['delete_error'] ?? '') === 'repair_payment') echo '<script>window.addEventListener("DOMContentLoaded",()=>alert("Bu Tamir kartına bağlı tahsilat var. Önce tahsilatı iptal etmeden kayıt silinemez."));</script>';
 patient_header('Teknik Servis','stock');
@@ -255,4 +337,132 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 })();
 </script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const modal=document.getElementById('technical-form-modal');
+  const form=modal?.querySelector('form');
+  const external=modal?.querySelector('input[name="external_patient"]');
+  const voxSearch=modal?.querySelector('.technical-patient-search');
+  const patientSelect=modal?.querySelector('select[name="id"]');
+  const submit=form?.querySelector('footer .button');
+  if(!modal||!form||!external||!voxSearch||!patientSelect||!submit)return;
+  const externalPatients=<?=json_encode($externalTechnicalPatients, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const externalSearch=modal.querySelector('[name="external_name"]');
+  if(!externalSearch)return;
+  const externalId=document.createElement('input'); externalId.type='hidden'; externalId.name='id'; externalId.disabled=true; form.append(externalId);
+  const results=document.createElement('div'); results.hidden=true;
+  Object.assign(results.style,{maxHeight:'160px',overflowY:'auto',marginTop:'6px',border:'1px solid #d9d7e1',borderRadius:'7px',background:'#fff'});
+  externalSearch.after(results);
+  const searchKey=value=>String(value).toLocaleLowerCase('tr-TR').replace(/\u00e7/g,'c').replace(/\u011f/g,'g').replace(/\u0131/g,'i').replace(/\u00f6/g,'o').replace(/\u015f/g,'s').replace(/\u00fc/g,'u').replace(/[^a-z0-9]/g,'');
+  const setButton=(selected=false)=>{const icon=submit.querySelector('i');if(selected){submit.title='Tamir Formu';submit.setAttribute('aria-label','Tamir Formu');if(icon)icon.className='ti tabler-tool';}else{submit.title='Yeni dış hasta';submit.setAttribute('aria-label','Yeni dış hasta');if(icon)icon.className='ti tabler-user-plus';}};
+  const renderExternalResults=()=>{
+    const query=searchKey(externalSearch.value); results.replaceChildren(); externalId.value='';
+    if(query.length<3){results.hidden=true;setButton(false);return;}
+    const matches=externalPatients.filter(patient=>searchKey(`${patient.full_name} ${patient.phone_primary||''} ${patient.phone_secondary||''}`).includes(query)).slice(0,3);
+    matches.forEach(patient=>{const item=document.createElement('button');item.type='button';item.textContent=`${patient.full_name}${patient.phone_primary?' — '+patient.phone_primary:''}`;Object.assign(item.style,{display:'block',width:'100%',padding:'10px 12px',border:'0',borderBottom:'1px solid #ecebf0',background:'#fff',color:'#2f2b3d',font:'inherit',textAlign:'left',cursor:'pointer'});item.addEventListener('click',()=>{externalSearch.value=item.textContent;externalId.value=String(patient.id);results.hidden=true;setButton(true);});results.append(item);});
+    results.hidden=!matches.length; setButton(false);
+  };
+  const syncExternalFlow=()=>{
+    const isExternal=external.checked;
+    externalSearch.hidden=!isExternal; results.hidden=true; externalId.disabled=!isExternal;
+    patientSelect.disabled=isExternal; patientSelect.required=!isExternal;
+    if(isExternal){voxSearch.hidden=true;externalSearch.required=false;externalSearch.placeholder='Dışarıdan gelen hasta adı veya telefonu ara';form.action=<?=json_encode(url('external-technical-patient.php'))?>;setButton(!!externalId.value);}
+    else{externalId.value='';patientSelect.disabled=false;voxSearch.hidden=false;form.action=<?=json_encode(url('patient-followup.php'))?>;}
+  };
+  externalSearch.type='search'; externalSearch.required=false; externalSearch.addEventListener('input',renderExternalResults);
+  external.addEventListener('change',syncExternalFlow); syncExternalFlow();
+  form.addEventListener('submit',event=>{
+    if(!external.checked)return;
+    if(externalId.value){form.action=<?=json_encode(url('external-technical-repair.php'))?>;return;}
+    form.action=<?=json_encode(url('external-technical-patient.php'))?>;
+  },true);
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.technical-card tbody tr').forEach(row=>{
+    if (!row.cells[0]?.textContent.trim().startsWith('DS-')) return;
+    const actions=row.querySelector('.technical-actions');
+    const edit=actions?.querySelector('a');
+    if (!edit) return;
+    const parameters=new URL(edit.href,window.location.origin).searchParams;
+    const patientId=parameters.get('id');
+    const editId=parameters.get('edit');
+    if (patientId) edit.href='external-technical-repair.php?id='+encodeURIComponent(patientId)+(editId?'&edit='+encodeURIComponent(editId):'');
+    actions.querySelector('form')?.remove();
+  });
+});
+</script>
+<style>.technical-list-toolbar{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid #e7e6ec;flex-wrap:wrap}.technical-list-toolbar label{display:flex;align-items:center;gap:8px;color:#6d697d;font-size:14px}.technical-list-toolbar select,.technical-list-toolbar input{height:40px;border:1px solid #d9d7e1;border-radius:7px;padding:0 12px;background:#fff;color:#2f2b3d;font:inherit}.technical-list-toolbar select{min-width:82px}.technical-list-toolbar .technical-year{min-width:196px}.technical-toolbar-spacer{flex:1}.technical-toolbar-button{height:40px;border:0;border-radius:7px;padding:0 14px;background:#19a94b;color:#fff;font:600 13px inherit;cursor:pointer}.technical-export-button{width:42px;padding:0;font-size:19px}.technical-column-panel{position:absolute;z-index:20;display:none;min-width:190px;padding:10px;border:1px solid #dedce5;border-radius:8px;background:#fff;box-shadow:0 9px 25px #1e283c22}.technical-column-panel.visible{display:grid;gap:8px}.technical-column-panel label{display:flex;gap:8px;align-items:center;font-size:13px;color:#4b495c}.technical-column-panel input{width:16px;height:16px;margin:0;padding:0}@media(max-width:720px){.technical-list-toolbar{padding:14px}.technical-toolbar-spacer{display:none}.technical-list-toolbar .technical-search{width:100%}}</style>
+<script>document.addEventListener('DOMContentLoaded',()=>{const table=document.querySelector('.technical-card table'),card=document.querySelector('.technical-card');if(!table||!card)return;const rows=[...table.tBodies[0].rows].filter(row=>!row.querySelector('.empty')),headers=[...table.tHead.rows[0].cells];const toolbar=document.createElement('div');toolbar.className='technical-list-toolbar';toolbar.innerHTML='<label>Göster <select class="technical-page-size"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option></select> kayıt</label><select class="technical-year"></select><span class="technical-toolbar-spacer"></span><button type="button" class="technical-toolbar-button technical-columns"><i class="ti tabler-columns-3"></i> Sütunlar</button><button type="button" class="technical-toolbar-button technical-export-button" title="Excel olarak indir" aria-label="Excel olarak indir"><i class="ti tabler-file-spreadsheet"></i></button><label>Ara: <input class="technical-search" placeholder="Seçili sütunlarda ara"></label>';card.querySelector('header')?.after(toolbar);const yearSelect=toolbar.querySelector('.technical-year'),search=toolbar.querySelector('.technical-search'),pageSize=toolbar.querySelector('.technical-page-size');const years={};rows.forEach(row=>{const match=row.cells[1]?.textContent.match(/(\d{4})/);if(match)years[match[1]]=(years[match[1]]||0)+1;});yearSelect.add(new Option('Tüm Kayıtlar ('+rows.length+' kayıt)','all'));Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([year,count])=>yearSelect.add(new Option(year+' ('+count+' kayıt)',year)));const panel=document.createElement('div');panel.className='technical-column-panel';headers.forEach((header,index)=>{const label=document.createElement('label'),checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=true;checkbox.addEventListener('change',()=>{table.querySelectorAll('tr').forEach(row=>{if(row.cells[index])row.cells[index].style.display=checkbox.checked?'':'none';});});label.append(checkbox,header.textContent.trim());panel.append(label);});toolbar.querySelector('.technical-columns').after(panel);toolbar.querySelector('.technical-columns').addEventListener('click',()=>panel.classList.toggle('visible'));const update=()=>{const query=search.value.toLocaleLowerCase('tr-TR').trim(),year=yearSelect.value,limit=Number(pageSize.value);let shown=0;rows.forEach(row=>{const rowYear=(row.cells[1]?.textContent.match(/(\d{4})/)||[])[1]||'';const matchesYear=year==='all'||rowYear===year;const matchesQuery=!query||[...row.cells].some(cell=>cell.style.display!=='none'&&cell.textContent.toLocaleLowerCase('tr-TR').includes(query));const visible=matchesYear&&matchesQuery&&shown<limit;if(matchesYear&&matchesQuery)shown++;row.style.display=visible?'':'none';});};[search,yearSelect,pageSize].forEach(input=>input.addEventListener(input===search?'input':'change',update));update();toolbar.querySelector('.technical-export-button').addEventListener('click',()=>{const selected=headers.map((header,index)=>header.style.display!=='none'?index:null).filter(index=>index!==null),csv=[selected.map(index=>headers[index].textContent.trim())];rows.filter(row=>row.style.display!=='none').forEach(row=>csv.push(selected.map(index=>'"'+String(row.cells[index]?.textContent||'').trim().replaceAll('"','""')+'"')));const blob=new Blob(['\uFEFF'+csv.map(line=>line.join(';')).join('\n')],{type:'text/csv;charset=utf-8'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='teknik-servis-listesi.csv';link.click();URL.revokeObjectURL(link.href);});});</script>
+<style>.technical-list-toolbar{position:relative}.technical-column-panel{position:absolute!important}</style>
+<script>document.addEventListener('DOMContentLoaded',()=>{const toolbar=document.querySelector('.technical-list-toolbar'),button=toolbar?.querySelector('.technical-columns'),panel=toolbar?.querySelector('.technical-column-panel');if(!toolbar||!button||!panel)return;button.addEventListener('click',()=>{const toolbarBox=toolbar.getBoundingClientRect(),buttonBox=button.getBoundingClientRect();panel.style.left=(buttonBox.left-toolbarBox.left)+'px';panel.style.top=(buttonBox.bottom-toolbarBox.top+6)+'px';});});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const button=document.getElementById('new-technical-service');if(button)button.textContent='+ Teknik Servis';});</script>
+<style>.technical-toolbar-button i{font-size:18px!important;line-height:1!important;vertical-align:-3px}.technical-export-button i{font-size:20px!important}</style>
+<script>document.addEventListener('DOMContentLoaded',()=>{const columns=document.querySelector('.technical-columns'),exportButton=document.querySelector('.technical-export-button');if(columns)columns.innerHTML='<i class="ti tabler-columns"></i> Sütunlar';if(exportButton)exportButton.innerHTML='<i class="ti tabler-file-spreadsheet"></i>';});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const data=<?=json_encode($repairDeviceData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>,table=document.querySelector('.technical-card table'),quantityHeader=table?.querySelector('.technical-quantity-header');if(!table||!quantityHeader)return;if(!table.querySelector('.technical-status-header')){const header=document.createElement('th');header.className='technical-status-header';header.textContent='DURUM';quantityHeader.after(header);}table.querySelectorAll('tbody tr').forEach((row,index)=>{const quantity=row.querySelector('.technical-quantity-cell');if(!quantity||row.querySelector('.technical-status-cell'))return;const cell=document.createElement('td');cell.className='technical-status-cell';cell.textContent=data[index]?.status||'—';quantity.after(cell);});});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const table=document.querySelector('.technical-card table'),panel=document.querySelector('.technical-column-panel');if(!table||!panel)return;panel.querySelectorAll('input[type="checkbox"]').forEach(checkbox=>checkbox.addEventListener('change',()=>{const title=checkbox.parentElement?.textContent.trim(),headers=[...table.tHead.rows[0].cells],index=headers.findIndex(header=>header.textContent.trim()===title);if(index<0)return;table.tBodies[0].rows.forEach(row=>{if(row.cells[index])row.cells[index].style.display=checkbox.checked?'':'none';});}));});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>{const table=document.querySelector('.technical-card table'),panel=document.querySelector('.technical-column-panel');if(!table||!panel||panel.querySelector('[data-status-column]'))return;const label=document.createElement('label'),checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=true;checkbox.dataset.statusColumn='1';label.append(checkbox,'DURUM');checkbox.addEventListener('change',()=>{const index=[...table.tHead.rows[0].cells].findIndex(header=>header.textContent.trim()==='DURUM');table.tBodies[0].rows.forEach(row=>{if(index>=0&&row.cells[index])row.cells[index].style.display=checkbox.checked?'':'none';});});panel.append(label);});</script>
+<script>document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const data=<?=json_encode($repairDeviceData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>,table=document.querySelector('.technical-card table'),panel=document.querySelector('.technical-column-panel'),quantityHeader=table?.querySelector('.technical-quantity-header');if(!table||!panel||!quantityHeader)return;let index=[...table.tHead.rows[0].cells].findIndex(header=>header.textContent.trim()==='DURUM');if(index<0){const header=document.createElement('th');header.className='technical-status-header';header.textContent='DURUM';quantityHeader.after(header);index=[...table.tHead.rows[0].cells].findIndex(item=>item===header);}table.tBodies[0].rows.forEach((row,rowIndex)=>{let cell=row.cells[index];if(!cell){cell=document.createElement('td');cell.className='technical-status-cell';row.querySelector('.technical-quantity-cell')?.after(cell);}cell.textContent=data[rowIndex]?.status||'—';cell.style.display='';});if(!panel.querySelector('[data-status-column]')){const label=document.createElement('label'),checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=true;checkbox.dataset.statusColumn='1';label.append(checkbox,'DURUM');checkbox.addEventListener('change',()=>table.tBodies[0].rows.forEach(row=>{if(row.cells[index])row.cells[index].style.display=checkbox.checked?'':'none';}));panel.append(label);}},120));</script>
+<script>document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const panel=document.querySelector('.technical-column-panel');if(!panel)return;const status=[...panel.querySelectorAll('label')].find(label=>label.textContent.trim()==='DURUM'),quantity=[...panel.querySelectorAll('label')].find(label=>label.textContent.trim()==='ADET');if(status&&quantity)quantity.after(status);},180));</script>
+<style>.technical-status-cell{font-weight:800}.technical-status-cell.status-branch{color:#1769aa}.technical-status-cell.status-service{color:#8a4b12}.technical-status-cell.status-waiting{color:#d26a00}.technical-status-cell.status-delivered{color:#169447}.technical-status-cell.status-empty{color:#8a8795}</style>
+<script>document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>document.querySelectorAll('.technical-status-cell').forEach(cell=>{const value=cell.textContent.trim();cell.classList.remove('status-branch','status-service','status-waiting','status-delivered','status-empty');cell.classList.add(value==='Şubede'?'status-branch':value==='Serviste'?'status-service':value==='Teslim Bekliyor'?'status-waiting':value==='Teslim Edildi'?'status-delivered':'status-empty');}),200));</script>
+<style>.technical-status-cell{font-weight:800!important;color:#fff!important}.technical-status-cell.status-branch{background:#1769aa!important}.technical-status-cell.status-service{background:#8a4b12!important}.technical-status-cell.status-waiting{background:#d26a00!important}.technical-status-cell.status-delivered{background:#169447!important}.technical-status-cell.status-empty{background:#8a8795!important}</style>
+<style>.technical-status-cell{background:transparent!important;color:inherit!important}.technical-status-badge{display:inline-block;padding:5px 9px;border-radius:6px;color:#fff!important;font-weight:800;white-space:nowrap}.technical-status-cell.status-branch .technical-status-badge{background:#1769aa}.technical-status-cell.status-service .technical-status-badge{background:#8a4b12}.technical-status-cell.status-waiting .technical-status-badge{background:#d26a00}.technical-status-cell.status-delivered .technical-status-badge{background:#169447}.technical-status-cell.status-empty .technical-status-badge{background:#8a8795}</style>
+<script>document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>document.querySelectorAll('.technical-status-cell').forEach(cell=>{if(cell.querySelector('.technical-status-badge'))return;const badge=document.createElement('span');badge.className='technical-status-badge';badge.textContent=cell.textContent.trim();cell.replaceChildren(badge);}),240));</script>
+<style>.technical-status-cell,.technical-status-badge{font-weight:400!important}</style>
+<style>.technical-status-badge{background:transparent!important;border:1px solid currentColor!important}.technical-status-cell.status-branch .technical-status-badge{color:#1769aa!important}.technical-status-cell.status-service .technical-status-badge{color:#dc3545!important}.technical-status-cell.status-waiting .technical-status-badge{color:#d26a00!important}.technical-status-cell.status-delivered .technical-status-badge{color:#169447!important}.technical-status-cell.status-empty .technical-status-badge{color:#8a8795!important}</style>
+<style>.technical-status-badge{border:0!important;padding:0!important;border-radius:0!important;background:transparent!important}</style>
+<style>
+/* Vuexy'deki rounded renkli buton görünümü: durumlar için rozet olarak kullanılır. */
+.technical-status-cell{background:transparent!important}
+.technical-status-cell.status-branch,.technical-status-cell.status-service,.technical-status-cell.status-waiting,.technical-status-cell.status-delivered,.technical-status-cell.status-empty{background:#fff!important}
+.technical-status-badge{display:inline-flex!important;align-items:center!important;min-height:32px!important;padding:7px 13px!important;border:0!important;border-radius:.375rem!important;color:#2f2b3d!important;font-size:13px!important;font-weight:500!important;line-height:1!important;white-space:nowrap!important;box-shadow:0 2px 5px rgba(47,43,61,.16)!important}
+.technical-status-cell.status-branch .technical-status-badge{background:#4d8edb!important}
+.technical-status-cell.status-service .technical-status-badge{background:#e64255!important}
+.technical-status-cell.status-waiting .technical-status-badge{background:#ffc53d!important}
+.technical-status-cell.status-delivered .technical-status-badge{background:#8fc544!important}
+.technical-status-cell.status-empty .technical-status-badge{background:#82868b!important}
+.technical-status-cell.status-branch .technical-status-badge,.technical-status-cell.status-service .technical-status-badge,.technical-status-cell.status-waiting .technical-status-badge,.technical-status-cell.status-delivered .technical-status-badge,.technical-status-cell.status-empty .technical-status-badge{color:#2f2b3d!important}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
+  const table = document.querySelector('.technical-card table');
+  if (!table) return;
+  const statusByRecord = <?=json_encode($repairStatusByRecord, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const statusClass = {'Şubede':'status-branch','Serviste':'status-service','Teslim Bekliyor':'status-waiting','Teslim Edildi':'status-delivered'};
+  [...table.tBodies[0].rows].forEach(row => {
+    const recordNo = row.dataset.technicalRecordNo || row.cells[0]?.textContent.trim() || '';
+    const status = statusByRecord[recordNo];
+    const column = [...table.tHead.rows[0].cells].findIndex(header => header.textContent.trim() === 'DURUM');
+    if (!status || column < 0 || !row.cells[column]) return;
+    const cell = row.cells[column];
+    cell.className = 'technical-status-cell ' + (statusClass[status] || 'status-empty');
+    const badge = document.createElement('span');
+    badge.className = 'technical-status-badge';
+    badge.textContent = status;
+    cell.replaceChildren(badge);
+  });
+}, 350));
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.technical-card tbody tr').forEach(row=>{
+    if(!row.cells[0]?.textContent.trim().startsWith('DS-'))return;
+    const actions=row.querySelector('.technical-actions');
+    const edit=actions?.querySelector('a');
+    if(!actions||!edit||actions.querySelector('.external-patient-card-link'))return;
+    const patientId=new URL(edit.href,window.location.origin).searchParams.get('id');
+    if(!patientId)return;
+    const card=document.createElement('a');
+    card.className='external-patient-card-link';
+    card.href='external-technical-patient.php?id='+encodeURIComponent(patientId);
+    card.title='Dış Hasta Kartı';card.setAttribute('aria-label','Dış Hasta Kartı');
+    card.innerHTML='<i class="ti tabler-user-circle"></i>';
+    actions.insertBefore(card, edit);
+  });
+});
+</script>
+<style>.technical-actions .external-patient-card-link{display:grid;place-items:center;width:40px;height:42px;border-radius:7px;background:#6f42c1;color:#fff;text-decoration:none}.technical-actions .external-patient-card-link .ti{font-size:21px}</style>
+<script>document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>document.querySelectorAll('.technical-card tbody tr').forEach(row=>{const record=row.cells[0]?.textContent.trim()||'';if(!record.startsWith('DS-BEKLEME-'))return;row.dataset.technicalRecordNo=record;row.cells[0].textContent='—';}),500));</script>
 <?php patient_footer(); ?>

@@ -24,9 +24,9 @@ function next_service_record_no(PDO $pdo): string
 {
     $highest = 1452;
     foreach ($pdo->query('SELECT record_no FROM patient_services WHERE record_no IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN) as $recordNo) {
-        if (preg_match('/^VK-(\d+)$/', (string)$recordNo, $matches)) $highest = max($highest, (int)$matches[1]);
+        if (preg_match('/^VX-(\d+)$/', (string)$recordNo, $matches)) $highest = max($highest, (int)$matches[1]);
     }
-    return 'VK-' . ($highest + 1);
+    return 'VX-' . ($highest + 1);
 }
 
 $pdo = db();
@@ -426,7 +426,7 @@ if (trim((string)($serviceCard['service_name'] ?? '')) === 'Satış') {
         $savedCashRecords = $cashPaymentStatement->fetchAll();
         $savedCashRecord = $savedCashRecords[0] ?? [];
         $savedCashPaymentType = match ((string)($savedCashRecord['payment_type'] ?? '')) {
-            'cash' => 'Nakit', 'credit_card' => 'Kredi Kartı', 'mail_order' => 'Mail Order', 'term' => 'Vadeli', default => '',
+            'cash' => 'Nakit', 'eft_transfer' => 'EFT / Havale', 'credit_card' => 'Kredi Kartı', 'mail_order' => 'Mail Order', 'term' => 'Vadeli', default => '',
         };
     } catch (Throwable $exception) {
         $savedCashPaymentType = '';
@@ -573,7 +573,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $cashUpdateAmount += patient_parse_money($installment['amount'] ?? '');
             }
         }
-        if ($cashUpdateDate !== '' && $cashUpdateDescription !== '' && ($cashUpdateAmount > 0 || $cashUpdatePayment === 'term') && in_array($cashUpdatePayment, ['cash','credit_card','mail_order','term'], true)) {
+        if ($cashUpdateDate !== '' && $cashUpdateDescription !== '' && ($cashUpdateAmount > 0 || $cashUpdatePayment === 'term') && in_array($cashUpdatePayment, ['cash','eft_transfer','credit_card','mail_order','term'], true)) {
             if ($cashUpdatePayment === 'term' && $cashUpdateTermSchedule === '') {
                 $cashUpdateStatement = $pdo->prepare("UPDATE cash_transactions SET transaction_date=?,description=?,amount=?,payment_type=?,installment_count=?,bank_name=?,commission_rate=? WHERE id=? AND transaction_type='income'");
                 $cashUpdateStatement->execute([$cashUpdateDate, $cashUpdateDescription, $cashUpdateAmount, $cashUpdatePayment, $cashUpdateInstallments, $cashUpdateBank ?: null, $cashUpdateRate ?: null, $cashUpdateId]);
@@ -605,7 +605,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($installment['paid'])) $cashUpdateExtraAmount += $installmentAmount;
             }
         }
-        if ($cashUpdateExtraDescription !== '' && $cashUpdateExtraValidationAmount > 0 && in_array($cashUpdateExtraPayment, ['cash','credit_card','mail_order','term'], true)) {
+        if ($cashUpdateExtraDescription !== '' && $cashUpdateExtraValidationAmount > 0 && in_array($cashUpdateExtraPayment, ['cash','eft_transfer','credit_card','mail_order','term'], true)) {
             $cashUpdateExtraStatement = $pdo->prepare("UPDATE cash_transactions SET description=?,amount=?,payment_type=?,installment_count=?,bank_name=?,commission_rate=?,current_account_id=?,term_schedule=? WHERE id=? AND transaction_type='income'");
             $cashUpdateExtraStatement->execute([$cashUpdateExtraDescription, $cashUpdateExtraAmount, $cashUpdateExtraPayment, $cashUpdateExtraInstallments, $cashUpdateExtraBank ?: null, $cashUpdateExtraRate ?: null, $cashUpdateExtraAccountId ?: null, $cashUpdateExtraTermSchedule ?: null, $cashUpdateExtraId]);
         }
@@ -618,7 +618,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cashUpdateExtraRate = (float)str_replace(',', '.', (string)($_POST['cash_update_extra_commission_rate'] ?? '0'));
         $cashUpdateExtraAccountId = (int)($_POST['cash_update_extra_current_account_id'] ?? 0);
         $cashUpdateDate = trim((string)($_POST['cash_update_date'] ?? ''));
-        if ($cashUpdateDate !== '' && $cashUpdateExtraDescription !== '' && $cashUpdateExtraAmount > 0 && in_array($cashUpdateExtraPayment, ['cash','credit_card','mail_order','term'], true)) {
+        if ($cashUpdateDate !== '' && $cashUpdateExtraDescription !== '' && $cashUpdateExtraAmount > 0 && in_array($cashUpdateExtraPayment, ['cash','eft_transfer','credit_card','mail_order','term'], true)) {
             $cashInsertExtraStatement = $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,source_url,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
             $cashInsertExtraStatement->execute([$cashUpdateDate, $cashUpdateExtraDescription, 'income', $cashUpdateExtraAmount, $cashUpdateExtraPayment, $cashUpdateExtraInstallments, $cashUpdateExtraBank ?: null, $cashUpdateExtraRate ?: null, $cashUpdateExtraAccountId ?: null, url('patient-followup.php?id=' . $id), (int)($_SESSION['user']['id'] ?? 0)]);
         }
@@ -1429,7 +1429,7 @@ document.addEventListener('click',async event=>{
     if (!repairId) { alert('Tamir kartı kaydedilemedi. Lütfen tekrar deneyin.'); return; }
     const cashForm = document.querySelector('form[action*="cash.php"]');
     if (!cashForm) { alert('Gelir kayıt ekranı hazırlanamadı.'); return; }
-    const paymentMap = {'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'};
+    const paymentMap = {'Nakit':'cash','EFT / Havale':'eft_transfer','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'};
     const date = cashForm.querySelector('[name="transaction_date"]');
     const payment = cashForm.querySelector('[name="payment_type"]');
     const salesPayment = document.querySelector('[name="sales_payment_type"]');
@@ -1471,7 +1471,7 @@ document.addEventListener('click',async event=>{
     button.innerHTML = '<i class="ti tabler-cash-register" style="font-size:20px;line-height:1" aria-hidden="true"></i>';
     button.style.cssText = 'width:36px;min-width:36px;height:36px;min-height:36px;margin:0;padding:0;display:inline-grid;place-items:center';
     button.addEventListener('click', openRepairFeeIncome);
-    const syncIncomeButton = () => { button.hidden = serviceFeePayment.value === 'Nakit'; };
+    const syncIncomeButton = () => { button.hidden = ['Nakit', 'EFT / Havale'].includes(serviceFeePayment.value); };
     serviceFeePayment.addEventListener('change', () => {
       syncIncomeButton();
       const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
@@ -1758,7 +1758,7 @@ const initializeSalesScreen=()=>{
   cashSourceForm?.addEventListener('focusin',event=>{if(!event.target.matches('[name="extra_commission_rate"]'))return;const amount=event.target.closest('[data-extra-income]')?.querySelector('[name="extra_amount"]');if(amount&&!amount.dataset.grossAmount)amount.dataset.grossAmount=String(parseTurkishMoney(amount.value)||'');});
   cashSourceForm?.addEventListener('input',event=>{if(event.target.matches('[name="extra_amount"]'))event.target.dataset.grossAmount=String(parseTurkishMoney(event.target.value)||'');if(event.target.matches('[name="extra_commission_rate"]'))applyExtraCommissionRate();});
   const syncPaymentFields=(scope,paymentType)=>{if(!scope)return;const extra=scope.matches?.('[data-extra-income]'),prefix=extra?'extra_':'',row=value=>String(Number(value)+(extra?1:0));const setLabel=(name,title,column,rowNumber,visible=true)=>{const field=scope.querySelector(`[name="${prefix}${name}"]`),label=field?.closest('label');if(!label)return;const textNode=[...label.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);if(textNode&&title)textNode.nodeValue=title;label.style.display=visible?'flex':'none';if(visible){label.style.gridColumn=column;label.style.gridRow=rowNumber;label.style.flexDirection='column';label.style.gap='5px';}};if(extra){const heading=scope.querySelector('strong');if(heading){heading.style.gridColumn='1/-1';heading.style.gridRow='1';}setLabel('payment_type','Ödeme Şekli','1/-1','2');}setLabel('bank_name','Banka','1/2',row(2),paymentType==='credit_card'||paymentType==='mail_order');setLabel('current_account_id','Cari Hesap','2/3',row(2),paymentType==='mail_order');setLabel('installment_count',paymentType==='term'?'Vade Sayısı':'KK Taksit Sayısı',paymentType==='term'?'1/2':'2/3',row(2),paymentType==='credit_card'||paymentType==='term');setLabel('commission_rate',paymentType==='term'?'Aylık Ödeme':'Komisyon Oranı',paymentType==='term'?'2/3':'2/3',row(paymentType==='term'?2:3),paymentType==='credit_card'||paymentType==='term');setLabel('amount',paymentType==='term'?'Toplam':'Tutar',paymentType==='credit_card'?'1/2':'1/-1',row(paymentType==='credit_card'?3:3),true);};
-  const salesPaymentToCashType=value=>({'Nakit':'cash','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'}[value]||'');
+  const salesPaymentToCashType=value=>({'Nakit':'cash','EFT / Havale':'eft_transfer','Kredi Kartı':'credit_card','Mail Order':'mail_order','Vadeli':'term'}[value]||'');
   const hidePrimaryTermMonthlyField=()=>{if(paymentSelect?.value!=='Vadeli')return;commissionLabel?.remove();const section=cashSourceForm?.querySelector('section'),totalLabel=cashSourceForm?.querySelector('[name="amount"]')?.closest('label');if(section)section.style.setProperty('grid-template-columns','repeat(2,minmax(0,1fr))','important');if(totalLabel){const textNode=[...totalLabel.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);if(textNode)textNode.nodeValue='Toplam';totalLabel.style.setProperty('display','flex','important');totalLabel.style.setProperty('grid-column','2 / 3','important');totalLabel.style.setProperty('grid-row','2','important');}};paymentSelect?.addEventListener('change',()=>setTimeout(hidePrimaryTermMonthlyField,0));setTimeout(hidePrimaryTermMonthlyField,0);
   const syncPrimaryPaymentFields=()=>{const type=cashSourceForm?.dataset.forcedPaymentType||cashPaymentSelect?.value||salesPaymentToCashType(paymentSelect?.value||'')||'cash';syncPaymentFields(cashSourceForm,type);};
   paymentSelect?.addEventListener('change',syncPrimaryPaymentFields);cashIconLink?.addEventListener('click',()=>setTimeout(syncPrimaryPaymentFields,0));cashSourceForm?.addEventListener('change',event=>{if(event.target.matches('[name="extra_payment_type"]'))syncPaymentFields(event.target.closest('[data-extra-income]'),event.target.value);});new MutationObserver(()=>{const extraPayment=cashSourceForm?.querySelector('[name="extra_payment_type"]');if(extraPayment)syncPaymentFields(extraPayment.closest('[data-extra-income]'),extraPayment.value);}).observe(cashSourceForm||document.body,{childList:true,subtree:true});syncPrimaryPaymentFields();
