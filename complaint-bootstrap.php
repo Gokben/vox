@@ -19,11 +19,27 @@ function complaint_definitions(): array
         $index = $pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='complaint_definitions' AND index_name='uq_complaint_definitions_name' LIMIT 1");
         if (!$index->fetchColumn()) $pdo->exec('ALTER TABLE complaint_definitions ADD UNIQUE KEY uq_complaint_definitions_name (name)');
     }
-    $insert = $sqlite
-        ? $pdo->prepare('INSERT OR IGNORE INTO complaint_definitions(name,active,sort_order) VALUES(?,?,?)')
-        : $pdo->prepare('INSERT IGNORE INTO complaint_definitions(name,active,sort_order) VALUES(?,?,?)');
-    foreach (['Çalışmıyor', 'Ara ara kesiliyor', 'Açma-kapama anahtarı arızalı', 'Ses kontrol düğmesi arızalı', 'Yüksek pil tüketimi', 'Feedback (çınlama)', 'Program geçişi yapmıyor'] as $index => $name) {
-        $insert->execute([$name, 1, $index + 1]);
+    // Başlangıç kalemleri yalnızca tanım tablosu ilk kez oluşturulurken eklenir.
+    // Aksi halde kullanıcının sildiği varsayılan kalemler sayfa yenilendiğinde
+    // yeniden oluşurdu.
+    $hasDefinitions = (bool)$pdo->query('SELECT 1 FROM complaint_definitions LIMIT 1')->fetchColumn();
+    if (!$hasDefinitions) {
+        $insert = $sqlite
+            ? $pdo->prepare('INSERT OR IGNORE INTO complaint_definitions(name,active,sort_order) VALUES(?,?,?)')
+            : $pdo->prepare('INSERT IGNORE INTO complaint_definitions(name,active,sort_order) VALUES(?,?,?)');
+        foreach (['Çalışmıyor', 'Ara ara kesiliyor', 'Açma-kapama anahtarı arızalı', 'Ses kontrol düğmesi arızalı', 'Yüksek pil tüketimi', 'Feedback (çınlama)', 'Program geçişi yapmıyor'] as $index => $name) {
+            $insert->execute([$name, 1, $index + 1]);
+        }
+    }
+    // Eski kayıtlarda aynı sıra numarası kalmış olabilir. Sıralamayı
+    // deterministik biçimde eşitleyerek her kaleme benzersiz sıra veriyoruz.
+    $definitions = $pdo->query('SELECT id, sort_order FROM complaint_definitions ORDER BY sort_order, id')->fetchAll();
+    $updateSort = $pdo->prepare('UPDATE complaint_definitions SET sort_order=? WHERE id=?');
+    foreach ($definitions as $position => $definition) {
+        $sortOrder = $position + 1;
+        if ((int)$definition['sort_order'] !== $sortOrder) {
+            $updateSort->execute([$sortOrder, (int)$definition['id']]);
+        }
     }
     return $pdo->query('SELECT * FROM complaint_definitions ORDER BY sort_order,name')->fetchAll();
 }

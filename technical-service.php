@@ -6,6 +6,41 @@ require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+
+function technical_service_legal_days_remaining(?string $serviceDeliveryDate): ?int
+{
+    $serviceDeliveryDate = trim((string)$serviceDeliveryDate);
+    if ($serviceDeliveryDate === '') return null;
+    try {
+        $start = (new DateTimeImmutable($serviceDeliveryDate))->setTime(0, 0);
+        $today = (new DateTimeImmutable('today'))->setTime(0, 0);
+    } catch (Throwable) {
+        return null;
+    }
+    $elapsedBusinessDays = 0;
+    for ($day = $start; $day < $today; $day = $day->modify('+1 day')) {
+        if ((int)$day->format('N') <= 5) $elapsedBusinessDays++;
+    }
+    return max(0, 21 - $elapsedBusinessDays);
+}
+
+function technical_service_legal_deadline(?string $serviceDeliveryDate): ?string
+{
+    $serviceDeliveryDate = trim((string)$serviceDeliveryDate);
+    if ($serviceDeliveryDate === '') return null;
+    try {
+        $day = (new DateTimeImmutable($serviceDeliveryDate))->setTime(0, 0);
+    } catch (Throwable) {
+        return null;
+    }
+    $businessDay = 0;
+    while ($businessDay < 21) {
+        if ((int)$day->format('N') <= 5) $businessDay++;
+        if ($businessDay < 21) $day = $day->modify('+1 day');
+    }
+    return $day->format('d.m.Y');
+}
+
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS patient_services (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER NOT NULL, service_date TEXT NOT NULL, service_status TEXT NOT NULL, performed_action TEXT, action_date TEXT, opened_by TEXT, branch_name TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
     : 'CREATE TABLE IF NOT EXISTS patient_services (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, patient_id INT UNSIGNED NOT NULL, service_date DATE NOT NULL, service_status VARCHAR(80) NOT NULL, performed_action TEXT NULL, action_date DATE NULL, opened_by VARCHAR(190) NULL, branch_name VARCHAR(190) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
@@ -70,7 +105,14 @@ foreach ($services as $service) {
     if (trim((string)($repair['repair_delivery_date'] ?? '')) !== '') $repairStatus = 'Serviste';
     if (trim((string)($repair['repair_service_return_date'] ?? '')) !== '') $repairStatus = 'Teslim Bekliyor';
     if (trim((string)($repair['repair_patient_delivery_date'] ?? '')) !== '') $repairStatus = 'Teslim Edildi';
-    $repairDeviceData[] = ['record_no' => (string)$service['record_no'], 'device' => $device ?: '—', 'quantity' => $quantity ?: '—', 'status' => $repairStatus];
+    $repairDeviceData[] = [
+        'record_no' => (string)$service['record_no'],
+        'device' => $device ?: '—',
+        'quantity' => $quantity ?: '—',
+        'status' => $repairStatus,
+        'legal_remaining' => technical_service_legal_days_remaining((string)($repair['repair_delivery_date'] ?? '')),
+        'legal_deadline' => technical_service_legal_deadline((string)($repair['repair_delivery_date'] ?? '')),
+    ];
 }
 $patients=$pdo->query('SELECT id,full_name,phone_primary FROM patients ORDER BY full_name')->fetchAll();
 $pdo->exec($sqlite
@@ -118,6 +160,8 @@ foreach ($externalServices as $externalService) {
         'device' => trim((string)($externalService['device'] ?? '')) ?: '—',
         'quantity' => (string)($externalRepairDetails['repair_quantity'] ?? '1'),
         'status' => $externalStatus,
+        'legal_remaining' => technical_service_legal_days_remaining((string)($externalService['delivery_date'] ?? '')),
+        'legal_deadline' => technical_service_legal_deadline((string)($externalService['delivery_date'] ?? '')),
     ];
 }
 $externalPatientsWithoutService = $pdo->query('SELECT p.* FROM external_technical_patients p WHERE NOT EXISTS(SELECT 1 FROM external_technical_services s WHERE s.external_patient_id=p.id) ORDER BY p.record_date DESC,p.id DESC')->fetchAll();
@@ -136,10 +180,14 @@ foreach ($externalPatientsWithoutService as $externalPatientWithoutService) {
         'device' => '—',
         'quantity' => '—',
         'status' => 'Teknik Servis Formu Bekliyor',
+        'legal_remaining' => null,
+        'legal_deadline' => null,
     ];
 }
 $repairStatusByRecord = [];
 foreach ($repairDeviceData as $repairDevice) $repairStatusByRecord[(string)($repairDevice['record_no'] ?? '')] = (string)($repairDevice['status'] ?? '—');
+$repairLegalDaysByRecord = [];
+foreach ($repairDeviceData as $repairDevice) $repairLegalDaysByRecord[(string)($repairDevice['record_no'] ?? '')] = $repairDevice['legal_remaining'] ?? null;
 function repair_value(string $details,string $key): string {$data=json_decode($details,true);if($key==='repair_delivery_date')$key='repair_branch_delivery_date';$value=is_array($data)?($data[$key]??''):'';return is_array($value)?implode(', ', array_values(array_unique(array_filter(array_map('trim', $value), static fn(string $item): bool => $item !== '')))):(string)$value;}
 if (($_GET['delete_error'] ?? '') === 'repair_payment') echo '<script>window.addEventListener("DOMContentLoaded",()=>alert("Bu Tamir kartına bağlı tahsilat var. Önce tahsilatı iptal etmeden kayıt silinemez."));</script>';
 patient_header('Teknik Servis','stock');
@@ -337,6 +385,40 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 })();
 </script>
+<script>
+(() => {
+  const legalData = <?=json_encode($repairDeviceData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const table = document.querySelector('.technical-card table');
+  const quantityHeader = table?.querySelector('.technical-quantity-header');
+  if (!table || !quantityHeader || table.querySelector('.technical-legal-header')) return;
+  const legalHeader = document.createElement('th');
+  legalHeader.className = 'technical-legal-header';
+  legalHeader.textContent = 'YASAL SÜRE';
+  quantityHeader.after(legalHeader);
+  [...table.tBodies[0].rows].forEach((row, index) => {
+    const quantityCell = row.querySelector('.technical-quantity-cell');
+    if (!quantityCell || row.querySelector('.technical-legal-cell')) return;
+    const remaining = legalData[index]?.legal_remaining;
+    const deadline = legalData[index]?.legal_deadline;
+    const legalCell = document.createElement('td');
+    legalCell.className = 'technical-legal-cell';
+    legalCell.textContent = remaining === null || remaining === undefined ? '—' : `${remaining} iş günü`;
+    if (remaining !== null && remaining !== undefined) {
+      legalCell.classList.add('legal-active');
+      if (deadline) legalCell.title = `Süre bitiş tarihi: ${deadline}`;
+    }
+    if (remaining === 0) legalCell.classList.add('legal-expired');
+    else if (typeof remaining === 'number' && remaining <= 5) legalCell.classList.add('legal-warning');
+    quantityCell.after(legalCell);
+  });
+})();
+</script>
+<style>
+.technical-legal-cell{color:#2f2b3d;white-space:nowrap}
+.technical-legal-cell.legal-active{color:#dc3545!important;cursor:help}
+.technical-legal-cell.legal-warning{color:#d26a00}
+.technical-legal-cell.legal-expired{color:#dc3545}
+</style>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   const modal=document.getElementById('technical-form-modal');
