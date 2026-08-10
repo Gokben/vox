@@ -122,7 +122,7 @@ const unitsSubmenu = document.createElement('div');
 unitsSubmenu.className = 'report-submenu';
 const companiesMenuLink = document.createElement('a');
 companiesMenuLink.href = <?= json_encode(url('companies.php')) ?>;
-companiesMenuLink.innerHTML = '<span><i class="icon-base ti tabler-building-community"></i></span> Kurumlar & Firmalar';
+companiesMenuLink.innerHTML = '<span><i class="icon-base ti tabler-building-community"></i></span> Saha Aksiyonları';
 unitsSubmenu.append(companiesMenuLink);
 unitsMenuLink.setAttribute('aria-haspopup', 'true');
 unitsMenuLink.setAttribute('aria-expanded', 'false');

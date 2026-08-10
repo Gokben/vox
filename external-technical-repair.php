@@ -62,6 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $details = [
         'repair_technician' => trim((string)($_POST['repair_technician'] ?? '')),
         'repair_warranty' => isset($_POST['repair_warranty']),
+        'repair_out_of_warranty' => isset($_POST['repair_out_of_warranty']),
+        'repair_priority' => in_array((string)($_POST['repair_priority'] ?? ''), ['urgent', 'normal'], true) ? (string)$_POST['repair_priority'] : 'normal',
         'repair_accessories' => $accessories,
         'repair_quantity' => $quantity,
         'purchase_date' => trim((string)($_POST['purchase_date'] ?? '')),
@@ -146,10 +148,10 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
             <section class="tab-pane active show" data-panel="general">
               <div class="form-row two">
                 <label class="service-select-line">Servis Seç<select class="form-select" name="repair_technician"><option value="">Servis seçiniz</option><?php foreach($serviceAccounts as $service):$label=(string)($service['short_name'] ?: $service['title']);?><option value="<?=e((string)$service['title'])?>" <?=((string)($savedDetails['repair_technician'] ?? '')===(string)$service['title'])?'selected':''?>><?=e($label)?></option><?php endforeach?></select></label>
-                <label class="checkbox-line"><input type="checkbox" name="repair_warranty" <?=!empty($savedDetails['repair_warranty'])?'checked':''?>> Garanti kapsamında</label>
+                <div class="warranty-options"><div class="warranty-status-options"><label class="checkbox-line"><input type="checkbox" name="repair_warranty" <?=!empty($savedDetails['repair_warranty'])?'checked':''?>> Garanti kapsamında</label><label class="checkbox-line"><input type="checkbox" name="repair_out_of_warranty" <?=!empty($savedDetails['repair_out_of_warranty'])?'checked':''?>> Garanti dışı</label></div><div class="priority-options"><label class="checkbox-line"><input type="checkbox" name="repair_priority" value="urgent" <?=((string)($savedDetails['repair_priority'] ?? '')==='urgent')?'checked':''?>> Acil</label><label class="checkbox-line"><input type="checkbox" name="repair_priority" value="normal" <?=((string)($savedDetails['repair_priority'] ?? 'normal')==='normal')?'checked':''?>> Normal</label></div></div>
               </div>
               <h3>Aksesuarlar</h3>
-              <div class="checkbox-group"><?php foreach(['Cihaz Kutusu','Şarj Cihazı','Kulak Kalıbı','Receiver','Dome','Hortum','Drop'] as $accessory):?><label><input type="checkbox" name="repair_accessories[]" value="<?=e($accessory)?>" <?=in_array($accessory,(array)($savedDetails['repair_accessories'] ?? []),true)?'checked':''?>> <?=e($accessory)?></label><?php endforeach?></div>
+              <div class="checkbox-group"><?php foreach(['Kulak Kalıbı' => 'Kalıp','Dome' => 'Dome','Şarj Cihazı' => 'Charger','Receiver' => 'Receiver','Cihaz Kutusu' => 'Cihaz Kutusu'] as $accessory => $label):?><label><input type="checkbox" name="repair_accessories[]" value="<?=e($accessory)?>" <?=in_array($accessory,(array)($savedDetails['repair_accessories'] ?? []),true)?'checked':''?>> <?=e($label)?></label><?php endforeach?></div>
               <div class="form-row device-row">
                 <label>Hastanın Cihazı<input class="form-control" name="device" required value="<?=e((string)($repair['device'] ?? ''))?>"></label>
                 <label>Adet<input class="form-control" type="number" name="quantity" min="1" max="2" value="<?=e((string)($savedDetails['repair_quantity'] ?? 1))?>"></label>
@@ -212,7 +214,7 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
   <div class="print-choice-row">
     <table class="print-warranty"><thead><tr><th colspan="2">GARANTİ KAPSAMI</th></tr><tr><td>EVET</td><td>HAYIR</td></tr></thead><tbody><tr><td data-print="warranty-yes"></td><td data-print="warranty-no"></td></tr></tbody></table>
     <div class="print-device-options">
-      <table class="print-priority"><thead><tr><th>ACİL</th><th>NORMAL</th></tr></thead><tbody><tr><td data-print="urgent"></td><td data-print="normal">X</td></tr></tbody></table>
+      <table class="print-priority"><thead><tr><th>ACİL</th><th>NORMAL</th></tr></thead><tbody><tr><td data-print="urgent"></td><td data-print="normal"></td></tr></tbody></table>
       <table class="print-accessories"><thead><tr><th colspan="5">CİHAZ İLE BİRLİKTE GÖNDERİLEN</th></tr><tr><td>KALIP</td><td>DOME</td><td>CHARGER</td><td>RECEIVER</td><td>CİHAZ KUTUSU</td></tr></thead><tbody><tr><?php foreach(['Kulak Kalıbı','Dome','Şarj Cihazı','Receiver','Cihaz Kutusu'] as $item):?><td data-accessory="<?=e($item)?>"></td><?php endforeach?></tr></tbody></table>
     </div>
   </div>
@@ -228,12 +230,13 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
 <style>
 .form-tabs-card .service-select-line{flex-direction:row!important;align-items:center!important;gap:12px!important;padding-top:28px!important;white-space:nowrap}.form-tabs-card .service-select-line select{flex:1!important}@media(max-width:700px){.form-tabs-card .service-select-line{padding-top:0!important}}
 </style>
-<style>.form-tabs-card .serial-row{margin-top:16px!important}.form-tabs-card .serial-control{display:flex!important;align-items:center!important;gap:8px!important}.form-tabs-card .serial-control input[type=checkbox]{flex:0 0 17px!important;width:17px!important;height:17px!important;min-height:17px!important}.form-tabs-card .serial-control .form-control{flex:1!important}.external-tabs-form footer a,.external-tabs-form footer button{width:42px!important;padding:0!important}.external-tabs-form footer a i,.external-tabs-form footer button i{font-size:20px!important;line-height:1!important}</style>
+<style>.form-tabs-card .serial-row{margin-top:16px!important}.form-tabs-card .serial-control{display:flex!important;align-items:center!important;gap:8px!important}.form-tabs-card .serial-control input[type=checkbox]{flex:0 0 17px!important;width:17px!important;height:17px!important;min-height:17px!important}.form-tabs-card .serial-control .form-control{flex:1!important}.warranty-options{display:flex;align-items:center;gap:20px}.external-tabs-form footer a,.external-tabs-form footer button{width:42px!important;padding:0!important}.external-tabs-form footer a i,.external-tabs-form footer button i{font-size:20px!important;line-height:1!important}</style>
 <style>
 .service-documents{width:min(100%,520px);margin-top:22px;padding:16px 18px;border:1px solid #e2e1e8;border-radius:8px;background:#fafafa}.service-documents h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;color:#3c394d;font-size:15px}.service-documents h3 .ti{color:#7367f0;font-size:19px}.service-document-links{display:grid;gap:8px}.service-document-link{display:flex;align-items:center;gap:9px;min-height:39px;padding:7px 11px;border:1px solid #dcd9e4;border-radius:7px;background:#fff;color:#444050;text-decoration:none}.service-document-link:hover{border-color:#7367f0;color:#6558e8}.service-document-link .tabler-download{margin-left:auto;color:#19a94b;font-size:19px}.service-documents-empty{margin:0;color:#8c8898;font-size:13px}[data-theme=dark] .service-documents{background:#292c40;border-color:#454a63}[data-theme=dark] .service-document-link{background:#34384f;border-color:#50556f;color:#fff}
 </style>
 <style>
-.external-tabs-form footer .technical-print-button{background:#2f405a!important;color:#fff!important}.external-tabs-form footer .technical-print-button:hover{background:#26354c!important}
+.external-tabs-form footer .technical-print-button{background:#2f405a!important;color:#fff!important}.external-tabs-form footer .technical-print-button:hover{background:#26354c!important}.warranty-options{grid-column:1/-1;display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:70px}.warranty-status-options,.priority-options{display:flex;align-items:center;gap:20px;margin:0}.warranty-options .checkbox-line{padding-top:0!important}
+.form-tabs-card .service-select-line{grid-column:1/-1!important;justify-self:center!important;width:min(100%,420px)!important;padding-top:8px!important;margin-bottom:12px!important}
 #technical-print-sheet{display:none;box-sizing:border-box;width:190mm;min-height:270mm;padding:4mm 5mm 10mm;color:#111;background:#fff;font-family:Arial,sans-serif;font-size:8.5pt;line-height:1.15}.print-brand{display:flex;align-items:center;gap:2mm;height:18mm;margin:0 0 7mm}.print-brand img{display:block;width:31mm;max-height:17mm;object-fit:contain}.print-brand span{height:5mm;flex:1;margin-right:26mm;background:#8bd347}.print-brand+h1{display:inline-block;margin:0 0 10mm;padding:2.1mm 1.5mm 1.8mm;background:#050505;color:#fff;font-size:12pt;font-weight:400;line-height:1}.print-date{height:7mm;margin:0 24mm 5mm 0;text-align:right}.print-date strong{display:inline-block;min-width:27mm;text-align:left}.print-info-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:0;margin-bottom:7mm}.print-info-grid>div{box-sizing:border-box;min-height:7mm;padding:2.2mm 1mm 1mm;border-bottom:0.3mm dotted #555}.print-info-grid>div:nth-child(odd){margin-right:0}.print-info-grid b{font-weight:400}.print-choice-row{display:grid;grid-template-columns:48mm 1fr;align-items:end;gap:18mm;margin:0 0 7mm}.print-choice-row table,.print-accessories,.print-complaints{border-collapse:collapse;table-layout:fixed}.print-choice-row th,.print-accessories th,.print-complaints th{height:7mm;box-sizing:border-box;padding:1.8mm 1mm;background:#050505!important;color:#fff!important;font-weight:400;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-choice-row td,.print-accessories td{box-sizing:border-box;height:9mm;padding:1mm;border:0.25mm solid #aaa;text-align:center}.print-warranty{width:48mm}.print-device-options{display:flex;flex-direction:column;align-items:flex-end}.print-priority{width:42mm;margin:0 0 0 auto}.print-accessories{width:100%;margin:-0.25mm 0 0}.print-accessories th{font-size:8.5pt}.print-accessories td{font-size:7pt}.print-complaints{width:100%;margin:0 0 7mm}.print-complaints th{font-size:9pt}.print-complaints td{box-sizing:border-box;height:5.5mm;padding:0.8mm 1mm;border-bottom:0.25mm solid #aaa;background:rgba(255,255,255,.55)}.print-complaints .print-question{text-align:left}.print-complaints .mark{display:inline-flex;box-sizing:border-box;width:4.5mm;height:4.5mm;margin-right:2.5mm;border:0.25mm solid #777;align-items:center;justify-content:center;vertical-align:middle;font-size:10pt;line-height:1}.print-note{box-sizing:border-box;min-height:30mm;padding:2mm 1mm;border-top:0.25mm solid #888;border-bottom:0.25mm solid #888}.print-note b{display:inline-block;margin-right:5mm;font-weight:400}.print-note span{white-space:pre-wrap}
 #technical-print-sheet{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 /* Referans teknik servis formunun A4 oranları */
@@ -317,6 +320,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     setText('serials',[firstSerial,secondSerial].filter(Boolean).join(' / '));
     setText('warranty-yes',checked('[name="repair_warranty"]')?'X':'');
     setText('warranty-no',checked('[name="repair_warranty"]')?'':'X');
+    setText('urgent',checked('[name="repair_priority"][value="urgent"]')?'X':'');
+    setText('normal',checked('[name="repair_priority"][value="urgent"]')?'':'X');
     setText('note',form.querySelector('[name="technician_note"]')?.value.trim()||'');
     sheet.querySelectorAll('[data-accessory]').forEach(cell=>{cell.textContent=checked('[name="repair_accessories[]"][value="'+CSS.escape(cell.dataset.accessory)+'"]')?'X':'';});
     const selectedIssues=new Set(Array.from(form.querySelectorAll('[name="repair_customer_issues[]"]:checked'),input=>input.value));
@@ -342,6 +347,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   const field=(label,name,type='text',value='')=>'<label>'+label+'<input class="form-control" type="'+type+'" name="'+name+'" value="'+String(value).replace(/"/g,'&quot;')+'"></label>';
   const renderPaymentExtra=()=>{if(!payment||!extra)return;extra.innerHTML='';if(payment.value==='Kredi Kartı'){const label=document.createElement('label'),select=document.createElement('select');label.textContent='Banka';select.name='repair_fee_bank';select.className='form-select';select.append(new Option('Banka seçiniz',''));banks.forEach(bank=>select.append(new Option(bank.name,bank.name)));select.value=saved.repair_fee_bank||'';label.append(select);extra.append(label);extra.insertAdjacentHTML('beforeend',field('Taksit Sayısı','repair_fee_installment_count','number',saved.repair_fee_installment_count||'')+field('Komisyon Oranı','repair_fee_commission_rate','text',saved.repair_fee_commission_rate||''));}if(payment.value==='Mail Order')extra.innerHTML=field('Cari Hesap','repair_fee_current_account','text',saved.repair_fee_current_account||'');if(payment.value==='Vadeli')extra.innerHTML=field('Vade Sayısı','repair_fee_term_count','number',saved.repair_fee_term_count||'');};
   payment?.addEventListener('change',renderPaymentExtra);renderPaymentExtra();
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const form=document.querySelector('.external-tabs-form');
+  const warranty=form?.querySelector('[name="repair_warranty"]');
+  const outOfWarranty=form?.querySelector('[name="repair_out_of_warranty"]');
+  const priorities=[...(form?.querySelectorAll('[name="repair_priority"]')||[])];
+  warranty?.addEventListener('change',()=>{if(warranty.checked&&outOfWarranty)outOfWarranty.checked=false;});
+  outOfWarranty?.addEventListener('change',()=>{if(outOfWarranty.checked&&warranty)warranty.checked=false;});
+  priorities.forEach(priority=>priority.addEventListener('change',()=>{if(priority.checked)priorities.forEach(other=>{if(other!==priority)other.checked=false;});}));
 });
 </script>
 <?php patient_footer(); ?>

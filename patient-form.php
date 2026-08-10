@@ -78,8 +78,8 @@ try {
 
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
-if (!preg_match('/^(patients|patient-results|company-patients)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
-$fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_company_id','source_detail','notes'];
+if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
+$fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_detail','notes'];
 $patient = array_fill_keys($fields, '');
 $patient['patient_status'] = 'active';
 $defaultRecordDate = (string)($_GET['date'] ?? '');
@@ -116,11 +116,9 @@ try {
 $serviceTypeOptions=array_filter($serviceTypeDefinitions, static fn(array $row): bool => (int)$row['active'] === 1);
 $sourceDefinitions = [];
 $sourceUnits = [];
-$sourceCompanies = [];
 try {
     $sourceDefinitions=source_definitions();
     $sourceUnits=db()->query('SELECT id,unit_no FROM units WHERE COALESCE(unit_no, \'\') <> \'\' ORDER BY unit_no')->fetchAll();
-    $sourceCompanies=db()->query('SELECT id,company_name FROM companies ORDER BY company_name')->fetchAll();
 } catch (Throwable $exception) {
     $formSetupErrors[] = 'source-options';
     error_log('patient-form.php source options: ' . $exception->getMessage());
@@ -150,10 +148,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $sourceName = (string)($sourceStatement->fetchColumn() ?: '');
         if ($sourceName === '') $error = 'Seçilen kaynak bulunamadı.';
         elseif (!in_array($sourceName, ['Kaynak Ünite', 'Ünite'], true)) $patient['source_unit_id'] = 0;
-        if ($sourceName !== 'Kurumlar & Firmalar') $patient['source_company_id'] = 0;
     } else {
         $patient['source_unit_id'] = 0;
-        $patient['source_company_id'] = 0;
     }
     if ($patient['full_name']==='') $error='Ad soyad alanı zorunludur.';
     elseif ($error === '') {
@@ -204,7 +200,6 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 <h3 class="form-section-title">Başvuru ve Açıklamalar</h3>
 <div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach($sourceDefinitions as $source):$isCurrent=(int)$patient['source_id']===(int)$source['id'];if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ünite No seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e($unit['unit_no'])?></option><?php endforeach?></select></div></div>
-<div class="icon-form-row source-company-row" hidden><label class="icon-form-label">Kurumlar &amp; Firmalar</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_company_id"><option value="">Firma adı seçiniz</option><?php foreach($sourceCompanies as $company):?><option value="<?=(int)$company['id']?>" <?=((int)($patient['source_company_id']??0)===(int)$company['id'])?'selected':''?>><?=e($company['company_name'])?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><input name="source_detail" value="<?=e($patient['source_detail'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Açıklama</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="notes"><?=e($patient['notes'])?></textarea></div></div>
 <div class="vuexy-form-actions"><?php if($id):?><a href="<?=e(url('patient-followup.php?id='.$id))?>" title="Hizmetler" aria-label="Hizmetler" style="display:grid;place-items:center;width:40px;min-width:40px;height:40px;min-height:40px;padding:0;border-radius:6px;background:#f3a64a;color:#fff;text-decoration:none"><i class="icon-base ti tabler-heart-handshake" style="font-size:20px"></i></a><?php endif?><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url($returnTo))?>">İptal</a></div></form></section></main>
@@ -215,7 +210,7 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
     birth_date:'tabler-cake',phone_primary:'tabler-phone',phone_secondary:'tabler-phone',address:'tabler-map-pin',
     patient_rating_comment:'tabler-message',social_security:'tabler-shield-check',report_info:'tabler-file-description',
     report_status:'tabler-file-check',
-    source_id:'tabler-speakerphone',source_unit_id:'tabler-building',source_company_id:'tabler-building-store',source_detail:'tabler-list-details',
+    source_id:'tabler-speakerphone',source_unit_id:'tabler-building',source_detail:'tabler-list-details',
     notes:'tabler-note'
   };
   Object.entries(icons).forEach(([name,icon])=>{
@@ -267,7 +262,6 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 (()=>{const phone=document.getElementById('phone_primary'),toggle=document.getElementById('proximity-toggle'),row=document.getElementById('proximity-row'),relation=document.getElementById('proximity_relation');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else{row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
 (()=>{const phone=document.getElementById('phone_secondary'),toggle=document.getElementById('proximity-secondary-toggle'),row=document.getElementById('proximity-secondary-row'),relation=document.getElementById('proximity_relation_secondary');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else if(relation.value.trim()!==''){row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
 (()=>{const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-unit-row'),units=document.querySelector('select[name="source_unit_id"]');if(!source||!row||!units)return;const refresh=()=>{const label=(source.options[source.selectedIndex]?.textContent||'').trim();const show=/^(kaynak\s*)?ünite$/i.test(label);row.hidden=!show;if(!show)units.value='';};source.addEventListener('change',refresh);refresh()})();
-(()=>{const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-company-row'),companies=document.querySelector('select[name="source_company_id"]');if(!source||!row||!companies)return;const refresh=()=>{const label=(source.options[source.selectedIndex]?.textContent||'').trim();const show=/^kurumlar\s*&\s*firmalar$/i.test(label);row.hidden=!show;if(!show)companies.value='';};source.addEventListener('change',refresh);refresh()})();
 (()=>{const input=document.getElementById('patient-full-name'),display=document.querySelector('.patient-name-display');if(!input||!display)return;const edit=()=>{input.focus();input.setSelectionRange(input.value.length,input.value.length)};display.addEventListener('click',edit);display.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();edit()}})})();
 </script>
 <?php patient_footer();

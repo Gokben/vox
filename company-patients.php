@@ -6,6 +6,10 @@ require_login();
 ensure_patient_source_schema();
 require __DIR__ . '/patient-layout.php';
 
+// Saha Aksiyonları hasta kartlarından bağımsız bir fihristtir. Eski hasta
+// bağlantılarının doğrudan URL ile de açılmasını engelle.
+redirect('companies.php');
+
 $companyId = max(0, (int)($_GET['company_id'] ?? 0));
 $pdo = db();
 $companyStatement = $pdo->prepare('SELECT id,company_name FROM companies WHERE id=?');

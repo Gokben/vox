@@ -10,7 +10,15 @@ $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS companies (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, record_date TEXT, company_name TEXT NOT NULL, short_name TEXT, department TEXT, company_type TEXT, phone1 TEXT, phone2 TEXT, email TEXT, tax_no TEXT, tax_office TEXT, billing_address TEXT, city TEXT, district TEXT, address TEXT, related_cards TEXT, note TEXT)'
     : 'CREATE TABLE IF NOT EXISTS companies (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, record_date DATE NULL, company_name VARCHAR(190) NOT NULL, short_name VARCHAR(190) NULL, department VARCHAR(150) NULL, company_type VARCHAR(150) NULL, phone1 VARCHAR(50) NULL, phone2 VARCHAR(50) NULL, email VARCHAR(190) NULL, tax_no VARCHAR(50) NULL, tax_office VARCHAR(150) NULL, billing_address TEXT NULL, city VARCHAR(100) NULL, district VARCHAR(100) NULL, address TEXT NULL, related_cards TEXT NULL, note TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
-$fields = ['record_date','company_name','short_name','department','company_type','phone1','phone2','email','tax_no','tax_office','billing_address','city','district','address','related_cards','note'];
+$companyColumns = $sqlite ? array_column($pdo->query('PRAGMA table_info(companies)')->fetchAll(), 'name') : array_column($pdo->query('SHOW COLUMNS FROM companies')->fetchAll(), 'Field');
+foreach (['first_name' => 'VARCHAR(190) NULL', 'last_name' => 'VARCHAR(190) NULL', 'birth_date' => 'DATE NULL'] as $column => $definition) {
+    if (!in_array($column, $companyColumns, true)) $pdo->exec('ALTER TABLE companies ADD COLUMN ' . $column . ' ' . $definition);
+}
+$pdo->exec($sqlite
+    ? 'CREATE TABLE IF NOT EXISTS company_visits (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL, visit_date TEXT NOT NULL, payment_amount REAL NOT NULL DEFAULT 0, description TEXT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
+    : 'CREATE TABLE IF NOT EXISTS company_visits (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id INT UNSIGNED NOT NULL, visit_date DATE NOT NULL, payment_amount DECIMAL(12,2) NOT NULL DEFAULT 0, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_company_visits_company_date (company_id, visit_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+$fields = ['record_date','first_name','last_name','phone1','phone2','email','birth_date','company_name','department','city','district','address','note'];
 $editId = (int)($_GET['edit'] ?? 0);
 $showForm = $editId > 0 || isset($_GET['new']);
 $company = array_fill_keys($fields, '');
@@ -45,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     catch (Throwable $exception) { error_log('companies.php: ' . $exception->getMessage()); $error = 'Kayıt işlemi tamamlanamadı.'; }
 }
 $message = isset($_GET['saved']) ? 'Kayıt kaydedildi.' : '';
-$companies = $pdo->query('SELECT * FROM companies ORDER BY company_name')->fetchAll();
-patient_header($editId ? 'Kurum/Firma Düzenle' : ($showForm ? 'Yeni Kurum/Firma' : 'Kurumlar & Firmalar'), 'cash');
+$companies = $pdo->query('SELECT c.*, (SELECT COUNT(*) FROM company_visits cv WHERE cv.company_id=c.id) AS visit_count FROM companies c ORDER BY c.company_name')->fetchAll();
+patient_header($editId ? 'Saha Aksiyonu Düzenle' : ($showForm ? 'Yeni Saha Aksiyonu' : 'Saha Aksiyonları'), 'cash');
 ?>
 <style>
 .company-page{width:100%!important;max-width:1100px!important;margin-left:auto!important;margin-right:auto!important;padding:96px 20px 48px!important}.company-card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1);overflow:hidden}.company-head,.company-list-head{display:flex;align-items:center;justify-content:space-between;min-height:70px;padding:0 24px;border-bottom:1px solid var(--line)}.company-head h2,.company-list-head h2{margin:0;font-size:20px;font-weight:500}.company-list{width:calc(100% - 64px);margin:28px 32px 48px;border:1px solid var(--line);border-radius:8px;background:var(--card);overflow:hidden}.company-list table{width:100%;border-collapse:collapse}.company-list th,.company-list td{padding:13px 18px;border-bottom:1px solid var(--line);text-align:left}.company-list th{font-size:12px;color:var(--muted)}.company-actions{display:flex;gap:8px}.company-actions a,.company-actions button{display:inline-grid;place-items:center;width:36px;height:36px;border:0;border-radius:6px;background:#20a447;color:#fff;cursor:pointer}.company-actions>a[href*="patients.php"]{width:36px;height:36px;min-width:36px;min-height:36px;background:#f3a64a}.company-actions>a[href*="patients.php"]:hover{background:#df8f2b}.company-actions button{background:#e04f55}.company-form{padding:24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px}.company-field{display:flex;flex-direction:column;gap:7px;color:var(--text);font-size:14px}.company-field input,.company-field textarea{width:100%;min-height:40px;padding:9px 12px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);color:var(--text);font:inherit}.company-field textarea{min-height:82px;resize:vertical}.company-wide{grid-column:1/-1}.company-actions-row{grid-column:1/-1;display:flex;gap:12px;margin-top:4px}.company-alert{margin:18px 24px 0;padding:12px;border-radius:6px;background:#fde8e8;color:#a62c2c}.company-empty{text-align:center;color:var(--muted)}@media(max-width:720px){.company-page{padding:92px 12px 30px!important}.company-list{width:auto;margin:20px 12px 30px;overflow:auto}.company-list table{min-width:600px}.company-form{grid-template-columns:1fr;padding:18px}.company-wide,.company-actions-row{grid-column:auto}.company-head,.company-list-head{padding:0 16px}}
@@ -57,6 +65,24 @@ patient_header($editId ? 'Kurum/Firma Düzenle' : ($showForm ? 'Yeni Kurum/Firma
 <?php if (!$showForm): ?><main class="patient-container company-page"><?php if($message):?><p style="color:#16883d"><?=e($message)?></p><?php endif?><section class="company-list"><div class="company-list-head"><h2>Firma Listesi</h2><a class="button" href="<?=e(url('companies.php?new=1'))?>">+ Yeni Kurum/Firma</a></div><table><thead><tr><th>KAYIT NO</th><th>FİRMA</th><th>TELEFON</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach($companies as $row):?><tr data-edit-url="<?=e(url('companies.php?edit='.(int)$row['id']))?>"><td><?=e($row['code'])?></td><td><?=e($row['company_name'])?></td><td><?=e($row['phone1'])?></td><td><div class="company-actions"><a href="<?=e(url('companies.php?edit='.(int)$row['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu kurum/firma silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$row['id']?>"><button title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$companies):?><tr><td colspan="4" class="company-empty">Henüz kurum/firma bulunmuyor.</td></tr><?php endif?></tbody></table></section></main><?php endif; ?>
 <script>
 (()=>{
+  const form=document.querySelector('.company-form');
+  if(form){
+    const extraValues=<?=json_encode(['first_name'=>(string)($company['first_name']??''),'last_name'=>(string)($company['last_name']??''),'birth_date'=>(string)($company['birth_date']??'')], JSON_UNESCAPED_UNICODE)?>;
+    const labels={record_date:'Tarih',first_name:'Adı',last_name:'Soyadı',phone1:'Tel 1',phone2:'Tel 2',email:'E-posta',birth_date:'Doğum Günü',company_name:'Firma / Kurum Adı',department:'Bölüm / Departman',city:'İl',district:'İlçe',address:'Adres',note:'Açıklama'};
+    const order=Object.keys(labels);
+    const actions=form.querySelector('.company-actions-row');
+    for(const name of order){
+      let input=form.querySelector(`[name="${name}"]`);
+      let field=input?.closest('.company-field');
+      if(!input){
+        field=document.createElement('label');field.className='company-field';field.append(document.createTextNode(labels[name]));
+        input=document.createElement('input');input.name=name;input.type=name==='birth_date'?'date':'text';input.value=extraValues[name]||'';field.append(input);
+      }
+      const textNode=[...field.childNodes].find(node=>node.nodeType===Node.TEXT_NODE);
+      if(textNode) textNode.nodeValue=labels[name];
+      form.insertBefore(field,actions);
+    }
+  }
   const format=value=>{
     let digits=String(value).replace(/\D/g,'');
     if(digits.length===13&&digits.startsWith('90')&&digits.charAt(2)==='0')digits=digits.slice(2);
@@ -74,37 +100,64 @@ patient_header($editId ? 'Kurum/Firma Düzenle' : ($showForm ? 'Yeni Kurum/Firma
 </script>
 <script>
 (() => {
+  const cardTitle = document.querySelector('.company-head h2');
+  if (cardTitle) cardTitle.textContent = 'Kişi Kartı';
   const title = document.querySelector('.company-list-head h2');
-  if (title) title.textContent = 'Kurumlar/Firmalar';
-  document.querySelectorAll('.company-actions').forEach(actions => {
-    const editLink = actions.querySelector('a[href*="companies.php?edit="]');
-    const match = editLink?.href.match(/[?&]edit=(\d+)/);
-    if (!match) return;
-    const patientsLink = document.createElement('a');
-    patientsLink.href = <?=json_encode(url('company-patients.php'))?> + '?company_id=' + match[1];
-    patientsLink.className = 'company-patients-action';
-    patientsLink.title = 'Hastalar';
-    patientsLink.setAttribute('aria-label', 'Hastalar');
-    patientsLink.innerHTML = '<i class="icon-base ti tabler-users"></i>';
-    actions.insertBefore(patientsLink, editLink);
-    const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element.style.setProperty(property, value, 'important'));
-    force(actions, { position: 'relative', display: 'block', width: '140px', minWidth: '140px', height: '40px' });
-    [patientsLink, editLink, actions.querySelector(':scope > form')].forEach((control, index) => {
-      if (!control) return;
-      const isPatientsAction = control === patientsLink;
-      const size = isPatientsAction ? '49px' : '40px';
-      force(control, { position: 'absolute', top: isPatientsAction ? '1px' : '0', left: isPatientsAction ? '0' : (index * 50) + 'px', display: 'grid', placeItems: 'center', width: size, minWidth: size, maxWidth: size, height: size, minHeight: size, maxHeight: size, margin: '0', padding: '0', boxSizing: 'border-box' });
-      const button = control.matches('form') ? control.querySelector('button') : control;
-      force(button, { display: 'grid', placeItems: 'center', width: size, minWidth: size, maxWidth: size, height: size, minHeight: size, maxHeight: size, margin: '0', padding: '0', border: '0', borderRadius: '6px', lineHeight: '1', textDecoration: 'none', boxSizing: 'border-box' });
-    });
+  if (title) title.textContent = 'Saha Aksiyonları';
+  const newRecordButton = document.querySelector('.company-list-head .button');
+  if (newRecordButton) newRecordButton.textContent = '+ Yeni Kayıt';
+  const directoryRows = <?=json_encode(array_map(static fn(array $row): array => ['code'=>(string)$row['code'],'first_name'=>(string)($row['first_name']??''),'last_name'=>(string)($row['last_name']??''),'company_name'=>(string)($row['company_name']??''),'phone1'=>(string)($row['phone1']??''),'visit_count'=>(int)($row['visit_count']??0)], $companies), JSON_UNESCAPED_UNICODE)?>;
+  const table = document.querySelector('.company-list table');
+  if (!table) return;
+  const headings = ['Kayıt No','Ad','Soyad','Kurum / Firma','Tel 1','Ziyaret Sayısı','İşlemler'];
+  table.tHead.innerHTML = '';
+  const headerRow = document.createElement('tr');
+  headings.forEach(heading => { const cell=document.createElement('th');cell.textContent=heading;headerRow.append(cell); });
+  table.tHead.append(headerRow);
+  [...table.tBodies[0].rows].forEach((row,index) => {
+    if (row.querySelector('.company-empty')) { row.firstElementChild.colSpan = headings.length; return; }
+    const data=directoryRows[index]; if (!data) return;
+    const actions=row.lastElementChild; actions.remove(); row.replaceChildren();
+    [data.code,data.first_name,data.last_name,data.company_name,data.phone1,String(data.visit_count)].forEach(value => { const cell=document.createElement('td');cell.textContent=value;row.append(cell); });
+    row.append(actions);
   });
 })();
 </script>
 <script>
 document.querySelectorAll('.company-actions').forEach(actions => {
+  const editLink=actions.querySelector(':scope>a[href*="edit="]');
+  const id=editLink?.href.match(/[?&]edit=(\d+)/)?.[1];
+  if(id&&!actions.querySelector('.company-visit-action')){
+    const visit=document.createElement('a');
+    visit.className='company-visit-action';visit.href=<?=json_encode(url('company-visits.php'))?>+'?company_id='+id;
+    visit.title='Ziyaret';visit.setAttribute('aria-label','Ziyaret');visit.innerHTML='<i class="icon-base ti tabler-map-pin"></i>';
+    actions.prepend(visit);
+  }
   Object.assign(actions.style, { display: 'grid', gridTemplateColumns: 'repeat(3, 40px)', gridAutoRows: '40px', columnGap: '10px', rowGap: '0', alignItems: 'center', width: '140px', height: '40px' });
   actions.querySelectorAll(':scope > a, :scope > form').forEach(item => Object.assign(item.style, { display: 'block', flex: '0 0 40px', width: '40px', height: '40px', margin: '0' }));
   actions.querySelectorAll(':scope > a, :scope > form > button').forEach(button => Object.assign(button.style, { boxSizing: 'border-box', width: '40px', height: '40px', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px', padding: '0' }));
+  const visit=actions.querySelector('.company-visit-action');
+  const removeForm=actions.querySelector(':scope>form');
+  [visit,editLink,removeForm].filter(Boolean).forEach(item=>{
+    item.style.removeProperty('left');
+    item.style.setProperty('position','static','important');
+  });
 });
 </script>
+<style>
+.company-list th:last-child,.company-list td:last-child{width:176px!important;min-width:176px!important}
+.company-actions{width:140px!important;min-width:140px!important}
+.company-actions>.company-visit-action{left:0!important;display:grid!important;place-items:center!important;background:#f3a64a!important}
+.company-actions>a:not(.company-patients-action):not(.company-visit-action){left:50px!important}
+.company-actions>form{left:100px!important}
+.company-actions>a,.company-actions>form,.company-actions>form>button{width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important;max-width:40px!important;max-height:40px!important;padding:0!important;box-sizing:border-box!important}
+.company-actions{position:static!important;display:flex!important;align-items:center!important;gap:0!important;width:140px!important;height:40px!important}.company-actions>a,.company-actions>form{position:static!important;flex:0 0 40px!important;margin:0!important;transform:none!important}.company-actions>a+a,.company-actions>a+form{margin-left:10px!important}
+.company-actions>form>button{display:grid!important;place-items:center!important;position:relative!important;left:0!important;right:auto!important;margin:0!important;transform:translateX(-8px)!important}
+.company-actions>.company-visit-action,.company-actions>a[href*="edit="],.company-actions>form>button{display:grid!important;place-items:center!important;width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important;max-width:40px!important;max-height:40px!important;padding:0!important;border-radius:6px!important;line-height:1!important}
+.company-field:has([name="related_cards"]){display:none!important}
+.company-field:has([name="tax_no"]),.company-field:has([name="tax_office"]){display:none!important}
+.company-field:has([name="billing_address"]){display:none!important}
+.company-field:has([name="company_type"]),.company-field:has([name="short_name"]){display:none!important}
+.company-actions-row>.button,.company-actions-row>.cancel-link{display:grid!important;place-items:center!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;max-width:36px!important;max-height:36px!important;padding:0!important;box-sizing:border-box!important}
+</style>
 <?php patient_footer(); ?>
