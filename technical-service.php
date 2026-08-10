@@ -559,4 +559,23 @@ document.addEventListener('DOMContentLoaded',()=>{
   sync();
 });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const table=document.querySelector('.technical-card table');
+  const panel=document.querySelector('.technical-column-panel');
+  if(!table||!panel)return;
+  panel.addEventListener('change',event=>{
+    const checkbox=event.target.closest('input[type="checkbox"]');
+    if(!checkbox)return;
+    event.stopImmediatePropagation();
+    const title=checkbox.closest('label')?.textContent.trim()||'';
+    const headers=[...table.tHead.rows[0].cells];
+    const index=headers.findIndex(header=>header.textContent.trim()===title);
+    if(index<0)return;
+    table.querySelectorAll('tr').forEach(row=>{
+      if(row.cells[index])row.cells[index].style.display=checkbox.checked?'':'none';
+    });
+  },true);
+});
+</script>
 <?php patient_footer(); ?>
