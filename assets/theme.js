@@ -302,7 +302,7 @@
       const layoutStyles = document.createElement('link');
       layoutStyles.id = 'vuexy-layout-fixes';
       layoutStyles.rel = 'stylesheet';
-      layoutStyles.href = new URL('assets/vuexy-layout-fixes.css?v=16', location.href).href;
+      layoutStyles.href = new URL('assets/vuexy-layout-fixes.css?v=19', location.href).href;
       document.head.appendChild(layoutStyles);
     }
     const vuexyIcons = {
@@ -380,16 +380,6 @@
     document.addEventListener('click', event => {
       if (mobile() && document.body.classList.contains('menu-open') && !sidebar.contains(event.target) && !button.contains(event.target)) {
         document.body.classList.remove('menu-open');
-        update();
-      }
-    });
-    const brand = document.querySelector('.patient-brand');
-    brand?.addEventListener('click', event => {
-      if (!mobile() && document.body.classList.contains('menu-collapsed')) {
-        event.preventDefault();
-        document.body.classList.remove('menu-collapsed');
-        localStorage.setItem('vox-sidebar-collapsed', 'false');
-        syncLayoutClasses();
         update();
       }
     });

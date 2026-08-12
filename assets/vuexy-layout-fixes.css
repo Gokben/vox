@@ -100,23 +100,29 @@ body .patient-nav .report-submenu a{display:flex!important;justify-content:flex-
   body.menu-collapsed .patient-brand,body.layout-menu-collapsed .patient-brand{background-image:none!important;background-size:0!important}
   body.menu-collapsed .patient-brand::before,body.layout-menu-collapsed .patient-brand::before{position:absolute;top:14px;left:20px;width:36px;height:36px;background:url('vox-logo-02.png?v=20260713-9') -43px -3px/118px 43px no-repeat;content:''}
   body.menu-collapsed .patient-topbar .menu-toggle,body.menu-collapsed .patient-topbar .menu-toggle:hover,body.layout-menu-collapsed .patient-topbar .menu-toggle,body.layout-menu-collapsed .patient-topbar .menu-toggle:hover{display:none!important}
-  body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{background-image:url('vox-logo-02.png?v=20260713-9')!important;background-size:105px auto!important;background-position:20px center!important}
-  body.menu-collapsed:has(.patient-nav:hover) .patient-brand::before,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand::before{display:none}
+  /* Hovering the menu must not expand the logo or replace its compact mark. */
+  body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{background-image:none!important;background-size:0!important;background-position:center!important}
+  body.menu-collapsed:has(.patient-nav:hover) .patient-brand::before,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand::before{display:block!important}
 }
 
 /* Vuexy fixed/collapsed/hover-expanded sidebar behaviour. */
 @media(min-width:901px){
   body .patient-nav{width:260px!important;transition:width .3s ease,box-shadow .3s ease!important}
-  body .patient-brand{width:260px!important;transition:width .3s ease!important}
+  body .patient-brand{width:260px!important;transition:none!important}
   body.menu-collapsed .patient-nav,body.layout-menu-collapsed .patient-nav{width:76px!important;overflow-x:hidden!important;box-shadow:0 0 6px rgba(47,43,61,.10)!important}
   body.menu-collapsed .patient-brand,body.layout-menu-collapsed .patient-brand{width:76px!important}
   body.menu-collapsed .patient-nav:hover,body.layout-menu-collapsed .patient-nav:hover{width:260px!important;overflow-x:visible!important;box-shadow:7px 0 18px rgba(47,43,61,.14)!important}
-  body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{width:260px!important;box-shadow:7px 0 18px rgba(47,43,61,.10)!important}
+  /* Keep the logo stable while the collapsed navigation opens on hover. */
+  body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{width:76px!important;box-shadow:none!important}
   body.menu-collapsed .patient-nav:hover>a,body.menu-collapsed .patient-nav:hover>.report-menu-group>a,body.layout-menu-collapsed .patient-nav:hover>a,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a{justify-content:flex-start!important;padding-left:12px!important;padding-right:38px!important;font-size:15px!important}
   body.menu-collapsed .patient-nav:hover>a span,body.menu-collapsed .patient-nav:hover>.report-menu-group>a span,body.layout-menu-collapsed .patient-nav:hover>a span,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a span{width:20px!important;margin-right:8px!important;font-size:18px!important}
   body.menu-collapsed .patient-nav:hover>.report-menu-group>a::after,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a::after{display:block!important}
   body.menu-collapsed .patient-nav:hover .report-submenu,body.layout-menu-collapsed .patient-nav:hover .report-submenu{display:none!important}
   body.menu-collapsed .patient-nav:hover .report-menu-group.open .report-submenu,body.layout-menu-collapsed .patient-nav:hover .report-menu-group.open .report-submenu{display:grid!important}
+  /* Keep the collapsed menu fixed; it must not expand while the logo is clicked. */
+  body.menu-collapsed .patient-nav:hover,body.layout-menu-collapsed .patient-nav:hover{width:76px!important;overflow-x:hidden!important;box-shadow:0 0 6px rgba(47,43,61,.10)!important}
+  body.menu-collapsed .patient-nav:hover>a,body.menu-collapsed .patient-nav:hover>.report-menu-group>a,body.layout-menu-collapsed .patient-nav:hover>a,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a{justify-content:center!important;padding-left:8px!important;padding-right:8px!important;font-size:0!important}
+  body.menu-collapsed .patient-nav:hover>a span,body.menu-collapsed .patient-nav:hover>.report-menu-group>a span,body.layout-menu-collapsed .patient-nav:hover>a span,body.layout-menu-collapsed .patient-nav:hover>.report-menu-group>a span{width:auto!important;margin-right:0!important;font-size:16px!important}
   body .patient-nav>a,body .patient-nav>.report-menu-group>a{font-weight:400!important}
   body .patient-nav .report-submenu a{font-weight:400!important}
   body .patient-nav>a.active{font-weight:500!important}
