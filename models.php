@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/config.php';
 require_admin();
+redirect('brands.php');
 require __DIR__ . '/patient-layout.php';
 
 function ensure_model_schema(): void

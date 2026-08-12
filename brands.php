@@ -217,9 +217,21 @@ if ($editModelId > 0) {
 $brands = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY id ASC')->fetchAll();
 $brandOptions = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY name')->fetchAll();
 $firstBrandId = (int)($brandOptions[0]['id'] ?? 0);
-$models = $pdo->query('SELECT models.id,models.brand_id,models.name,models.stock_type AS model_stock_type,brands.name AS brand_name,brands.stock_type AS brand_stock_type
-    FROM models INNER JOIN brands ON brands.id=models.brand_id
-    ORDER BY models.id ASC')->fetchAll();
+$selectedBrandId = max(0, (int)($_GET['brand_id'] ?? $_POST['selected_brand_id'] ?? 0));
+$selectedBrand = null;
+if ($selectedBrandId > 0) {
+    $selectedBrandStatement = $pdo->prepare('SELECT id,name,stock_type FROM brands WHERE id=?');
+    $selectedBrandStatement->execute([$selectedBrandId]);
+    $selectedBrand = $selectedBrandStatement->fetch() ?: null;
+    if (!$selectedBrand) $selectedBrandId = 0;
+}
+if ($selectedBrandId > 0) {
+    $modelsStatement = $pdo->prepare('SELECT models.id,models.brand_id,models.name,models.stock_type AS model_stock_type,brands.name AS brand_name,brands.stock_type AS brand_stock_type FROM models INNER JOIN brands ON brands.id=models.brand_id WHERE models.brand_id=? ORDER BY models.id ASC');
+    $modelsStatement->execute([$selectedBrandId]);
+    $models = $modelsStatement->fetchAll();
+} else {
+    $models = [];
+}
 $brandGroups = ['İşitme Cihazı Markaları' => [], 'Pil Markaları' => [], 'Diğer Markalar' => []];
 foreach ($brands as $brand) {
     $types = array_filter(explode(',', (string)$brand['stock_type']));
@@ -243,6 +255,10 @@ $activeSection = (
     || $editModelId > 0
     || ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['entity'] ?? '') === 'model')
 ) ? 'models' : 'brands';
+if ($selectedBrandId > 0) $activeSection = 'models';
+if (($_GET['tab'] ?? '') === 'models' && $selectedBrandId === 0 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect('brands.php?tab=brands&group=' . $activeGroup);
+}
 
 patient_header('Kurulum - Markalar', 'settings');
 ?>
@@ -251,7 +267,7 @@ patient_header('Kurulum - Markalar', 'settings');
     <a class="<?=$activeSection === 'brands' ? 'active' : ''?>" href="<?=url('brands.php?tab=brands')?>">Markalar</a>
     <a class="<?=$activeSection === 'models' ? 'active' : ''?>" href="<?=url('brands.php?tab=models')?>">Modeller</a>
   </nav>
-  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeSection=<?=json_encode($activeSection)?>,activeGroup=<?=json_encode($activeGroup)?>,items=[['brands','hearing','İşitme Cihazı Markaları'],['models','hearing','İşitme Cihazı Modelleri'],['brands','battery','Pil Markaları'],['models','battery','Pil Numaraları']];nav.innerHTML='';items.forEach(([tab,group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab='+tab+'&group='+group;link.textContent=label;link.className=activeSection===tab&&activeGroup===group?'active':'';nav.append(link)})})();</script>
+  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeGroup=<?=json_encode($activeGroup)?>,items=[['hearing','İşitme Cihazı Markaları'],['battery','Pil Markaları']];nav.innerHTML='';items.forEach(([group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab=brands&group='+group;link.textContent=label;link.className=<?=json_encode($selectedBrandId === 0)?>&&activeGroup===group?'active':'';nav.append(link)})})();</script>
   <?php if ($message): ?><p class="manage-message success"><?=e($message)?></p><?php endif; ?>
   <?php if ($error): ?><p class="manage-message error"><?=e($error)?></p><?php endif; ?>
 
@@ -268,7 +284,7 @@ patient_header('Kurulum - Markalar', 'settings');
       <input type="hidden" name="action" value="save">
       <input type="hidden" name="id" value="<?=(int)$editBrand['id']?>">
       <label>Marka adı<input name="name" maxlength="190" required placeholder="Marka adı" value="<?=e($editBrand['name'])?>"></label>
-      <div class="form-actions"><button type="submit">Kaydet</button><a href="<?=url('brands.php?tab=brands')?>">İptal</a></div>
+      <div class="form-actions"><button type="submit" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy" aria-hidden="true"></i><span class="visually-hidden">Kaydet</span></button></div>
     </form>
   </details>
   <section class="vuexy-form-card manage-card list-admin-card">
@@ -281,7 +297,7 @@ patient_header('Kurulum - Markalar', 'settings');
             <?php if (!$groupBrands): ?><tr class="empty-row"><td colspan="4">Henüz kayıt bulunmuyor.</td></tr><?php endif; ?>
             <?php foreach ($groupBrands as $brand): ?>
             <tr><td><?=(int)$brand['id']?></td><td><?=e($brand['name'])?></td><td><?=e($brand['stock_type'] ?: '—')?></td><td>
-              <a class="row-action edit" href="<?=url('brands.php?tab=brands&amp;group='.$activeGroup.'&amp;edit_brand='.(int)$brand['id'])?>" title="Düzenle" aria-label="<?=e($brand['name'])?> markasını düzenle"><?=action_icon('edit')?></a>
+              <a class="row-action models" href="<?=url('brands.php?group='.$activeGroup.'&amp;brand_id='.(int)$brand['id'])?>" title="Modeller" aria-label="<?=e($brand['name'])?> modelleri"><i class="ti tabler-list-details"></i></a><a class="row-action edit" href="<?=url('brands.php?tab=brands&amp;group='.$activeGroup.'&amp;edit_brand='.(int)$brand['id'])?>" title="Düzenle" aria-label="<?=e($brand['name'])?> markasını düzenle"><?=action_icon('edit')?></a>
               <form method="post" onsubmit="return confirm('Bu marka silinsin mi?')">
                 <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="entity" value="brand"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$brand['id']?>">
                 <button class="row-action delete" title="Sil" aria-label="<?=e($brand['name'])?> markasını sil"><?=action_icon('delete')?></button>
@@ -298,47 +314,41 @@ patient_header('Kurulum - Markalar', 'settings');
   <div class="brand-tab-panel models-section" id="models" <?=$activeSection !== 'models' ? 'hidden' : ''?>>
   <details class="vuexy-form-card manage-card admin-new-card"<?=((int)$editModel['id'] || ($error && ($_POST['entity'] ?? '') === 'model')) ? ' open' : ''?>>
     <summary class="form-card-title manage-head models-head">
-      <div><h2><?= (int)$editModel['id'] ? 'Modeli Düzenle' : ($activeGroup === 'battery' ? 'Yeni Pil Numarası' : 'Yeni Model') ?></h2><p><?= $activeGroup === 'battery' ? 'Markalara bağlı pil numaralarını yönetin.' : 'Markalara bağlı ürün modellerini yönetin.' ?></p></div>
+      <div><h2><?= (int)$editModel['id'] ? 'Modeli Düzenle' : ($activeGroup === 'battery' ? 'Yeni Pil Numarası' : 'Yeni Model') ?></h2><p><?= $selectedBrand ? e($selectedBrand['name']) . ' markasına ait modelleri yönetin.' : 'Model eklemek için önce marka seçin.' ?></p></div>
       <i class="admin-card-chevron" aria-hidden="true"></i>
     </summary>
     <form class="personnel-form manage-form model-form <?=$editModel['id'] || ($error && ($_POST['entity'] ?? '') === 'model') ? 'is-open' : ''?>" id="model-form" method="post">
       <input type="hidden" name="csrf" value="<?=csrf()?>">
       <input type="hidden" name="entity" value="model">
       <input type="hidden" name="group" value="<?=e($activeGroup)?>">
+      <input type="hidden" name="selected_brand_id" value="<?=(int)$selectedBrandId?>">
       <input type="hidden" name="action" value="save">
       <input type="hidden" name="id" value="<?=(int)$editModel['id']?>">
-      <label>Marka
-        <select name="brand_id" required>
-          <option value="">Marka Ara</option>
-          <?php foreach ($brandOptions as $brand): ?>
-            <?php if (!in_array($activeGroup === 'battery' ? 'Pil' : 'İşitme Cihazı', array_filter(explode(',', (string)$brand['stock_type'])), true)) continue; ?>
-            <option value="<?=(int)$brand['id']?>" <?=(int)$editModel['brand_id'] === (int)$brand['id'] ? 'selected' : ''?>><?=e($brand['name'])?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
+      <input type="hidden" name="brand_id" value="<?=(int)$selectedBrandId?>">
+      <label>Marka<input value="<?=e($selectedBrand['name'] ?? '')?>" readonly></label>
       <label><?= $activeGroup === 'battery' ? 'Pil Numarası' : 'Model Adı' ?><input name="name" maxlength="190" required placeholder="<?= $activeGroup === 'battery' ? 'Pil Numarası' : 'Model Adı' ?>" value="<?=e($editModel['name'])?>"></label>
-      <div class="form-actions"><button type="submit">Kaydet</button><a href="<?=url('brands.php?tab=models')?>">İptal</a></div>
+      <div class="form-actions"><button type="submit" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy" aria-hidden="true"></i><span class="visually-hidden">Kaydet</span></button><a href="<?=url('brands.php?group='.$activeGroup.'&amp;brand_id='.$selectedBrandId.'#models')?>">İptal</a></div>
     </form>
   </details>
   <section class="vuexy-form-card manage-card list-admin-card">
     <header class="form-card-title manage-head models-list-head">
-      <div class="model-list-title"><h2><?= $activeGroup === 'battery' ? 'Pil Numara Listesi' : 'Model Listesi' ?></h2><p><?= $visibleModelCount ?> kayıt</p></div>
+      <div class="model-list-title"><h2><?=e($selectedBrand['name'] ?? 'Marka')?> <?= $activeGroup === 'battery' ? 'Pil Numaraları' : 'Model Listesi' ?></h2><p><?= $visibleModelCount ?> kayıt</p></div>
       <label class="model-search">
         <span class="model-search-icon" aria-hidden="true">⌕</span>
-        <input type="search" id="model-search" placeholder="Tüm modellerde ara" autocomplete="off" aria-label="Tüm modellerde ara">
+        <input type="search" id="model-search" placeholder="Bu markanın modellerinde ara" autocomplete="off" aria-label="Modellerde ara">
       </label>
     </header>
     <div class="table-responsive manage-table-wrap">
       <table class="personnel-table manage-table models-table">
-        <thead><tr><th>ID</th><th>MARKA</th><th><?= $activeGroup === 'battery' ? 'PİL NO' : 'MODEL ADI' ?></th><th>STOK TİPİ</th><th>İŞLEMLER</th></tr></thead>
+        <thead><tr><th>ID</th><th><?= $activeGroup === 'battery' ? 'PİL NO' : 'MODEL ADI' ?></th><th>STOK TİPİ</th><th>İŞLEMLER</th></tr></thead>
         <tbody>
           <?php foreach ($visibleModelGroups as $groupTitle => $groupModels): ?>
-            <?php if (!$groupModels): ?><tr class="empty-row"><td colspan="5">Henüz kayıt bulunmuyor.</td></tr><?php endif; ?>
+            <?php if (!$groupModels): ?><tr class="empty-row"><td colspan="4">Henüz kayıt bulunmuyor.</td></tr><?php endif; ?>
             <?php foreach ($groupModels as $model): ?>
-            <tr data-model-brand="<?=(int)$model['brand_id']?>"><td><?=(int)$model['id']?></td><td><?=e($model['brand_name'])?></td><td><?=e($model['name'])?></td><td><?=e($model['model_stock_type'] ?: '—')?></td><td>
-              <a class="row-action edit" href="<?=url('brands.php?tab=models&amp;group='.$activeGroup.'&amp;edit_model='.(int)$model['id'].'#models')?>" title="Düzenle" aria-label="<?=e($model['name'])?> modelini düzenle"><?=action_icon('edit')?></a>
+            <tr data-model-brand="<?=(int)$model['brand_id']?>"><td><?=(int)$model['id']?></td><td><?=e($model['name'])?></td><td><?=e($model['model_stock_type'] ?: '—')?></td><td>
+              <a class="row-action edit" href="<?=url('brands.php?group='.$activeGroup.'&amp;brand_id='.$selectedBrandId.'&amp;edit_model='.(int)$model['id'].'#models')?>" title="Düzenle" aria-label="<?=e($model['name'])?> modelini düzenle"><?=action_icon('edit')?></a>
               <form method="post" onsubmit="return confirm('Bu model silinsin mi?')">
-                <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="entity" value="model"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$model['id']?>">
+                <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="entity" value="model"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$model['id']?>"><input type="hidden" name="selected_brand_id" value="<?=(int)$selectedBrandId?>"><input type="hidden" name="group" value="<?=e($activeGroup)?>">
                 <button class="row-action delete" title="Sil" aria-label="<?=e($model['name'])?> modelini sil"><?=action_icon('delete')?></button>
               </form>
             </td></tr>
@@ -363,6 +373,10 @@ function action_icon(string $type): string
 .brands-page{max-width:1180px;margin:0 auto;padding:28px 20px 48px}.brand-page-tabs{display:flex;align-items:center;gap:8px;margin-bottom:20px}.brand-page-tabs a{padding:12px 18px;border-radius:8px;background:#e8f7ed;color:#16883d;text-decoration:none;font-weight:700}.brand-page-tabs a.active{background:#19a94b;color:#fff}.manage-card[hidden]{display:none!important}.manage-card{background:var(--card,#fff);border:1px solid var(--line,#e1e2e8);border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.models-section{margin-top:0;scroll-margin-top:24px}.manage-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 24px;border-bottom:1px solid var(--line,#e1e2e8)}.models-head{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,440px) minmax(220px,1fr)}.models-head>.manage-add{justify-self:end}.manage-head h1,.manage-head h2{margin:0 0 5px;font-size:21px}.manage-head p{margin:0;color:var(--muted,#7b7b8d)}.model-search{position:relative;display:block;width:100%;font-weight:400}.model-search-icon{position:absolute;z-index:1;left:13px;top:50%;transform:translateY(-52%);color:#8b8995;font-size:20px;pointer-events:none}.model-search input{width:100%;height:42px;padding:0 38px;border:1px solid #d7d6e0;border-radius:8px;background:var(--card,#fff);color:var(--text,#2f2b3d);font:inherit;outline:0}.model-search input:focus{border-color:#20a447;box-shadow:0 0 0 3px rgba(32,164,71,.13)}.model-search input::-webkit-search-cancel-button{cursor:pointer}.manage-add,.manage-form button{border:0;border-radius:6px;padding:10px 15px;background:#20a447;color:#fff;font-weight:700;cursor:pointer}.manage-form{display:none;align-items:end;gap:12px;padding:18px 24px;border-bottom:1px solid var(--line,#e1e2e8)}.manage-form.is-open{display:flex}.manage-form label{display:flex;flex:1;flex-direction:column;gap:6px;min-width:230px;font-size:13px;font-weight:700}.brand-form label{max-width:430px}.manage-form input,.manage-form select{height:38px;border:1px solid #d2d2dc;border-radius:6px;padding:0 10px;background:#fff;color:inherit;font:inherit}.form-actions{display:flex;align-items:center;gap:10px}.form-actions a{padding:10px;color:#ea5455;text-decoration:none}.brand-tabs{display:flex;align-items:center;gap:8px;width:100%;padding:16px 24px 0;overflow:hidden;border-bottom:1px solid var(--line,#e1e2e8)}.brand-tab{flex:1 1 0;min-width:0;min-height:38px!important;margin:0 0 -1px;padding:0 6px!important;overflow:hidden;border:1px solid #dedde5!important;border-bottom-color:var(--line,#e1e2e8)!important;border-radius:7px 7px 0 0!important;background:#f7f7f9!important;color:#6e6b7b!important;box-shadow:none!important;font-size:13px;text-overflow:ellipsis;white-space:nowrap}.brand-tab.active{border-color:#20a447!important;border-bottom-color:#fff!important;background:#fff!important;color:#16883d!important}.manage-table-wrap{overflow:auto}.manage-table{width:100%;border-collapse:collapse;min-width:650px}.models-table{min-width:760px}.manage-table th,.manage-table td{padding:14px 24px;border-bottom:1px solid var(--line,#e1e2e8);text-align:left;color:var(--muted,#6e6b7b)}.manage-table th{font-size:12px;font-weight:700;color:#5d596c}.manage-table td:last-child{display:flex;align-items:center}.manage-table td:last-child form{display:flex;width:49px;height:30px;margin:0}.row-action{box-sizing:border-box;display:grid;place-items:center;width:49px;min-width:49px;height:30px;min-height:30px;max-height:30px;margin:0;padding:0;border:0;color:#fff;text-decoration:none;line-height:1;cursor:pointer;transition:background .18s ease}.row-action svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.row-action.edit{background:#35b85d;border-radius:5px 0 0 5px}.row-action.edit:hover{background:#20a447}.row-action.delete{background:#16883d;border-radius:0 5px 5px 0}.row-action.delete:hover{background:#0d7130}.manage-message{max-width:1180px;margin:0 0 16px;padding:12px 15px;border-radius:6px}.manage-message.success{background:#daf5e3;color:#0d7130}.manage-message.error{background:#ffe3e3;color:#9d2020}.empty-row td{text-align:center!important;padding:34px!important}.empty-row td:last-child{display:table-cell!important}[data-theme=dark] .manage-card{background:#2f3349;border-color:#454a63}[data-theme=dark] .manage-head,[data-theme=dark] .manage-table th,[data-theme=dark] .manage-table td,[data-theme=dark] .manage-form,[data-theme=dark] .brand-tabs{border-color:#454a63}[data-theme=dark] .manage-table th{color:#fff}[data-theme=dark] .manage-form input,[data-theme=dark] .manage-form select,[data-theme=dark] .model-search input{background:#30334d;color:#fff;border-color:#5a607b}[data-theme=dark] .brand-tab{background:#292c43!important;color:#c7c8d1!important;border-color:#454a63!important}[data-theme=dark] .brand-tab.active{background:#30334d!important;color:#75d392!important;border-color:#20a447!important;border-bottom-color:#30334d!important}@media(max-width:900px){.models-head{grid-template-columns:1fr auto}.model-search{grid-column:1/-1;grid-row:2}.brand-tabs{flex-wrap:wrap;padding-bottom:10px}.brand-tab{flex:1 1 calc(25% - 8px);margin-bottom:0}}@media(max-width:760px){.brands-page{padding:20px 12px}.brand-page-tabs{overflow-x:auto}.brand-page-tabs a{white-space:nowrap}.manage-head{align-items:flex-start;flex-direction:column}.models-head{display:flex}.models-head>.manage-add{align-self:flex-start}.manage-form{align-items:stretch;flex-direction:column}.manage-form label{width:100%;min-width:0}.form-actions{justify-content:flex-start}.brand-tabs{padding-left:14px;padding-right:14px}.brand-tab{flex-basis:calc(33.333% - 8px)}}
 </style>
 <style>
+.brands-table .row-action.models{display:grid!important;place-items:center!important;width:40px!important;min-width:40px!important;height:40px!important;min-height:40px!important;max-height:40px!important;padding:0!important;background:#f3a13b!important;border-radius:6px!important}.brands-table .row-action.models:hover{background:#dc8926!important}.brands-table .row-action.models+.row-action.edit{border-radius:6px!important}
+.brands-table .row-action.models i{font-size:21px!important;line-height:1!important}
+</style>
+<style>
 .patient-container.personnel-page.brands-page{max-width:1180px!important;margin:0 auto!important;padding:96px 32px 48px!important}
 .brand-tab-panel[hidden]{display:none!important}
 .admin-new-card>summary{position:relative;display:flex!important;align-items:center!important;padding-right:64px!important;cursor:pointer;list-style:none;user-select:none}
@@ -374,6 +388,7 @@ function action_icon(string $type): string
 .brands-page .admin-new-card .personnel-form label{display:flex!important;flex-direction:column!important;gap:7px!important;min-width:0!important;max-width:none!important;font-size:14px!important;font-weight:400!important}
 .brands-page .admin-new-card .personnel-form input,.brands-page .admin-new-card .personnel-form select{width:100%!important;height:43px!important;border:1px solid #d2d2dc!important;border-radius:7px!important;padding:0 12px!important}
 .brands-page .admin-new-card .form-actions{grid-column:1/-1}
+.brands-page .admin-new-card .form-actions button{display:grid!important;place-items:center!important;width:36px!important;min-width:36px!important;height:36px!important;min-height:36px!important;padding:0!important}.brands-page .admin-new-card .form-actions button i{font-size:18px!important;line-height:1}
 .list-admin-card{margin-top:24px}
 .brands-page .manage-table td:last-child{display:flex!important;align-items:center!important;gap:8px!important}
 .brands-page .manage-table td:last-child form{display:inline-flex!important;align-items:center!important;width:40px!important;height:42px!important;margin:0!important;padding:0!important}
