@@ -2,6 +2,24 @@
 declare(strict_types=1);
 require __DIR__ . '/config.php'; require_login(); require __DIR__ . '/patient-layout.php';
 function current_movement_parse_amount(string $value): float { $value = trim(str_replace(' ', '', $value)); if (str_contains($value, ',')) return (float)str_replace(',', '.', str_replace('.', '', $value)); return (float)str_replace('.', '', $value); }
+function current_movement_sold_device_quantity(array $salesDetails): int {
+    $deviceFields = [
+        ['sales_brand', 'sales_model', 'sales_device_serial'],
+        ['sales_device_2_brand', 'sales_device_2_model', 'sales_device_2_serial'],
+        ['sales_device_3_brand', 'sales_device_3_model', 'sales_device_3_serial'],
+        ['sales_device_4_brand', 'sales_device_4_model', 'sales_device_4_serial'],
+    ];
+    $quantity = 0;
+    foreach ($deviceFields as $fields) {
+        foreach ($fields as $field) {
+            if (trim((string)($salesDetails[$field] ?? '')) !== '') {
+                $quantity++;
+                break;
+            }
+        }
+    }
+    return $quantity;
+}
 $id=filter_input(INPUT_GET,'id',FILTER_VALIDATE_INT)?:0;$pdo=db();$q=$pdo->prepare('SELECT * FROM current_accounts WHERE id=?');$q->execute([$id]);$account=$q->fetch();if(!$account){http_response_code(404);exit('Cari kart bulunamadı.');}$rows=[];try{$q=$pdo->prepare('SELECT m.*,s.stock_code,s.stock_name FROM stock_movements m JOIN stock_cards s ON s.id=m.stock_id WHERE m.current_account_id=? ORDER BY m.movement_date DESC,m.id DESC');$q->execute([$id]);$rows=$q->fetchAll();}catch(Throwable $e){}patient_header('Cari Hareketleri','cash');
 $mailOrderRows = [];
 try {
@@ -26,6 +44,28 @@ foreach ($mailOrderRows as &$mailOrder) {
         $invoiceStatement->execute([$patientId]);
         $salesDetails = json_decode((string)$invoiceStatement->fetchColumn(), true);
         if (is_array($salesDetails)) $mailOrder['invoice_no'] = trim((string)($salesDetails['sales_invoice_no'] ?? ''));
+    } catch (Throwable $e) {}
+}
+unset($mailOrder);
+$mailOrderDeviceQuantities = [];
+foreach ($mailOrderRows as &$mailOrder) {
+    $mailOrderDeviceQuantities[] = null;
+    $sourceQuery = [];
+    parse_str((string)parse_url((string)($mailOrder['source_url'] ?? ''), PHP_URL_QUERY), $sourceQuery);
+    $patientId = (int)($sourceQuery['id'] ?? 0);
+    if (!$patientId) continue;
+    try {
+        $saleStatement = $pdo->prepare("SELECT sales_details FROM patient_services WHERE patient_id=? AND service_name='Satış' ORDER BY service_date DESC,id DESC");
+        $saleStatement->execute([$patientId]);
+        foreach ($saleStatement->fetchAll(PDO::FETCH_COLUMN) as $salesJson) {
+            $salesDetails = json_decode((string)$salesJson, true);
+            if (!is_array($salesDetails)) continue;
+            $salesAccountId = (int)($salesDetails['sales_current_account'] ?? 0);
+            if ($salesAccountId > 0 && $salesAccountId !== $id) continue;
+            $quantity = current_movement_sold_device_quantity($salesDetails);
+            if ($quantity > 0) $mailOrderDeviceQuantities[array_key_last($mailOrderDeviceQuantities)] = $quantity;
+            break;
+        }
     } catch (Throwable $e) {}
 }
 unset($mailOrder);
@@ -193,6 +233,7 @@ foreach ($sgkRows as $sgkRow) $accountBalance += $sgkRow['movement_kind'] === 'd
 </main>
 <style>.cam-card>header{display:flex;align-items:center;justify-content:space-between;gap:24px}.account-balance{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:160px;padding:9px 14px;border:1px solid #d9e7dc;border-radius:7px;background:#fbfefb}.account-balance span{font-size:12px;color:#7b7b8d}.account-balance strong{font-size:18px;color:#159447}.account-balance.is-debit{border-color:#f0c7ca;background:#fff7f7}.account-balance.is-debit strong{color:#e04f55}@media(max-width:620px){.cam-card>header{align-items:flex-start;flex-direction:column}.account-balance{align-items:flex-start}}</style>
 <script>const parseAmount=value=>{value=String(value||'').replace(/\s/g,'');return Number(value.includes(',')?value.replaceAll('.','').replace(',','.'):value.replaceAll('.',''))||0},formatAmount=value=>new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(parseAmount(value));document.querySelectorAll('input[name="gross_amount"]').forEach(input=>input.addEventListener('blur',()=>input.value=formatAmount(input.value)));document.querySelectorAll('.invoice-gross-inline').forEach(form=>form.addEventListener('submit',()=>{const detail=form.closest('tr')?.nextElementSibling;if(!detail?.classList.contains('invoice-detail-row'))return;const values={};detail.querySelectorAll('.item-discount-inline').forEach(itemForm=>{values[itemForm.querySelector('[name="movement_id"]').value]=itemForm.querySelector('[name="discount_rate"]').value});let input=form.querySelector('[name="discount_rates"]');if(!input){input=document.createElement('input');input.type='hidden';input.name='discount_rates';form.append(input)}input.value=JSON.stringify(values)}));const saveDiscount=form=>fetch(form.action,{method:'POST',body:new FormData(form),credentials:'same-origin'});document.querySelectorAll('.invoice-details-toggle').forEach(button=>button.addEventListener('click',()=>{const detail=document.querySelector(`[data-invoice-detail="${button.dataset.invoiceRow}"]`);if(!detail)return;if(!detail.hidden){const values={};detail.querySelectorAll('.item-discount-inline').forEach(form=>values[form.querySelector('[name="movement_id"]').value]=form.querySelector('[name="discount_rate"]').value);const batch=document.createElement('form');batch.method='post';batch.action=location.href;[['csrf',detail.querySelector('[name="csrf"]').value],['action','save_item_discounts'],['discount_rates',JSON.stringify(values)]].forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;batch.append(input)});document.body.append(batch);batch.submit();return;}detail.hidden=false;button.textContent='−';button.title='Fatura kalemlerini gizle'}));document.querySelectorAll('.item-discount-inline input[name="discount_rate"]').forEach(input=>{let timer;input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>{const form=input.form;if(!form||!input.validity.valid)return;saveDiscount(form);},400)});input.addEventListener('change',()=>{clearTimeout(timer);const form=input.form;if(form&&input.validity.valid)saveDiscount(form);});});</script>
+<script>(()=>{const quantities=<?=json_encode($mailOrderDeviceQuantities)?>;document.querySelectorAll('.mail-order-outgoing').forEach((row,index)=>{const quantity=Number(quantities[index]||0);if(quantity>0&&row.cells[3])row.cells[3].textContent=String(quantity);});})();</script>
 <script>if(<?=json_encode($invoiceFilter !== '')?>)document.querySelector('.invoice-details-toggle')?.click();</script>
 <script>(()=>{const button=document.querySelector('.current-date-sort'),body=document.querySelector('.cam-card tbody');if(!button||!body)return;let ascending=false;const dateValue=row=>{const [day,month,year]=String(row.cells[0]?.textContent||'').trim().split('.');return Date.UTC(Number(year)||0,(Number(month)||1)-1,Number(day)||0)};button.addEventListener('click',()=>{ascending=!ascending;const records=[...body.children].filter(row=>row.tagName==='TR'&&!row.classList.contains('invoice-detail-row')&&row.cells.length>1&&!row.querySelector('.empty')).map(row=>({row,detail:row.nextElementSibling?.classList.contains('invoice-detail-row')?row.nextElementSibling:null}));records.sort((left,right)=>(dateValue(left.row)-dateValue(right.row))*(ascending?1:-1));records.forEach(({row,detail})=>{body.append(row);if(detail)body.append(detail)});button.querySelector('i').className='ti '+(ascending?'tabler-sort-ascending':'tabler-sort-descending')})})();</script>
 <style>.invoice-gross-inline{display:flex;align-items:center;gap:6px}.invoice-gross-inline input{width:115px;height:34px;padding:0 8px;border:1px solid #d2d2dc;border-radius:6px;font:inherit}.invoice-gross-inline button,.item-discount-inline button{display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:6px;background:#19a94b;color:#fff;cursor:pointer}.item-discount-inline{display:flex;align-items:center;gap:5px}.item-discount-inline input{width:70px;height:32px;padding:0 7px;border:1px solid #d2d2dc;border-radius:6px;font:inherit}.invoice-gross-toggle{display:inline-grid;place-items:center;width:32px;height:32px;margin-left:6px;border:0;border-radius:6px;background:#19a94b;color:#fff;cursor:pointer}.invoice-gross-form{display:flex;align-items:end;gap:12px;padding:14px 18px;background:#edf9f0}.invoice-gross-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}.invoice-gross-form input{height:38px;padding:0 10px;border:1px solid #d2d2dc;border-radius:6px;font:inherit}.invoice-gross-form button{height:38px;padding:0 14px;border:0;border-radius:6px;background:#19a94b;color:#fff;font-weight:700;cursor:pointer}</style>
