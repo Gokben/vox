@@ -59,11 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $invoiceNo = trim($form['invoice_no']);
         if ($invoiceNo !== '') {
-            $invoiceDateStatement = $pdo->prepare('SELECT DISTINCT movement_date FROM stock_movements WHERE movement_type=? AND LOWER(TRIM(invoice_no))=LOWER(?) AND id<>? ORDER BY movement_date ASC');
-            $invoiceDateStatement->execute(['Giriş', $invoiceNo, $editId]);
-            $invoiceDates = array_values(array_filter($invoiceDateStatement->fetchAll(PDO::FETCH_COLUMN)));
-            if ($invoiceDates && !in_array($form['movement_date'], $invoiceDates, true)) {
-                $error = 'Bu fatura numarası daha önce ' . format_date_tr((string)$invoiceDates[0]) . ' giriş tarihiyle kaydedildi. Aynı fatura için farklı giriş tarihi kullanılamaz.';
+            $duplicateInvoiceStatement = $pdo->prepare('SELECT movement_date FROM stock_movements WHERE movement_type=? AND LOWER(TRIM(invoice_no))=LOWER(TRIM(?)) AND id<>? ORDER BY id ASC LIMIT 1');
+            $duplicateInvoiceStatement->execute(['Giriş', $invoiceNo, $editId]);
+            $duplicateInvoiceDate = $duplicateInvoiceStatement->fetchColumn();
+            if ($duplicateInvoiceDate !== false) {
+                $error = 'Bu fatura numarası daha önce ' . format_date_tr((string)$duplicateInvoiceDate) . ' tarihinde stok girişinde kullanılmıştır. Mükerrer kayıt yapılamaz.';
             }
         }
         if ($error === '') {
