@@ -248,6 +248,77 @@ if (!isset($_GET['new'])) {
   });
 })();
 </script>
+<style>
+  .stock-column-picker{position:relative;margin-left:auto;flex:0 0 auto}
+  .stock-column-picker-trigger{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:0;border-radius:6px;background:#18a84b;color:#fff;font:600 12px inherit;cursor:pointer}
+  .stock-column-picker-trigger i{font-size:15px}
+  .stock-column-picker-menu{position:absolute;z-index:80;top:calc(100% + 7px);right:0;display:none;width:210px;max-height:355px;overflow:auto;padding:8px;border:1px solid #dfe1e8;border-radius:7px;background:#fff;box-shadow:0 10px 22px rgba(47,43,61,.18)}
+  .stock-column-picker-menu.open{display:block}
+  .stock-column-picker-actions{display:flex;gap:6px;padding:0 0 8px;margin:0 0 7px;border-bottom:1px solid #ececf0}
+  .stock-column-picker-actions button{padding:4px 6px;border:0;border-radius:4px;background:#f0f1f5;color:#5d5b6d;font:600 10px inherit;cursor:pointer}
+  .stock-column-picker-option{display:flex;align-items:center;gap:7px;padding:5px 2px;color:#353244;font:12px/1.3 inherit;cursor:pointer}
+  .stock-column-picker-option input{width:15px;height:15px;margin:0;accent-color:#18a84b}
+  .technical-card.stock-column-picker-open{overflow:visible}
+  @media(max-width:900px){.stock-column-picker{margin-left:0}.stock-movement-filter{gap:12px}}
+</style>
+<script>
+(() => {
+  const table = document.querySelector('.technical-table-wrap table');
+  const filter = document.querySelector('.stock-movement-filter');
+  const card = document.querySelector('.technical-card');
+  if (!table || !filter || !table.tHead?.rows[0]) return;
+
+  const headers = [...table.tHead.rows[0].cells];
+  const columnNames = headers.map((header, index) => header.textContent.trim().replace(/\s+/g, ' ') || `Sütun ${index + 1}`);
+  const storageKey = 'vox-stock-entry-columns';
+  let visibleColumns;
+  try { visibleColumns = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch (error) { visibleColumns = null; }
+  if (!Array.isArray(visibleColumns) || visibleColumns.length !== columnNames.length) visibleColumns = columnNames.map(() => true);
+
+  const picker = document.createElement('div');
+  picker.className = 'stock-column-picker';
+  picker.innerHTML = '<button type="button" class="stock-column-picker-trigger" aria-expanded="false"><i class="ti tabler-columns-3"></i>Sütunlar</button><div class="stock-column-picker-menu"><div class="stock-column-picker-actions"><button type="button" data-columns-all>Tümünü seç</button><button type="button" data-columns-simple>Sade görünüm</button></div><div class="stock-column-picker-options"></div></div>';
+  filter.insertBefore(picker, filter.querySelector('.stock-filter-dates'));
+
+  const trigger = picker.querySelector('.stock-column-picker-trigger');
+  const menu = picker.querySelector('.stock-column-picker-menu');
+  const options = picker.querySelector('.stock-column-picker-options');
+  const applyColumns = () => {
+    table.querySelectorAll('tr').forEach(row => {
+      [...row.children].forEach((cell, index) => { cell.style.display = visibleColumns[index] ? '' : 'none'; });
+    });
+    localStorage.setItem(storageKey, JSON.stringify(visibleColumns));
+  };
+  const renderOptions = () => {
+    options.replaceChildren(...columnNames.map((name, index) => {
+      const label = document.createElement('label');
+      label.className = 'stock-column-picker-option';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = visibleColumns[index];
+      checkbox.addEventListener('change', () => { visibleColumns[index] = checkbox.checked; applyColumns(); });
+      label.append(checkbox, document.createTextNode(name));
+      return label;
+    }));
+  };
+  const close = () => { menu.classList.remove('open'); trigger.setAttribute('aria-expanded', 'false'); card?.classList.remove('stock-column-picker-open'); };
+  trigger.addEventListener('click', () => {
+    const open = !menu.classList.contains('open');
+    menu.classList.toggle('open', open);
+    trigger.setAttribute('aria-expanded', String(open));
+    card?.classList.toggle('stock-column-picker-open', open);
+  });
+  picker.querySelector('[data-columns-all]').addEventListener('click', () => { visibleColumns = columnNames.map(() => true); renderOptions(); applyColumns(); });
+  picker.querySelector('[data-columns-simple]').addEventListener('click', () => {
+    const keep = new Set(['TARİH', 'STOK TİPİ', 'STOK KARTI', 'CARİ', 'MİKTAR', 'İŞLEMLER']);
+    visibleColumns = columnNames.map(name => keep.has(name));
+    renderOptions(); applyColumns();
+  });
+  document.addEventListener('click', event => { if (!picker.contains(event.target)) close(); });
+  renderOptions();
+  applyColumns();
+})();
+</script>
 <?php patient_footer(); exit; }
 patient_header('Stok Girişi','stock');
 ?>
@@ -334,7 +405,7 @@ patient_header('Stok Girişi','stock');
 <script>(()=>{const savedType=<?=json_encode($form['stock_type'],JSON_UNESCAPED_UNICODE)?>,savedBrand=<?=json_encode($form['brand'],JSON_UNESCAPED_UNICODE)?>,savedStock=<?=json_encode($form['stock_id'])?>,type=document.getElementById('entry-stock-type'),brand=document.getElementById('entry-brand'),stock=document.getElementById('entry-stock-card');if(!type)return;type.innerHTML='<option value="">Seçiniz</option><option value="İşitme Cihazı">İşitme Cihazı</option><option value="Sarf Malzeme">Sarf Malzeme</option><option value="Pil">Pil</option><option value="Şarj Cihazı">Şarj Cihazı</option>';if(savedType){type.value=savedType;type.dispatchEvent(new Event('change'))}if(brand&&savedBrand){brand.value=savedBrand;brand.dispatchEvent(new Event('change'))}if(stock&&savedStock)stock.value=String(savedStock)})();</script>
 <script>(()=>{const optionalSerials=()=>document.querySelectorAll('#serial-fields input[name="serial_numbers[]"]').forEach(input=>input.required=false);document.getElementById('entry-stock-type')?.addEventListener('change',optionalSerials);document.getElementById('entry-quantity')?.addEventListener('input',optionalSerials);optionalSerials()})();</script>
 <script>(()=>['uts_lot_no','warranty_start','warranty_end'].forEach(name=>document.querySelector(`[name="${name}"]`)?.closest('label')?.remove()))();</script>
-<script>(()=>{const lastEntry=<?=json_encode($lastSavedEntry,JSON_UNESCAPED_UNICODE)?>,footer=document.querySelector('.stock-entry-card footer'),newEntryUrl=<?=json_encode(url('stock-entry.php?new=1'))?>;if(!lastEntry||!footer)return;const button=document.createElement('button');button.type='button';button.className='entry-copy-last';button.title='Son stok girişini getir';button.setAttribute('aria-label','Son stok girişini getir');button.innerHTML='<i class="ti tabler-plus"></i>';button.addEventListener('click',()=>{const type=document.getElementById('entry-stock-type'),brand=document.getElementById('entry-brand'),account=document.querySelector('select[name="current_account_id"]'),invoice=document.querySelector('input[name="invoice_no"]'),date=document.querySelector('input[name="movement_date"]'),purchase=document.querySelector('input[name="purchase_price"]'),unitCost=document.querySelector('input[name="unit_cost"]');const form=footer.closest('form');if(form)form.action=newEntryUrl;if(type){type.value=lastEntry.stock_type||'';type.dispatchEvent(new Event('change'))}if(brand){brand.value=lastEntry.brand||'';brand.dispatchEvent(new Event('change'))}if(account)account.value=String(lastEntry.current_account_id||'');if(invoice)invoice.value=lastEntry.invoice_no||'';if(date)date.value=lastEntry.movement_date||'';if(purchase)purchase.value='';if(unitCost)unitCost.value='';document.getElementById('entry-stock-card').value='' });footer.prepend(button)})();</script>
+<script>(()=>{const lastEntry=<?=json_encode($lastSavedEntry,JSON_UNESCAPED_UNICODE)?>,footer=document.querySelector('.stock-entry-card footer'),newEntryUrl=<?=json_encode(url('stock-entry.php?new=1'))?>;if(!lastEntry||!footer)return;const button=document.createElement('button');button.type='button';button.className='entry-copy-last';button.title='Son stok girişini getir';button.setAttribute('aria-label','Son stok girişini getir');button.innerHTML='<i class="ti tabler-phone"></i>';button.addEventListener('click',()=>{const type=document.getElementById('entry-stock-type'),brand=document.getElementById('entry-brand'),account=document.querySelector('select[name="current_account_id"]'),invoice=document.querySelector('input[name="invoice_no"]'),date=document.querySelector('input[name="movement_date"]'),purchase=document.querySelector('input[name="purchase_price"]'),unitCost=document.querySelector('input[name="unit_cost"]');const form=footer.closest('form');if(form)form.action=newEntryUrl;if(type){type.value=lastEntry.stock_type||'';type.dispatchEvent(new Event('change'))}if(brand){brand.value=lastEntry.brand||'';brand.dispatchEvent(new Event('change'))}if(account)account.value=String(lastEntry.current_account_id||'');if(invoice)invoice.value=lastEntry.invoice_no||'';if(date)date.value=lastEntry.movement_date||'';if(purchase)purchase.value='';if(unitCost)unitCost.value='';document.getElementById('entry-stock-card').value='' });footer.prepend(button)})();</script>
 <script>(()=>{const purchase=document.querySelector('input[name="purchase_price"]'),quantity=document.getElementById('entry-quantity'),unitCost=document.querySelector('input[name="unit_cost"]'),parse=value=>{value=String(value||'').replace(/\s/g,'');return Number(value.includes(',')?value.replaceAll('.','').replace(',','.'):value.replaceAll('.',''))||0},format=value=>new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(value);const calculate=()=>{const total=parse(purchase?.value),count=Number(quantity?.value||0);if(!unitCost||!Number.isFinite(total)||total<0||!Number.isFinite(count)||count<=0)return;unitCost.value=format(Math.round((total/count)*100)/100)};purchase?.addEventListener('input',calculate);purchase?.addEventListener('blur',()=>purchase.value=format(parse(purchase.value)));quantity?.addEventListener('input',calculate);unitCost?.addEventListener('blur',()=>unitCost.value=format(parse(unitCost.value)))})();</script>
 <script>(()=>document.querySelector('.entry-copy-last')?.addEventListener('click',()=>{const purchase=document.querySelector('input[name="purchase_price"]'),unitCost=document.querySelector('input[name="unit_cost"]');if(purchase)purchase.value='';if(unitCost)unitCost.value=''})})();</script>
 <script>(()=>document.querySelector('.entry-copy-last')?.addEventListener('click',()=>window.location.assign(<?=json_encode(url('stock-entry.php?new=1&copy_last=1'))?>)))();</script>
@@ -344,7 +415,7 @@ patient_header('Stok Girişi','stock');
 <script>(()=>{const grid=document.querySelector('.entry-prices-grid'),unit=document.querySelector('input[name="unit_cost"]')?.closest('label'),purchase=document.querySelector('input[name="purchase_price"]')?.closest('label');if(!grid||!unit||!purchase)return;grid.prepend(unit);grid.append(purchase)})();</script>
 <script>(()=>{const label=document.querySelector('input[name="unit_cost"]')?.closest('label');if(label?.firstChild)label.firstChild.nodeValue='Birim Fiyatı';document.querySelectorAll('.technical-table-wrap th').forEach(header=>{if(header.textContent.trim()==='BİRİM MALİYET')header.textContent='BİRİM FİYATI';if(header.textContent.trim()==='SATIŞ FİYATI')header.textContent='LİSTE FİYATI'})})();</script>
 <style>.stock-entry-page{max-width:900px!important;margin:0 auto!important;padding:28px 20px 48px!important}.stock-entry-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.stock-entry-card .form-card-title{padding:22px 24px;border-bottom:1px solid #e1e2e8}.stock-entry-card h1{margin:0 0 5px;font-size:21px}.stock-entry-card p{margin:0;color:#7b7b8d}.stock-entry-card form{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:24px}.stock-entry-card label,.serial-area{display:flex;flex-direction:column;gap:7px}.stock-entry-card input,.stock-entry-card select,.stock-entry-card textarea{border:1px solid #d5d3de;border-radius:6px;padding:10px 12px;font:inherit}.stock-entry-card input,.stock-entry-card select{height:42px}.stock-entry-wide,.stock-entry-card footer{grid-column:1/-1}.entry-prices{border-top:1px solid #e1e2e8;padding-top:18px}.entry-prices h2{margin:0 0 14px;color:#19a94b;font-size:14px}.entry-prices-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.entry-prices-grid label{display:flex;flex-direction:column;gap:7px}.entry-tracking{border-top:1px solid #e1e2e8;padding-top:18px}.entry-tracking h2{margin:0 0 14px;color:#19a94b;font-size:14px}.tracking-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.serial-area{grid-column:1/-1}.serial-area strong{font-size:14px}.serial-area #serial-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stock-entry-card footer{display:flex;justify-content:flex-end;align-items:center;gap:14px}.stock-entry-card footer a{text-decoration:none;color:#7b7b8d}.stock-entry-error{margin:16px 24px;padding:12px;background:#ffe3e3;color:#a21d1d;border-radius:7px}@media(max-width:720px){.stock-entry-page{padding:20px 12px 36px!important}.stock-entry-card form,.entry-prices-grid,.tracking-grid,.serial-area #serial-fields{grid-template-columns:1fr}}</style>
-<style>.stock-entry-card footer .entry-copy-last{display:inline-grid;place-items:center;width:43px;height:43px;padding:0;border:1px solid #f5a33b;border-radius:7px;background:#f5a33b;color:#000;cursor:pointer}.stock-entry-card footer .entry-copy-last:hover{background:#e98d18}</style>
+<style>.stock-entry-card footer .entry-copy-last,.stock-entry-card footer a,.stock-entry-card footer button{display:inline-grid!important;place-items:center!important;width:36px!important;min-width:36px!important;height:36px!important;min-height:36px!important;margin:0!important;padding:0!important;border-radius:7px!important}.stock-entry-card footer .entry-copy-last{border:1px solid #f5a33b;background:#f5a33b;color:#fff;cursor:pointer}.stock-entry-card footer .entry-copy-last i{font-size:18px}.stock-entry-card footer .entry-copy-last:hover{background:#e98d18}</style>
 <style>.entry-prices input[name="sale_price"][readonly]{background:#f3f4f7;color:#5d5b6d;cursor:not-allowed;pointer-events:none}.entry-list-price-warning{display:block;margin-top:4px;color:#dc3545;font-size:12px}</style>
 <style>
 [data-theme=dark] .stock-entry-page{background:transparent}
