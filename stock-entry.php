@@ -76,6 +76,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$check->fetchColumn() || !$accountCheck->fetchColumn()) {
             $error = 'Seçilen stok tipi ve marka bilgisine uygun stok ile cari seçin.';
         } else {
+            if ($form['stock_type'] === 'İşitme Cihazı') {
+                $activeListPrice = $pdo->prepare('SELECT i.list_price FROM stock_price_list_items i INNER JOIN stock_price_lists l ON l.id=i.price_list_id WHERE i.stock_id=? AND l.valid_from<=? AND l.valid_until>=? ORDER BY l.valid_from DESC,l.id DESC LIMIT 1');
+                $activeListPrice->execute([$stockId, $form['movement_date'], $form['movement_date']]);
+                $listPrice = $activeListPrice->fetchColumn();
+                if ($listPrice === false) {
+                    $error = 'Bu ürün için giriş tarihinde geçerli liste fiyatı bulunamadı. Önce fiyat listesini güncelleyin.';
+                } else {
+                    $form['sale_price'] = (float)$listPrice;
+                }
+            }
+            if ($error === '') {
             $pdo->prepare('UPDATE stock_cards SET purchase_price=?,sale_price=?,vat_rate=?,unit_cost=? WHERE id=?')->execute([$form['purchase_price'], $form['sale_price'], $form['vat_rate'], $form['unit_cost'], $stockId]);
             if ($editId) {
                 $pdo->prepare('UPDATE stock_movements SET stock_id=?,quantity=?,unit=?,movement_date=?,description=?,current_account_id=?,invoice_no=?,serial_numbers=?,uts_lot_no=?,warranty_start=?,warranty_end=?,purchase_price=?,sale_price=?,vat_rate=?,unit_cost=? WHERE id=? AND movement_type="Giriş"')->execute([$stockId, $quantity, $form['unit'], $form['movement_date'], $form['description'], $accountId, $form['invoice_no'], json_encode($serials, JSON_UNESCAPED_UNICODE), $form['uts_lot_no'], $form['warranty_start'] ?: null, $form['warranty_end'] ?: null, $form['purchase_price'], $form['sale_price'], $form['vat_rate'], $form['unit_cost'], $editId]);
@@ -84,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             header('Location: ' . url('stock-entry.php?saved=1'));
             exit;
+            }
         }
         }
     }
@@ -266,7 +278,7 @@ patient_header('Stok Girişi','stock');
   });
   const saleWrapper = document.createElement('label');
   saleWrapper.className = 'entry-sale-price';
-  saleWrapper.textContent = 'Satış Fiyatı (TL)';
+  saleWrapper.textContent = 'Liste Fiyatı (TL)';
   const saleField = document.createElement('input');
   saleField.name = 'sale_price';
   saleField.type = 'text';
@@ -276,6 +288,38 @@ patient_header('Stok Girişi','stock');
   const quantityWrapper = quantity.closest('label');
   quantityWrapper.after(saleWrapper);
   saleWrapper.after(section);
+})();
+</script>
+<script>
+(() => {
+  const stock = document.getElementById('entry-stock-card');
+  const date = document.querySelector('input[name="movement_date"]');
+  const price = document.querySelector('input[name="sale_price"]');
+  const priceLabel = price?.closest('label');
+  const priceLists = <?=json_encode($priceListItems, JSON_UNESCAPED_UNICODE)?>;
+  if (!stock || !date || !price || !priceLabel) return;
+  const warning = document.createElement('small');
+  warning.className = 'entry-list-price-warning';
+  priceLabel.append(warning);
+  const format = value => new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value || 0));
+  const setListPrice = () => {
+    const stockId = String(stock.value || '');
+    const purchaseDate = date.value;
+    if (!stockId || !purchaseDate) { warning.textContent = ''; return; }
+    const item = priceLists.find(row => String(row.stock_id) === stockId && row.valid_from <= purchaseDate && row.valid_until >= purchaseDate);
+    if (!item) {
+      price.value = '';
+      price.readOnly = false;
+      warning.textContent = 'Bu ürün için alış tarihinde geçerli liste fiyatı bulunamadı.';
+      return;
+    }
+    price.value = format(item.list_price);
+    price.readOnly = true;
+    warning.textContent = '';
+  };
+  stock.addEventListener('change', setListPrice);
+  date.addEventListener('change', setListPrice);
+  setListPrice();
 })();
 </script>
 <script>(()=>{const prices=document.querySelector('.entry-prices'),sale=document.querySelector('.entry-sale-price'),description=document.querySelector('textarea[name="description"]')?.closest('label');if(!prices||!sale||!description)return;prices.after(sale);sale.after(description)})();</script>
@@ -295,10 +339,10 @@ patient_header('Stok Girişi','stock');
 <script>(()=>{const dates=<?=json_encode($invoiceDatesByNumber,JSON_UNESCAPED_UNICODE)?>,invoice=document.querySelector('input[name="invoice_no"]'),date=document.querySelector('input[name="movement_date"]');if(!invoice||!date)return;const key=value=>String(value||'').trim().toLocaleLowerCase('tr-TR');const knownDate=()=>dates[key(invoice.value)]||'';const applyInvoiceDate=()=>{const value=knownDate();if(value)date.value=value};invoice.addEventListener('input',applyInvoiceDate);invoice.addEventListener('blur',applyInvoiceDate);date.addEventListener('change',()=>{const value=knownDate();if(value&&date.value!==value){alert('Bu fatura numarası için giriş tarihi '+new Intl.DateTimeFormat('tr-TR').format(new Date(value+'T00:00:00'))+' olmalıdır.');date.value=value;}});applyInvoiceDate()})();</script>
 <script>(()=>{const input=document.querySelector('input[name="unit_cost"]');if(!input||!input.value.trim())return;const value=input.value.trim(),amount=Number(value.includes(',')?value.replaceAll('.','').replace(',','.'):value.replaceAll('.',''));if(Number.isFinite(amount))input.value=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)})();</script>
 <script>(()=>{const grid=document.querySelector('.entry-prices-grid'),unit=document.querySelector('input[name="unit_cost"]')?.closest('label'),purchase=document.querySelector('input[name="purchase_price"]')?.closest('label');if(!grid||!unit||!purchase)return;grid.prepend(unit);grid.append(purchase)})();</script>
-<script>(()=>{const label=document.querySelector('input[name="unit_cost"]')?.closest('label');if(label?.firstChild)label.firstChild.nodeValue='Birim Fiyatı';document.querySelectorAll('.technical-table-wrap th').forEach(header=>{if(header.textContent.trim()==='BİRİM MALİYET')header.textContent='BİRİM FİYATI'})})();</script>
+<script>(()=>{const label=document.querySelector('input[name="unit_cost"]')?.closest('label');if(label?.firstChild)label.firstChild.nodeValue='Birim Fiyatı';document.querySelectorAll('.technical-table-wrap th').forEach(header=>{if(header.textContent.trim()==='BİRİM MALİYET')header.textContent='BİRİM FİYATI';if(header.textContent.trim()==='SATIŞ FİYATI')header.textContent='LİSTE FİYATI'})})();</script>
 <style>.stock-entry-page{max-width:900px!important;margin:0 auto!important;padding:28px 20px 48px!important}.stock-entry-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.stock-entry-card .form-card-title{padding:22px 24px;border-bottom:1px solid #e1e2e8}.stock-entry-card h1{margin:0 0 5px;font-size:21px}.stock-entry-card p{margin:0;color:#7b7b8d}.stock-entry-card form{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:24px}.stock-entry-card label,.serial-area{display:flex;flex-direction:column;gap:7px}.stock-entry-card input,.stock-entry-card select,.stock-entry-card textarea{border:1px solid #d5d3de;border-radius:6px;padding:10px 12px;font:inherit}.stock-entry-card input,.stock-entry-card select{height:42px}.stock-entry-wide,.stock-entry-card footer{grid-column:1/-1}.entry-prices{border-top:1px solid #e1e2e8;padding-top:18px}.entry-prices h2{margin:0 0 14px;color:#19a94b;font-size:14px}.entry-prices-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.entry-prices-grid label{display:flex;flex-direction:column;gap:7px}.entry-tracking{border-top:1px solid #e1e2e8;padding-top:18px}.entry-tracking h2{margin:0 0 14px;color:#19a94b;font-size:14px}.tracking-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.serial-area{grid-column:1/-1}.serial-area strong{font-size:14px}.serial-area #serial-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stock-entry-card footer{display:flex;justify-content:flex-end;align-items:center;gap:14px}.stock-entry-card footer a{text-decoration:none;color:#7b7b8d}.stock-entry-error{margin:16px 24px;padding:12px;background:#ffe3e3;color:#a21d1d;border-radius:7px}@media(max-width:720px){.stock-entry-page{padding:20px 12px 36px!important}.stock-entry-card form,.entry-prices-grid,.tracking-grid,.serial-area #serial-fields{grid-template-columns:1fr}}</style>
 <style>.stock-entry-card footer .entry-copy-last{display:inline-grid;place-items:center;width:43px;height:43px;padding:0;border:1px solid #f5a33b;border-radius:7px;background:#f5a33b;color:#000;cursor:pointer}.stock-entry-card footer .entry-copy-last:hover{background:#e98d18}</style>
-<style>.entry-prices input[name="sale_price"][readonly]{background:#f3f4f7;color:#5d5b6d;cursor:not-allowed}</style>
+<style>.entry-prices input[name="sale_price"][readonly]{background:#f3f4f7;color:#5d5b6d;cursor:not-allowed}.entry-list-price-warning{display:block;margin-top:4px;color:#dc3545;font-size:12px}</style>
 <style>
 [data-theme=dark] .stock-entry-page{background:transparent}
 [data-theme=dark] .stock-entry-card{background:#30334d;border-color:#464968;box-shadow:0 3px 14px rgba(0,0,0,.24)}
