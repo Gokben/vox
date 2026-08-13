@@ -327,7 +327,7 @@ patient_header('Kurulum - Markalar', 'settings');
       <input type="hidden" name="brand_id" value="<?=(int)$selectedBrandId?>">
       <label>Marka<input value="<?=e($selectedBrand['name'] ?? '')?>" readonly></label>
       <label><?= $activeGroup === 'battery' ? 'Pil Numarası' : 'Model Adı' ?><input name="name" maxlength="190" required placeholder="<?= $activeGroup === 'battery' ? 'Pil Numarası' : 'Model Adı' ?>" value="<?=e($editModel['name'])?>"></label>
-      <div class="form-actions"><button type="submit" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy" aria-hidden="true"></i><span class="visually-hidden">Kaydet</span></button><a href="<?=url('brands.php?group='.$activeGroup.'&amp;brand_id='.$selectedBrandId.'#models')?>">İptal</a></div>
+      <div class="form-actions"><button type="submit" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy" aria-hidden="true"></i><span class="visually-hidden">Kaydet</span></button></div>
     </form>
   </details>
   <section class="vuexy-form-card manage-card list-admin-card">
