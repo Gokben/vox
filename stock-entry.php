@@ -374,6 +374,10 @@ patient_header('Stok Girişi','stock');
   const quantityWrapper = quantity.closest('label');
   quantityWrapper.after(saleWrapper);
   saleWrapper.after(section);
+  const alignPriceColumns = () => { grid.style.gridTemplateColumns = getComputedStyle(section.closest('form')).gridTemplateColumns; };
+  requestAnimationFrame(alignPriceColumns);
+  window.addEventListener('load', alignPriceColumns);
+  window.addEventListener('resize', alignPriceColumns);
 })();
 </script>
 <script>
