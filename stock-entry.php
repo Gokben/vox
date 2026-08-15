@@ -12,6 +12,11 @@ $pdo->exec($sqlite?'CREATE TABLE IF NOT EXISTS stock_movements (id INTEGER PRIMA
 function stock_entry_column(PDO $pdo,string $column):bool{$driver=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);if($driver==='sqlite'){foreach($pdo->query('PRAGMA table_info(stock_movements)')->fetchAll() as $item)if($item['name']===$column)return true;return false;}$q=$pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name="stock_movements" AND column_name=?');$q->execute([$column]);return(bool)$q->fetchColumn();}
 function stock_entry_parse_amount(string $value): float { $value=trim(str_replace(' ','',$value)); if(str_contains($value,',')) return (float)str_replace(',', '.', str_replace('.', '', $value)); return (float)str_replace('.', '', $value); }
 foreach(['current_account_id'=>'INTEGER NULL','invoice_no'=>'VARCHAR(100) NULL','serial_numbers'=>'TEXT NULL','uts_lot_no'=>'VARCHAR(190) NULL','warranty_start'=>'DATE NULL','warranty_end'=>'DATE NULL','purchase_price'=>'DECIMAL(12,2) NULL','sale_price'=>'DECIMAL(12,2) NULL','vat_rate'=>'DECIMAL(5,2) NULL','unit_cost'=>'DECIMAL(12,2) NULL','unit'=>'VARCHAR(20) NULL'] as $column=>$definition)if(!stock_entry_column($pdo,$column))$pdo->exec('ALTER TABLE stock_movements ADD COLUMN '.$column.' '.$definition);
+$legacyEditId=filter_input(INPUT_GET,'edit',FILTER_VALIDATE_INT)?:0;
+if(isset($_GET['new'])||$legacyEditId||$_SERVER['REQUEST_METHOD']==='POST'){
+    if($legacyEditId){$legacyInvoice=$pdo->prepare('SELECT invoice_no FROM stock_movements WHERE id=? AND movement_type="Giriş"');$legacyInvoice->execute([$legacyEditId]);$legacyInvoiceNo=trim((string)$legacyInvoice->fetchColumn());if($legacyInvoiceNo!==''){header('Location: '.url('invoice-entry.php?edit_invoice='.rawurlencode($legacyInvoiceNo)));exit;}}
+    header('Location: '.url('invoice-entry.php'));exit;
+}
 $vatNormalization = 'CASE WHEN COALESCE(vat_rate,0)>=15 THEN 20 WHEN COALESCE(vat_rate,0)>=5 THEN 10 ELSE 0 END';
 $pdo->exec('UPDATE stock_movements SET vat_rate='.$vatNormalization.' WHERE vat_rate IS NULL OR vat_rate NOT IN (0,10,20)');
 $pdo->exec('UPDATE stock_cards SET vat_rate='.$vatNormalization.' WHERE vat_rate IS NULL OR vat_rate NOT IN (0,10,20)');

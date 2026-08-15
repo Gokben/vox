@@ -64,9 +64,6 @@ const stockGroup = document.createElement('div');
 stockGroup.className = 'report-menu-group';
 const stockSubmenu = document.createElement('div');
 stockSubmenu.className = 'report-submenu';
-const stockEntryLink = document.createElement('a');
-stockEntryLink.href = <?= json_encode(url('stock-entry.php')) ?>;
-stockEntryLink.textContent = 'Stok Giriş';
 const stockExitLink = document.createElement('a');
 stockExitLink.href = <?= json_encode(url('stock-exit.php')) ?>;
 stockExitLink.textContent = 'Stok Çıkış';
@@ -82,7 +79,7 @@ priceListsLink.textContent = 'Liste Fiyatları';
 const invoiceListLink = document.createElement('a');
 invoiceListLink.href = <?= json_encode(url('invoice-list.php')) ?>;
 invoiceListLink.textContent = 'Fatura Listesi';
-stockSubmenu.append(stockEntryLink, stockExitLink, stockCardLink, priceListsLink, invoiceListLink);
+stockSubmenu.append(stockExitLink, stockCardLink, priceListsLink, invoiceListLink);
 stockMenuLink.setAttribute('aria-haspopup', 'true');
 stockMenuLink.setAttribute('aria-expanded', 'false');
 stockMenuLink.addEventListener('click', event => {
@@ -95,7 +92,6 @@ stockSubmenu.addEventListener('click', event => { if (event.target.closest('a'))
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
 if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/stock-exit.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php') || location.pathname.endsWith('/invoice-list.php') || sessionStorage.getItem('vox.stockMenuOpen') === '1') { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
-if (location.pathname.endsWith('/stock-entry.php')) stockEntryLink.classList.add('active');
 if (location.pathname.endsWith('/stock-exit.php')) stockExitLink.classList.add('active');
 if (location.pathname.endsWith('/stocks.php')) stockCardLink.classList.add('active');
 if (location.pathname.endsWith('/price-lists.php')) priceListsLink.classList.add('active');
