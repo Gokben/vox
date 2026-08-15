@@ -1,0 +1,63 @@
+/* VOX Design System: shared tokens and base components. */
+:root {
+  --vox-color-primary: #20a447;
+  --vox-color-primary-hover: #168238;
+  --vox-color-primary-soft: #eaf7ed;
+  --vox-color-danger: #c53b3b;
+  --vox-color-danger-hover: #a92f2f;
+  --vox-color-surface: #ffffff;
+  --vox-color-surface-muted: #f7f7fb;
+  --vox-color-text: #343348;
+  --vox-color-text-muted: #717083;
+  --vox-color-border: #e4e3eb;
+  --vox-radius-sm: 6px;
+  --vox-radius-md: 8px;
+  --vox-radius-lg: 12px;
+  --vox-space-1: 4px;
+  --vox-space-2: 8px;
+  --vox-space-3: 12px;
+  --vox-space-4: 16px;
+  --vox-space-5: 20px;
+  --vox-shadow-card: 0 4px 14px rgba(34, 35, 58, .09);
+  --vox-focus-ring: 0 0 0 3px rgba(32, 164, 71, .2);
+  --accent: var(--vox-color-primary);
+  --accent-dark: var(--vox-color-primary-hover);
+  --bg: var(--vox-color-surface-muted);
+  --card: var(--vox-color-surface);
+  --text: var(--vox-color-text);
+  --muted: var(--vox-color-text-muted);
+  --line: var(--vox-color-border);
+  --shadow: var(--vox-shadow-card);
+}
+
+:where(button, .button, input[type="submit"], input[type="button"], input[type="reset"]) {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--vox-radius-md);
+  padding: 9px 14px;
+  background: var(--vox-color-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+:where(button, .button, input[type="submit"], input[type="button"], input[type="reset"]):hover:not(:disabled) { background: var(--vox-color-primary-hover); }
+:where(button, .button, input[type="submit"], input[type="button"], input[type="reset"]):focus-visible, :where(input, select, textarea):focus-visible { outline: none; box-shadow: var(--vox-focus-ring); }
+:where(button, .button, input[type="submit"], input[type="button"], input[type="reset"]):disabled { cursor: not-allowed; opacity: .55; }
+
+:where(.secondary, .button.secondary, .cancel-link, .company-visits-back) { border-color: var(--vox-color-border); background: var(--vox-color-surface); color: var(--vox-color-text); }
+:where(.secondary, .button.secondary, .cancel-link, .company-visits-back):hover { background: var(--vox-color-surface-muted); color: var(--vox-color-text); }
+:where(.delete, .delete-definition, .company-visit-delete, .patient-delete, .danger) { background: var(--vox-color-danger); color: #fff; }
+:where(.delete, .delete-definition, .company-visit-delete, .patient-delete, .danger):hover:not(:disabled) { background: var(--vox-color-danger-hover); }
+
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) { border: 1px solid var(--vox-color-border); border-radius: var(--vox-radius-md); background: var(--vox-color-surface); color: var(--vox-color-text); }
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus { border-color: var(--vox-color-primary); }
+:where(h1, h2, h3) { color: var(--vox-color-text); line-height: 1.25; }
+
+.vox-card { border: 1px solid var(--vox-color-border); border-radius: var(--vox-radius-lg); background: var(--vox-color-surface); box-shadow: var(--vox-shadow-card); }
+.vox-button--secondary { border-color: var(--vox-color-border); background: var(--vox-color-surface); color: var(--vox-color-text); }
+.vox-button--danger { background: var(--vox-color-danger); }
+.vox-button--danger:hover:not(:disabled) { background: var(--vox-color-danger-hover); }

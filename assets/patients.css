@@ -1,3 +1,5 @@
+@import url('design-system.css');
+
 :root{--accent:#20a447;--accent-dark:#168238;--accent-light:#66c936;--bg:#f7f7fb;--card:#fff;--text:#343348;--muted:#717083;--line:#e4e3eb;--shadow:0 4px 14px rgba(34,35,58,.09)}
 
 /* Vuexy-style vertical application shell — existing VOX colours are intentionally retained. */

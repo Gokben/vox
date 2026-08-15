@@ -302,7 +302,7 @@
       const layoutStyles = document.createElement('link');
       layoutStyles.id = 'vuexy-layout-fixes';
       layoutStyles.rel = 'stylesheet';
-      layoutStyles.href = new URL('assets/vuexy-layout-fixes.css?v=19', location.href).href;
+      layoutStyles.href = new URL('assets/vuexy-layout-fixes.css?v=20', location.href).href;
       document.head.appendChild(layoutStyles);
     }
     const vuexyIcons = {
@@ -320,13 +320,10 @@
     const taskLink = sidebar.querySelector('a[href*="kanban.php"]');
     if (taskLink && taskLink.lastChild?.nodeType === Node.TEXT_NODE) taskLink.lastChild.textContent = ' Görev Takip';
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'plain-tool menu-toggle';
+    const button = topbar.querySelector('.patient-brand');
+    if (!button) return;
     button.setAttribute('aria-label', 'Menüyü aç veya kapat');
     button.setAttribute('aria-expanded', 'true');
-    button.textContent = '';
-    topbar.insertBefore(button, topbar.firstChild);
 
     const mobile = () => window.matchMedia('(max-width: 900px)').matches;
     const saved = localStorage.getItem('vox-sidebar-collapsed') === 'true';
@@ -365,9 +362,9 @@
       const open = mobile() ? document.body.classList.contains('menu-open') : !document.body.classList.contains('menu-collapsed');
       button.setAttribute('aria-expanded', String(open));
       button.setAttribute('aria-label', open ? 'Menüyü gizle' : 'Menüyü göster');
-      button.textContent = mobile() ? '☰' : '';
     }
-    button.addEventListener('click', () => {
+    button.addEventListener('click', event => {
+      event.preventDefault();
       if (mobile()) document.body.classList.toggle('menu-open');
       else {
         document.body.classList.toggle('menu-collapsed');

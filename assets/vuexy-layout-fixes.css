@@ -99,7 +99,7 @@ body .patient-nav .report-submenu a{display:flex!important;justify-content:flex-
   body .patient-brand{height:64px!important;background-repeat:no-repeat!important;background-size:105px auto!important;background-position:20px center!important}
   body.menu-collapsed .patient-brand,body.layout-menu-collapsed .patient-brand{background-image:none!important;background-size:0!important}
   body.menu-collapsed .patient-brand::before,body.layout-menu-collapsed .patient-brand::before{position:absolute;top:14px;left:20px;width:36px;height:36px;background:url('vox-logo-02.png?v=20260713-9') -43px -3px/118px 43px no-repeat;content:''}
-  body.menu-collapsed .patient-topbar .menu-toggle,body.menu-collapsed .patient-topbar .menu-toggle:hover,body.layout-menu-collapsed .patient-topbar .menu-toggle,body.layout-menu-collapsed .patient-topbar .menu-toggle:hover{display:none!important}
+  body.menu-collapsed .patient-topbar .menu-toggle,body.menu-collapsed .patient-topbar .menu-toggle:hover,body.layout-menu-collapsed .patient-topbar .menu-toggle,body.layout-menu-collapsed .patient-topbar .menu-toggle:hover{display:block!important}
   /* Hovering the menu must not expand the logo or replace its compact mark. */
   body.menu-collapsed:has(.patient-nav:hover) .patient-brand,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand{background-image:none!important;background-size:0!important;background-position:center!important}
   body.menu-collapsed:has(.patient-nav:hover) .patient-brand::before,body.layout-menu-collapsed:has(.patient-nav:hover) .patient-brand::before{display:block!important}

@@ -34,7 +34,7 @@
 .eye-icon::after { content: ''; position: absolute; width: 5px; height: 5px; top: 4px; left: 4px; border-radius: 50%; background: #718096; }
 .password-toggle.is-visible .eye-icon::before { content: ''; position: absolute; z-index: 2; width: 24px; height: 2px; left: -5px; top: 3px; background: #718096; transform: rotate(-90deg); box-shadow: 0 0 0 2px #f8fafc; }
 .remember { display: flex; align-items: center; gap: 9px; font-weight: 500 !important; }
-.remember input { width: 18px; height: 18px; margin: 0; accent-color: #a7830b; }
+.remember input { width: 18px; height: 18px; margin: 0; accent-color: #20a447; }
 .login-page .login-card .login-submit { height: 46px; border-radius: 7px; background: #20a447 !important; border-color: #20a447 !important; color: #fff !important; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; transition: background .2s, transform .2s; }
 .login-page .login-card .login-submit:hover { background: #168238 !important; border-color: #168238 !important; }
 .login-submit:active { transform: translateY(1px); }
