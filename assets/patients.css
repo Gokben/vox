@@ -1,4 +1,4 @@
-@import url('design-system.css');
+@import url('design-system.css?v=2');
 
 :root{--accent:#20a447;--accent-dark:#168238;--accent-light:#66c936;--bg:#f7f7fb;--card:#fff;--text:#343348;--muted:#717083;--line:#e4e3eb;--shadow:0 4px 14px rgba(34,35,58,.09)}
 
