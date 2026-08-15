@@ -79,7 +79,10 @@ stockPricesLink.textContent = 'Liste Fiyatları';
 const priceListsLink = document.createElement('a');
 priceListsLink.href = <?= json_encode(url('price-lists.php')) ?>;
 priceListsLink.textContent = 'Liste Fiyatları';
-stockSubmenu.append(stockEntryLink, stockExitLink, stockCardLink, priceListsLink);
+const invoiceListLink = document.createElement('a');
+invoiceListLink.href = <?= json_encode(url('invoice-list.php')) ?>;
+invoiceListLink.textContent = 'Fatura Listesi';
+stockSubmenu.append(stockEntryLink, stockExitLink, stockCardLink, priceListsLink, invoiceListLink);
 stockMenuLink.setAttribute('aria-haspopup', 'true');
 stockMenuLink.setAttribute('aria-expanded', 'false');
 stockMenuLink.addEventListener('click', event => {
@@ -91,11 +94,12 @@ stockMenuLink.addEventListener('click', event => {
 stockSubmenu.addEventListener('click', event => { if (event.target.closest('a')) sessionStorage.setItem('vox.stockMenuOpen', '1'); });
 stockMenuLink.before(stockGroup);
 stockGroup.append(stockMenuLink, stockSubmenu);
-if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/stock-exit.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php') || sessionStorage.getItem('vox.stockMenuOpen') === '1') { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
+if (location.pathname.endsWith('/stock-card.php') || location.pathname.endsWith('/stocks.php') || location.pathname.endsWith('/stock-entry.php') || location.pathname.endsWith('/stock-exit.php') || location.pathname.endsWith('/price-lists.php') || location.pathname.endsWith('/stock-prices.php') || location.pathname.endsWith('/invoice-list.php') || sessionStorage.getItem('vox.stockMenuOpen') === '1') { stockMenuLink.classList.add('active'); stockGroup.classList.add('open'); stockMenuLink.setAttribute('aria-expanded', 'true'); }
 if (location.pathname.endsWith('/stock-entry.php')) stockEntryLink.classList.add('active');
 if (location.pathname.endsWith('/stock-exit.php')) stockExitLink.classList.add('active');
 if (location.pathname.endsWith('/stocks.php')) stockCardLink.classList.add('active');
 if (location.pathname.endsWith('/price-lists.php')) priceListsLink.classList.add('active');
+if (location.pathname.endsWith('/invoice-list.php')) invoiceListLink.classList.add('active');
 const technicalServiceMenuLink = document.createElement('a');
 technicalServiceMenuLink.href = <?= json_encode(url('technical-service.php')) ?>;
 technicalServiceMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Teknik Servis';
