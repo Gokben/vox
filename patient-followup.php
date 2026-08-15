@@ -295,6 +295,12 @@ $pdo->exec($sqlite
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS stock_price_list_items (price_list_id INTEGER NOT NULL, stock_id INTEGER NOT NULL, list_price DECIMAL(12,2) NOT NULL DEFAULT 0, PRIMARY KEY(price_list_id,stock_id))'
     : 'CREATE TABLE IF NOT EXISTS stock_price_list_items (price_list_id INT UNSIGNED NOT NULL, stock_id INT UNSIGNED NOT NULL, list_price DECIMAL(12,2) NOT NULL DEFAULT 0, PRIMARY KEY(price_list_id,stock_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+$stockMovementColumns = $sqlite
+    ? array_column($pdo->query('PRAGMA table_info(stock_movements)')->fetchAll(), 'name')
+    : array_column($pdo->query('SHOW COLUMNS FROM stock_movements')->fetchAll(), 'Field');
+if (!in_array('service_id', $stockMovementColumns, true)) {
+    $pdo->exec('ALTER TABLE stock_movements ADD COLUMN service_id ' . ($sqlite ? 'INTEGER NULL' : 'BIGINT NULL'));
+}
 $stockCards = $pdo->query('SELECT id,stock_code,stock_name,brand,model,stock_type FROM stock_cards ORDER BY stock_name,stock_code')->fetchAll();
 $stockPriceItems = $pdo->query('SELECT i.stock_id,i.list_price,l.valid_from,l.valid_until,l.id AS price_list_id FROM stock_price_list_items i INNER JOIN stock_price_lists l ON l.id=i.price_list_id ORDER BY l.valid_from DESC,l.id DESC')->fetchAll();
 $hearingDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price,(SELECT m.serial_numbers FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.movement_date DESC,m.id DESC LIMIT 1) AS serial_numbers FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type=? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]')) ORDER BY s.brand,s.model,s.id");
@@ -644,8 +650,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit('Satış bilgileri kilitli. Yalnız yönetici kilidi açabilir.');
     }
     if ($action === 'delete' && $postedEditId) {
-        if ($linkedSaleState['sale'] && ($linkedSaleState['cash'] || $linkedSaleState['stock'])) {
-            $_SESSION['service_integrity_error'] = 'Bu satışa bağlı ' . ($linkedSaleState['cash'] ? 'kasa tahsilatı' : '') . (($linkedSaleState['cash'] && $linkedSaleState['stock']) ? ' ve ' : '') . ($linkedSaleState['stock'] ? 'stok çıkışı' : '') . ' bulunuyor. Bağlantının kopmaması için önce tahsilatı iptal edip stok iadesini tamamlayın; satış kartı bu işlemler yapılmadan silinemez.';
+        if ($linkedSaleState['sale'] && $linkedSaleState['cash']) {
+            $_SESSION['service_integrity_error'] = 'Bu satışa bağlı kasa tahsilatı bulunuyor. Önce tahsilatı iptal etmeden satış kartı silinemez.';
             redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
         }
         if ($savedServiceName === 'Tamir') {
@@ -659,6 +665,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (Throwable $exception) {
                 error_log('repair delete payment check: ' . $exception->getMessage());
             }
+        }
+        if ($savedServiceName === 'Satış') {
+            $recordNoStatement = $pdo->prepare('SELECT record_no FROM patient_services WHERE id=? AND patient_id=?');
+            $recordNoStatement->execute([$postedEditId, $id]);
+            $recordNo = trim((string)$recordNoStatement->fetchColumn());
+            $pdo->prepare("DELETE FROM stock_movements WHERE movement_type='Çıkış' AND (service_id=? OR (service_id IS NULL AND description LIKE ?))")
+                ->execute([$postedEditId, 'Hizmet kartı satışı: ' . $recordNo . '%']);
         }
         $pdo->prepare('DELETE FROM patient_services WHERE id=? AND patient_id=?')->execute([$postedEditId, $id]);
         redirect('patient-followup.php?id=' . $id);
@@ -866,18 +879,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $savedServiceId = (int)$pdo->lastInsertId();
         $pdo->prepare('UPDATE patients SET service_location=NULL WHERE id=?')->execute([$id]);
     }
-    // Satış bilgileri ilk defa kaydedildikten sonra da stok çıkışı oluşturulur.
-    // Aynı hizmet kartı tekrar kaydedilirse önce eski çıkışlar yenilenir; mükerrer stok düşümü oluşmaz.
-    if ($postedServiceName === 'Satış') {
+    // Cari hareketindeki miktar, satıştaki cihaz adetleri üzerinden oluşan stok çıkışlarının toplamıdır.
+    // Satış kartı her kaydedildiğinde yalnız bu hizmet kartına bağlı eski çıkışlar yenilenir.
+    $savedServiceWasSale = $savedServiceName === 'Satış';
+    $saleCancelled = (string)($values['result_name'] ?? '') === 'İptal';
+    if ($savedServiceWasSale || $postedServiceName === 'Satış') {
+            $previousRecordNo = trim((string)($serviceCard['record_no'] ?? $values['record_no']));
+            $pdo->prepare("DELETE FROM stock_movements WHERE movement_type='Çıkış' AND (service_id=? OR (service_id IS NULL AND description LIKE ?))")
+                ->execute([$savedServiceId, 'Hizmet kartı satışı: ' . $previousRecordNo . '%']);
+    }
+    if ($postedServiceName === 'Satış' && !$saleCancelled) {
             $salesDetails = json_decode((string)$values['sales_details'], true);
             if (!is_array($salesDetails)) $salesDetails = [];
             $accountId = filter_var($salesDetails['sales_current_account'] ?? null, FILTER_VALIDATE_INT) ?: null;
             $invoiceNo = trim((string)($salesDetails['sales_invoice_no'] ?? ''));
             $movementDate = $values['service_date'] ?: date('Y-m-d');
             $description = 'Hizmet kartı satışı: ' . $values['record_no'];
-            $pdo->prepare("DELETE FROM stock_movements WHERE movement_type='Çıkış' AND description LIKE ?")->execute([$description . '%']);
             $findStock = $pdo->prepare('SELECT id FROM stock_cards WHERE stock_type=? AND brand=? AND model=? ORDER BY id LIMIT 1');
-            $addExit = $pdo->prepare('INSERT INTO stock_movements(stock_id,movement_type,quantity,movement_date,description,current_account_id,invoice_no,serial_numbers) VALUES(?,?,?,?,?,?,?,?)');
+            $addExit = $pdo->prepare('INSERT INTO stock_movements(stock_id,movement_type,quantity,movement_date,description,current_account_id,invoice_no,serial_numbers,service_id) VALUES(?,?,?,?,?,?,?,?,?)');
             $existingInvoiceSerialExit = $pdo->prepare("SELECT 1 FROM stock_movements WHERE movement_type='Çıkış' AND invoice_no=? AND serial_numbers LIKE ? LIMIT 1");
             $addDeviceExit = static function (string $type, string $brand, string $model, string $serial, int $quantity = 1) use ($findStock, $addExit, $existingInvoiceSerialExit, $movementDate, $description, $accountId, $invoiceNo): void {
                 if ($brand === '' || $model === '' || $quantity < 1) return;
@@ -889,7 +908,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stockId = (int)$findStock->fetchColumn();
                 if (!$stockId) return;
                 $serialNumbers = $serial === '' ? null : json_encode([$serial], JSON_UNESCAPED_UNICODE);
-                $addExit->execute([$stockId, 'Çıkış', $quantity, $movementDate, $description, $accountId, $invoiceNo ?: null, $serialNumbers]);
+                $addExit->execute([$stockId, 'Çıkış', $quantity, $movementDate, $description, $accountId, $invoiceNo ?: null, $serialNumbers, $savedServiceId]);
             };
             $addDeviceExit('İşitme Cihazı', trim((string)($salesDetails['sales_brand'] ?? '')), trim((string)($salesDetails['sales_model'] ?? '')), trim((string)($salesDetails['sales_device_serial'] ?? '')));
             for ($deviceNumber = 2; $deviceNumber <= 4; $deviceNumber++) {
@@ -900,7 +919,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $consumableQuantity = max(0, (int)($salesDetails['sales_consumable_quantity'] ?? 0));
             if ($consumableStockId && $consumableQuantity > 0) {
                 $consumableDescription = $description . (trim((string)($salesDetails['sales_consumable_promotion'] ?? '')) === 'Evet' ? ' — Promosyonlu sarf malzeme' : '');
-                $addExit->execute([$consumableStockId, 'Çıkış', $consumableQuantity, $movementDate, $consumableDescription, $accountId, $invoiceNo ?: null, null]);
+                $addExit->execute([$consumableStockId, 'Çıkış', $consumableQuantity, $movementDate, $consumableDescription, $accountId, $invoiceNo ?: null, null, $savedServiceId]);
             }
     }
     if ((string)($_POST['ajax'] ?? '') === 'repair_fee_prepare') {
