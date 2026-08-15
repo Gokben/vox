@@ -180,16 +180,22 @@ foreach ($rows as $row) {
     $invoiceNo = trim((string)($row['invoice_no'] ?? ''));
     $key = $invoiceNo === '' ? 'row-' . (int)$row['id'] : $row['movement_type'] . '|' . $invoiceNo;
     if (!isset($groupedRows[$key])) {
-        $groupedRows[$key] = ['date' => $row['movement_date'], 'movement_type' => $row['movement_type'], 'invoice_no' => $invoiceNo, 'quantity' => 0, 'total_price' => 0.0, 'total_price_with_vat' => 0.0, 'stocks' => [], 'items' => []];
+        $groupedRows[$key] = ['date' => $row['movement_date'], 'movement_type' => $row['movement_type'], 'invoice_no' => $invoiceNo, 'quantity' => 0, 'total_price' => 0.0, 'total_price_with_vat' => 0.0, 'calculated_gross' => 0.0, 'stocks' => [], 'items' => []];
     }
+    $itemDiscountRate = (float)($itemDiscountRates[$row['id']] ?? $row['discount_rate'] ?? 0);
+    $itemNetPrice = (float)($row['purchase_price'] ?? 0);
     $groupedRows[$key]['quantity'] += (int)$row['quantity'];
-    $groupedRows[$key]['total_price'] += (float)($row['purchase_price'] ?? 0);
-    $groupedRows[$key]['total_price_with_vat'] += (float)($row['purchase_price'] ?? 0) * (1 + ((float)($row['vat_rate'] ?? 0) / 100));
+    $groupedRows[$key]['total_price'] += $itemNetPrice;
+    $groupedRows[$key]['total_price_with_vat'] += $itemNetPrice * (1 + ((float)($row['vat_rate'] ?? 0) / 100));
+    $groupedRows[$key]['calculated_gross'] += $itemDiscountRate > 0 && $itemDiscountRate < 100 ? $itemNetPrice / (1 - ($itemDiscountRate / 100)) : $itemNetPrice;
     $groupedRows[$key]['stocks'][] = $row['stock_code'] . ' — ' . $row['stock_name'];
-    $groupedRows[$key]['items'][] = ['id' => (int)$row['id'], 'stock' => $row['stock_code'] . ' — ' . $row['stock_name'], 'quantity' => (int)$row['quantity'], 'discount_rate' => (float)($itemDiscountRates[$row['id']] ?? 0), 'price' => (float)($row['purchase_price'] ?? 0)];
+    $groupedRows[$key]['items'][] = ['id' => (int)$row['id'], 'stock' => $row['stock_code'] . ' — ' . $row['stock_name'], 'quantity' => (int)$row['quantity'], 'discount_rate' => $itemDiscountRate, 'price' => $itemNetPrice];
 }
 $groupedRows = array_values($groupedRows);
-foreach ($groupedRows as &$groupedRow) $groupedRow['gross_amount'] = $groupedRow['invoice_no'] !== '' ? (float)($invoiceGrossAmounts[$groupedRow['invoice_no']] ?? 0) : 0.0;
+foreach ($groupedRows as &$groupedRow) {
+    $savedGross = $groupedRow['invoice_no'] !== '' ? (float)($invoiceGrossAmounts[$groupedRow['invoice_no']] ?? 0) : 0.0;
+    $groupedRow['gross_amount'] = $savedGross > 0 ? $savedGross : round((float)$groupedRow['calculated_gross'], 2);
+}
 unset($groupedRow);
 $isSgkAccount = (string)$account['code'] === 'CR-08';
 $accountBalance = 0.0;
