@@ -59,12 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $invoiceNo = trim($form['invoice_no']);
         if ($invoiceNo !== '') {
-            $duplicateInvoiceStatement = $pdo->prepare('SELECT movement_date FROM stock_movements WHERE movement_type=? AND LOWER(TRIM(invoice_no))=LOWER(TRIM(?)) AND id<>? ORDER BY id ASC LIMIT 1');
-            $duplicateInvoiceStatement->execute(['Giriş', $invoiceNo, $editId]);
-            $duplicateInvoiceDate = $duplicateInvoiceStatement->fetchColumn();
+            $invoiceDateStatement = $pdo->prepare('SELECT movement_date FROM stock_movements WHERE movement_type=? AND LOWER(TRIM(invoice_no))=LOWER(TRIM(?)) AND id<>? ORDER BY id ASC LIMIT 1');
+            $invoiceDateStatement->execute(['Giriş', $invoiceNo, $editId]);
+            $existingInvoiceDate = $invoiceDateStatement->fetchColumn();
             $editingSameInvoice = $editRecord !== null && strtolower(trim((string)$editRecord['invoice_no'])) === strtolower($invoiceNo);
-            if ($duplicateInvoiceDate !== false && !($editInvoiceCorrectionAllowed && $editingSameInvoice)) {
-                $error = 'Bu fatura numarası daha önce ' . format_date_tr((string)$duplicateInvoiceDate) . ' tarihinde stok girişinde kullanılmıştır. Mükerrer kayıt yapılamaz.';
+            if ($existingInvoiceDate !== false && $form['movement_date'] !== $existingInvoiceDate && !($editInvoiceCorrectionAllowed && $editingSameInvoice)) {
+                $error = 'Bu fatura numarası için giriş tarihi ' . format_date_tr((string)$existingInvoiceDate) . ' olmalıdır.';
             }
         }
         if ($error === '') {
