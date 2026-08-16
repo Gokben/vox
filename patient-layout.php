@@ -621,7 +621,7 @@ if(settingsPages[currentSettingsPage]){
   };
   const isSaveAction=button=>/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test((button?.textContent||'').trim())||/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test(button?.getAttribute('title')||'')||/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test(button?.getAttribute('aria-label')||'');
   if(sessionStorage.getItem(notificationKey)==='1'){sessionStorage.removeItem(notificationKey);showSavedNotification();}
-  document.addEventListener('submit',event=>{if(!event.defaultPrevented){sessionStorage.setItem(notificationKey,'1');showSavedNotification();}},true);
+  document.addEventListener('submit',event=>{const form=event.target;if(event.defaultPrevented||!(form instanceof HTMLFormElement)||form.method.toLowerCase()==='get')return;sessionStorage.setItem(notificationKey,'1');showSavedNotification();},true);
   document.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&isSaveAction(button))showSavedNotification();});
   const style=document.createElement('style');
   style.textContent='.vox-save-notification{position:fixed;z-index:3000;right:24px;bottom:24px;padding:12px 18px;border-radius:7px;background:#19a94b;color:#fff;font-weight:700;box-shadow:0 8px 22px rgba(25,169,75,.28);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s}.vox-save-notification.visible{opacity:1;transform:translateY(0)}';
