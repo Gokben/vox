@@ -42,7 +42,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 if ($isRestrictedPatientList) {
     $showAll = true;
     $dateSort = 'date_desc';
-    $perPage = 75;
+    $perPage = 2;
     $page = 1;
 }
 $searchColumnKeys = ['no','date','name','national_id','phone_primary','phone_secondary','birth_date','address','social_security','report','service_location','application_detail','source','notes','result','contact'];
