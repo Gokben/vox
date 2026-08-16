@@ -2,19 +2,35 @@
 declare(strict_types=1);
 
 require __DIR__ . '/config.php';
+require __DIR__ . '/patient-report-schema.php';
 require_login();
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
+$isRestrictedResultList = in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_SECRETARY, ROLE_ACCOUNTING], true);
+$currentUserId = (int)($_SESSION['user']['id'] ?? 0);
 $dateFrom = trim((string)($_GET['date_from'] ?? ''));
 $dateTo = trim((string)($_GET['date_to'] ?? ''));
 $yearFrom = (int)($_GET['year_from'] ?? 0);
 $selectedResults = array_values(array_intersect(['approved', 'considering', 'rejected', 'none'], array_map('strval', (array)($_GET['results'] ?? []))));
 $resultOptions = ['approved' => 'Onay', 'considering' => 'Düşünecek', 'rejected' => 'Ret', 'none' => 'Sonuç Yok'];
 $resultExpressions = ['approved' => 'COALESCE(p.approval,0)=1', 'considering' => 'COALESCE(p.approval,0)=0 AND COALESCE(p.considering,0)=1', 'rejected' => 'COALESCE(p.approval,0)=0 AND COALESCE(p.considering,0)=0 AND COALESCE(p.rejected,0)=1', 'none' => 'COALESCE(p.approval,0)=0 AND COALESCE(p.considering,0)=0 AND COALESCE(p.rejected,0)=0'];
-$years = array_map('intval', $pdo->query("SELECT DISTINCT YEAR(record_date) FROM patients WHERE record_date IS NOT NULL ORDER BY YEAR(record_date) DESC")->fetchAll(PDO::FETCH_COLUMN));
+$yearsSql = 'SELECT DISTINCT YEAR(record_date) FROM patients WHERE record_date IS NOT NULL';
+$yearsParams = [];
+if ($isRestrictedResultList) {
+    $yearsSql .= ' AND created_by = ?';
+    $yearsParams[] = $currentUserId;
+}
+$yearsSql .= ' ORDER BY YEAR(record_date) DESC';
+$yearsStatement = $pdo->prepare($yearsSql);
+$yearsStatement->execute($yearsParams);
+$years = array_map('intval', $yearsStatement->fetchAll(PDO::FETCH_COLUMN));
 $where = [];
 $params = [];
+if ($isRestrictedResultList) {
+    $where[] = 'p.created_by = ?';
+    $params[] = $currentUserId;
+}
 if ($dateFrom !== '' || $dateTo !== '') {
     if ($dateFrom !== '') { $where[] = 'p.record_date >= ?'; $params[] = $dateFrom; }
     if ($dateTo !== '') { $where[] = 'p.record_date <= ?'; $params[] = $dateTo; }

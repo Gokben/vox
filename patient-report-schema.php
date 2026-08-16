@@ -3,6 +3,27 @@ declare(strict_types=1);
 
 const REPORT_STATUSES = ['Rapor getirdi', 'Rapor getirecek', 'Rapor gerekmedi', 'Özel reçete getirdi', 'Özel reçete getirecek'];
 
+function ensure_patient_creator_schema(): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
+    $pdo = db();
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $columns = array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name');
+        if (!in_array('created_by', $columns, true)) {
+            $pdo->exec('ALTER TABLE patients ADD COLUMN created_by INTEGER NULL');
+        }
+        return;
+    }
+
+    if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'created_by'")->fetch()) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN created_by INT UNSIGNED NULL');
+        $pdo->exec('ALTER TABLE patients ADD KEY idx_patients_created_by (created_by)');
+    }
+}
+
 function ensure_patient_report_schema(): void
 {
     static $done = false;
@@ -76,3 +97,4 @@ function ensure_patient_report_schema(): void
 }
 
 ensure_patient_report_schema();
+ensure_patient_creator_schema();

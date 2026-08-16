@@ -159,6 +159,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $stmt=db()->prepare("UPDATE patients SET $set,updated_at=CURRENT_TIMESTAMP WHERE id=?"); $stmt->execute([...array_values($values),$id]);
         } else {
             $values['import_order']=(int)db()->query('SELECT COALESCE(MAX(import_order),0)+1 FROM patients')->fetchColumn();
+            $values['created_by']=(int)($_SESSION['user']['id'] ?? 0) ?: null;
             $columns=array_keys($values); $stmt=db()->prepare('INSERT INTO patients ('.implode(',',$columns).') VALUES ('.implode(',',array_fill(0,count($columns),'?')).')'); $stmt->execute(array_values($values));
         }
         redirect($returnTo);

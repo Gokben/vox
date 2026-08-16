@@ -59,11 +59,13 @@ CREATE TABLE patients (
  staff_cansu TINYINT(1) NOT NULL DEFAULT 0,
  staff_busra TINYINT(1) NOT NULL DEFAULT 0,
  staff_belma TINYINT(1) NOT NULL DEFAULT 0,
+ created_by INT UNSIGNED NULL,
  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  KEY idx_patients_import_order(import_order),
  KEY idx_patients_branch(branch_id),
  KEY idx_patients_name(full_name),
+ KEY idx_patients_created_by(created_by),
  CONSTRAINT fk_patients_branch FOREIGN KEY(branch_id) REFERENCES branches(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
