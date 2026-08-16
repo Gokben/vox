@@ -414,6 +414,8 @@ document.querySelector('.patient-nav')?.addEventListener('click', event => {
   const trigger = event.target.closest('.report-menu-group > a');
   const group = trigger?.parentElement;
   if (!trigger || !group?.classList.contains('report-menu-group')) return;
+  // Takvim ana öğesi bir sayfa bağlantısıdır; menü animasyonu URL geçişini engellememeli.
+  if (trigger.getAttribute('href')?.includes('calendar.php')) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   const willOpen = !group.classList.contains('open');
