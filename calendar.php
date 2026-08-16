@@ -18,20 +18,6 @@ $nextMonth = $firstDay->modify('+1 month');
 $previousMonth = $firstDay->modify('-1 month');
 $todayMonth = date('Y-m');
 
-$statement = db()->prepare(
-    'SELECT patients.id,patients.record_date,patients.full_name,patients.approval,patients.considering,patients.rejected,source_definitions.name AS source_name
-     FROM patients
-     LEFT JOIN source_definitions ON source_definitions.id=patients.source_id
-     WHERE patients.record_date >= ? AND patients.record_date < ?
-     ORDER BY patients.record_date,patients.full_name'
-);
-$statement->execute([$firstDay->format('Y-m-d'), $nextMonth->format('Y-m-d')]);
-$eventsByDate = [];
-foreach ($statement->fetchAll() as $row) {
-    $day = (string)$row['record_date'];
-    $category = $row['approval'] ? 'approval' : ($row['considering'] ? 'considering' : ($row['rejected'] ? 'rejected' : 'other'));
-    $eventsByDate[$day][] = ['id'=>(int)$row['id'], 'name'=>(string)$row['full_name'], 'source'=>(string)($row['source_name'] ?? ''), 'category'=>$category];
-}
 $appointmentStatement = $pdo->prepare('SELECT a.*,b.name AS branch_name FROM appointments a LEFT JOIN branches b ON b.id=a.branch_id WHERE a.appointment_date>=? AND a.appointment_date<? ORDER BY a.appointment_date,a.appointment_time,a.id');
 $appointmentStatement->execute([$firstDay->format('Y-m-d'), $nextMonth->format('Y-m-d')]);
 $appointments = $appointmentStatement->fetchAll();
@@ -69,8 +55,6 @@ $monthNames = [1=>'Ocak',2=>'Şubat',3=>'Mart',4=>'Nisan',5=>'Mayıs',6=>'Hazira
 $monthTitle = $monthNames[(int)$firstDay->format('n')] . ' ' . $firstDay->format('Y');
 $leadingDays = (int)$firstDay->format('N') - 1;
 $daysInMonth = (int)$firstDay->format('t');
-$totalEvents = array_sum(array_map('count', $eventsByDate));
-
 patient_header('Takvim', 'calendar');
 ?>
 <main class="calendar-page">
@@ -82,16 +66,8 @@ patient_header('Takvim', 'calendar');
       <div class="mini-calendar">
         <div class="mini-calendar-head"><a href="<?=url('calendar.php?month='.$previousMonth->format('Y-m'))?>" aria-label="Önceki ay">‹</a><b><?=$monthTitle?></b><a href="<?=url('calendar.php?month='.$nextMonth->format('Y-m'))?>" aria-label="Sonraki ay">›</a></div>
         <div class="mini-week">P P S Ç P C C</div>
-        <div class="mini-days"><?php for($blank=0;$blank<$leadingDays;$blank++):?><span></span><?php endfor; ?><?php for($day=1;$day<=$daysInMonth;$day++):$date=$month.'-'.str_pad((string)$day,2,'0',STR_PAD_LEFT);?><a class="<?= $date===date('Y-m-d')?'today':'' ?> <?=isset($eventsByDate[$date])?'has-event':''?>" href="#day-<?=$day?>"><?=$day?></a><?php endfor; ?></div>
+        <div class="mini-days"><?php for($blank=0;$blank<$leadingDays;$blank++):?><span></span><?php endfor; ?><?php for($day=1;$day<=$daysInMonth;$day++):?><a class="<?= ($month.'-'.str_pad((string)$day,2,'0',STR_PAD_LEFT))===date('Y-m-d')?'today':'' ?>" href="#day-<?=$day?>"><?=$day?></a><?php endfor; ?></div>
       </div>
-      <hr>
-      <h3>Hasta Kayıtları</h3>
-      <label class="calendar-filter all"><input type="checkbox" data-filter="all" checked> <span></span>Tümünü Göster</label>
-      <label class="calendar-filter approval"><input type="checkbox" data-filter="approval" checked> <span></span>Onaylanan</label>
-      <label class="calendar-filter considering"><input type="checkbox" data-filter="considering" checked> <span></span>Düşünecek</label>
-      <label class="calendar-filter rejected"><input type="checkbox" data-filter="rejected" checked> <span></span>Reddedilen</label>
-      <label class="calendar-filter other"><input type="checkbox" data-filter="other" checked> <span></span>Sonuç Bekliyor</label>
-      <p class="calendar-count"><b><?=$totalEvents?></b> hasta kaydı</p>
     </aside>
     <section class="calendar-content">
       <header class="calendar-toolbar">
@@ -102,7 +78,7 @@ patient_header('Takvim', 'calendar');
       <div class="calendar-grid">
         <?php foreach(['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'] as $weekDay):?><div class="calendar-weekday"><?=$weekDay?></div><?php endforeach; ?>
         <?php for($blank=0;$blank<$leadingDays;$blank++):?><div class="calendar-day muted"></div><?php endfor; ?>
-        <?php for($day=1;$day<=$daysInMonth;$day++):$date=$month.'-'.str_pad((string)$day,2,'0',STR_PAD_LEFT);$events=$eventsByDate[$date]??[];?><div class="calendar-day <?= $date===date('Y-m-d')?'is-today':'' ?>" id="day-<?=$day?>" data-date="<?=$date?>"><div class="day-head"><span class="day-number"><?=$day?></span><a class="calendar-new" href="<?=url('patient-form.php?date='.$date)?>" title="Bu tarihe hasta kaydı ekle">＋</a></div><div class="day-events"><?php foreach($events as $event):?><a class="calendar-event <?=$event['category']?>" data-category="<?=$event['category']?>" href="<?=url('patient-form.php?id='.$event['id'])?>"><b><?=e($event['name'])?></b><?php if($event['source']!==''):?><small><?=e($event['source'])?></small><?php endif?></a><?php endforeach; ?></div></div><?php endfor; ?>
+        <?php for($day=1;$day<=$daysInMonth;$day++):$date=$month.'-'.str_pad((string)$day,2,'0',STR_PAD_LEFT);?><div class="calendar-day <?= $date===date('Y-m-d')?'is-today':'' ?>" id="day-<?=$day?>" data-date="<?=$date?>"><div class="day-head"><span class="day-number"><?=$day?></span><a class="calendar-new" href="<?=url('appointment-form.php?date='.$date)?>" title="Bu tarihe randevu ekle">＋</a></div><div class="day-events"></div></div><?php endfor; ?>
       </div>
     </section>
   </section>
