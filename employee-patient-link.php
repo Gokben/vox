@@ -37,13 +37,17 @@ function patient_staff_names(bool $includeInactive = false): array
     ];
 
     try {
-        $employees = db()->query('SELECT full_name,active FROM employees ORDER BY id')->fetchAll();
+        $employees = db()->query('SELECT full_name,start_date,end_date FROM employees ORDER BY id')->fetchAll();
+        $today = date('Y-m-d');
         foreach ($employees as $employee) {
             $fullName = trim((string)$employee['full_name']);
             $normalized = strtr(mb_strtolower($fullName, 'UTF-8'), ['ç'=>'c','ğ'=>'g','ı'=>'i','ö'=>'o','ş'=>'s','ü'=>'u']);
             $column = ($normalized === 'cansu' || str_starts_with($normalized, 'merve cansu ')) ? 'staff_cansu' : (str_starts_with($normalized, 'busra ') || $normalized === 'busra' ? 'staff_busra' : (($normalized === 'belma baysan' || str_starts_with($normalized, 'belma ')) ? 'staff_belma' : (str_starts_with($normalized, 'yeliz') ? 'staff_yeliz' : (str_starts_with($normalized, 'gunes') ? 'staff_gunes' : (str_starts_with($normalized, 'erva') ? 'staff_erva' : (str_starts_with($normalized, 'merve') ? 'staff_merve' : (str_starts_with($normalized, 'seyma') ? 'staff_seyma' : null)))))));
             if ($column === null) continue;
-            if (!empty($employee['active']) || $includeInactive) $names[$column] = $fullName;
+            $startDate = trim((string)($employee['start_date'] ?? ''));
+            $endDate = trim((string)($employee['end_date'] ?? ''));
+            $isActive = ($startDate === '' || $startDate <= $today) && ($endDate === '' || $endDate >= $today);
+            if ($isActive || $includeInactive) $names[$column] = $fullName;
             else unset($names[$column]);
         }
     } catch (Throwable $e) {
