@@ -33,7 +33,7 @@ patient_header('Randevu Listesi', 'calendar');
     </header>
     <?php if (($_GET['appointment_saved'] ?? '') === '1'): ?><div class="appointment-saved">Randevu kaydedildi.</div><?php endif ?>
     <div class="appointment-list-wrap"><table><thead><tr><th>Tarih</th><th>Saat</th><th>Ad Soyad</th><th>Telefon</th><th>Şube</th><th>İlgilenen Kişi</th><th>Not</th></tr></thead><tbody>
-      <?php foreach ($appointments as $appointment): ?><tr data-appointment-id="<?=(int)$appointment['id']?>"><td><?=e(format_date_tr($appointment['appointment_date']))?></td><td><?=e(substr((string)$appointment['appointment_time'], 0, 5))?></td><td><?=e($appointment['full_name'])?></td><td><?=e($appointment['phone'] ?: '—')?></td><td><?=e($appointment['branch_name'] ?: '—')?></td><td><?=e($appointment['contact_person'] ?: '—')?></td><td><?=e($appointment['note'] ?: '—')?></td></tr><?php endforeach ?>
+      <?php foreach ($appointments as $appointment): ?><tr data-appointment-id="<?=(int)$appointment['id']?>"><td><?=e(format_date_tr($appointment['appointment_date']))?></td><td><?=e(substr((string)$appointment['appointment_time'], 0, 5))?></td><td><?=e($appointment['full_name'])?></td><td><?=e(implode(' / ', array_filter([(string)($appointment['phone'] ?? ''),(string)($appointment['phone_secondary'] ?? '')])) ?: '—')?></td><td><?=e($appointment['branch_name'] ?: '—')?></td><td><?=e($appointment['contact_person'] ?: '—')?></td><td><?=e($appointment['note'] ?: '—')?></td></tr><?php endforeach ?>
       <?php if (!$appointments): ?><tr><td colspan="8" class="appointment-empty">Bu ay için randevu bulunmuyor.</td></tr><?php endif ?>
     </tbody></table></div>
   </section>
