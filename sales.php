@@ -17,10 +17,17 @@ $stockSaleKey = static fn(string $stockType, string $brand, string $model): stri
 );
 try {
     $pdo = db();
-    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_patient_services_sales_owner ON patient_services(service_name,opened_by,service_date,id)');
-    } elseif (!$pdo->query("SHOW INDEX FROM patient_services WHERE Key_name='idx_patient_services_sales_owner'")->fetch()) {
-        $pdo->exec('ALTER TABLE patient_services ADD KEY idx_patient_services_sales_owner (service_name(40),opened_by(120),service_date(10),id)');
+    try {
+        if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            $pdo->exec('CREATE INDEX IF NOT EXISTS idx_patient_services_sales_owner ON patient_services(service_name,opened_by,service_date,id)');
+        } elseif (!$pdo->query("SHOW INDEX FROM patient_services WHERE Key_name='idx_patient_services_sales_owner'")->fetch()) {
+            $serviceDateColumn = $pdo->query("SHOW COLUMNS FROM patient_services LIKE 'service_date'")->fetch();
+            $serviceDateType = (string)($serviceDateColumn['Type'] ?? '');
+            $serviceDateIndex = preg_match('/char|text|blob|binary/i', $serviceDateType) ? 'service_date(10)' : 'service_date';
+            $pdo->exec("ALTER TABLE patient_services ADD KEY idx_patient_services_sales_owner (service_name(40),opened_by(120),{$serviceDateIndex},id)");
+        }
+    } catch (Throwable $indexException) {
+        error_log('sales.php owner index: ' . $indexException->getMessage());
     }
     $sql = "SELECT s.id,s.stock_code,s.stock_name,s.brand,s.model,s.stock_type,s.image_path,COALESCE(q.stock_quantity,0) AS stock_quantity FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>0";
     $sql .= ' ORDER BY s.stock_type,s.brand,s.model,s.stock_name';
