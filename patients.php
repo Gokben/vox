@@ -30,17 +30,20 @@ start_patient_staff_ui_link($staffNames, [], $staffOrders);
 
 $q = trim($_GET['q'] ?? '');
 $databaseDriver = db()->getAttribute(PDO::ATTR_DRIVER_NAME);
-$isRestrictedPatientList = in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_SECRETARY, ROLE_ACCOUNTING], true);
-$showAll = ($_GET['all'] ?? '') === '1';
-$year = (int)($_GET['year'] ?? 2023);
-if (!in_array($year, [2023, 2024, 2025, 2026], true)) $year = 2023;
+$isCompanyManager = is_admin();
+$isRestrictedPatientList = !$isCompanyManager;
+$currentYear = (int)date('Y');
+$showAll = $isCompanyManager && ($_GET['all'] ?? '') === '1';
+$year = $isCompanyManager ? (int)($_GET['year'] ?? 2023) : $currentYear;
+$allowedYears = array_values(array_unique([2023, 2024, 2025, 2026, $currentYear]));
+if (!in_array($year, $allowedYears, true)) $year = $isCompanyManager ? 2023 : $currentYear;
 $dateSort = $_GET['sort'] ?? '';
 if (!in_array($dateSort, ['date_asc', 'date_desc'], true)) $dateSort = '';
 $perPage = (int)($_GET['length'] ?? 100);
 if (!in_array($perPage, [10,25,50,100], true)) $perPage = 10;
 $page = max(1, (int)($_GET['page'] ?? 1));
 if ($isRestrictedPatientList) {
-    $showAll = true;
+    $showAll = false;
     $dateSort = 'date_desc';
     $perPage = 2;
     $page = 1;
@@ -169,7 +172,8 @@ body .vuexy-actions>a,body .vuexy-actions>form>button{flex:0 0 32px!important;wi
  if(!toolbar||!table)return;
  table.querySelectorAll('tbody tr').forEach(row=>{row.style.cursor='default';row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,input,form'))return;const edit=row.querySelector('a[href*="patient-form.php?id="]');if(edit)window.location.href=edit.href});});
  const yearSelect=document.createElement('select');yearSelect.className='year-select';yearSelect.setAttribute('aria-label','Hasta kayıt yılı');
- yearSelect.innerHTML='<option value="all" <?=$showAll?'selected':''?>>Tüm Kayıtlar (<?=$allPatientCount?> kayıt)</option><option value="2023" <?=!$showAll&&$year===2023?'selected':''?>>2023 (<?=(int)($yearCounts[2023]??0)?> kayıt)</option><option value="2024" <?=!$showAll&&$year===2024?'selected':''?>>2024 (<?=(int)($yearCounts[2024]??0)?> kayıt)</option><option value="2025" <?=!$showAll&&$year===2025?'selected':''?>>2025 (<?=(int)($yearCounts[2025]??0)?> kayıt)</option><option value="2026" <?=!$showAll&&$year===2026?'selected':''?>>2026 (<?=(int)($yearCounts[2026]??0)?> kayıt)</option>';
+ yearSelect.innerHTML=<?php if($isCompanyManager):?>'<option value="all" <?=$showAll?'selected':''?>>Tüm Kayıtlar (<?=$allPatientCount?> kayıt)</option><option value="2023" <?=!$showAll&&$year===2023?'selected':''?>>2023 (<?=(int)($yearCounts[2023]??0)?> kayıt)</option><option value="2024" <?=!$showAll&&$year===2024?'selected':''?>>2024 (<?=(int)($yearCounts[2024]??0)?> kayıt)</option><option value="2025" <?=!$showAll&&$year===2025?'selected':''?>>2025 (<?=(int)($yearCounts[2025]??0)?> kayıt)</option><option value="2026" <?=!$showAll&&$year===2026?'selected':''?>>2026 (<?=(int)($yearCounts[2026]??0)?> kayıt)</option>'<?php else:?>'<option value="<?=$currentYear?>" selected><?=$currentYear?> (<?=(int)($yearCounts[$currentYear]??0)?> kayıt)</option>'<?php endif?>;
+ <?php if(!$isCompanyManager):?>yearSelect.disabled=true;yearSelect.title='Kullanıcılar yalnızca içinde bulunulan yılı görüntüleyebilir';<?php endif?>
  yearSelect.addEventListener('change',()=>{const url=new URL(window.location.href);url.searchParams.delete('page');if(yearSelect.value==='all'){url.searchParams.set('all','1');url.searchParams.delete('q')}else{url.searchParams.set('year',yearSelect.value);url.searchParams.delete('all');if(!url.searchParams.get('q'))url.searchParams.delete('q')}window.location.href=url.toString()});
  if(!restricted)toolbar.insertBefore(yearSelect,toolbar.querySelector('.vuexy-search'));
  document.getElementById('patient-table-filter')?.addEventListener('submit',event=>{const form=event.currentTarget;form.querySelector('input[name="search_columns"]').value=visible.map((isVisible,index)=>isVisible?searchKeys[index]:null).filter(Boolean).join(',');let all=form.querySelector('input[name="all"]');if(!all){all=document.createElement('input');all.type='hidden';all.name='all';form.appendChild(all)}all.value=yearSelect.value==='all'?'1':''});

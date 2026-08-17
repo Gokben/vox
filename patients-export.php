@@ -7,8 +7,10 @@ require __DIR__ . '/service-type-bootstrap.php';
 require __DIR__ . '/source-bootstrap.php';
 require_login();
 
-$year = (int)($_GET['year'] ?? 2026);
-if (!in_array($year, [2023, 2024, 2025, 2026], true)) $year = 2026;
+$currentYear = (int)date('Y');
+$year = is_admin() ? (int)($_GET['year'] ?? $currentYear) : $currentYear;
+$allowedYears = array_values(array_unique([2023, 2024, 2025, 2026, $currentYear]));
+if (!in_array($year, $allowedYears, true)) $year = $currentYear;
 
 $extendedSchemaReady = true;
 try {
