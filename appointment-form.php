@@ -9,7 +9,7 @@ require __DIR__ . '/employee-patient-link.php';
 $pdo = db();
 ensure_appointment_schema($pdo);
 $branches = $pdo->query('SELECT id,name FROM branches WHERE active=1 ORDER BY name')->fetchAll();
-$staffNames = patient_staff_names();
+$staffNames = active_employee_names();
 $appointmentId = (int)($_GET['id'] ?? 0);
 $requestedType = (string)($_GET['type'] ?? 'appointment');
 if (!in_array($requestedType, ['appointment', 'daily_event'], true)) $requestedType = 'appointment';

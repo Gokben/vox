@@ -37,17 +37,13 @@ function patient_staff_names(bool $includeInactive = false): array
     ];
 
     try {
-        $employees = db()->query('SELECT full_name,start_date,end_date FROM employees ORDER BY id')->fetchAll();
-        $today = date('Y-m-d');
+        $employees = db()->query('SELECT full_name,active FROM employees ORDER BY id')->fetchAll();
         foreach ($employees as $employee) {
             $fullName = trim((string)$employee['full_name']);
             $normalized = strtr(mb_strtolower($fullName, 'UTF-8'), ['ç'=>'c','ğ'=>'g','ı'=>'i','ö'=>'o','ş'=>'s','ü'=>'u']);
             $column = ($normalized === 'cansu' || str_starts_with($normalized, 'merve cansu ')) ? 'staff_cansu' : (str_starts_with($normalized, 'busra ') || $normalized === 'busra' ? 'staff_busra' : (($normalized === 'belma baysan' || str_starts_with($normalized, 'belma ')) ? 'staff_belma' : (str_starts_with($normalized, 'yeliz') ? 'staff_yeliz' : (str_starts_with($normalized, 'gunes') ? 'staff_gunes' : (str_starts_with($normalized, 'erva') ? 'staff_erva' : (str_starts_with($normalized, 'merve') ? 'staff_merve' : (str_starts_with($normalized, 'seyma') ? 'staff_seyma' : null)))))));
             if ($column === null) continue;
-            $startDate = trim((string)($employee['start_date'] ?? ''));
-            $endDate = trim((string)($employee['end_date'] ?? ''));
-            $isActive = ($startDate === '' || $startDate <= $today) && ($endDate === '' || $endDate >= $today);
-            if ($isActive || $includeInactive) $names[$column] = $fullName;
+            if (!empty($employee['active']) || $includeInactive) $names[$column] = $fullName;
             else unset($names[$column]);
         }
     } catch (Throwable $e) {
@@ -55,6 +51,25 @@ function patient_staff_names(bool $includeInactive = false): array
     }
 
     return $names;
+}
+
+/**
+ * Randevu formlarında seçilebilecek tüm aktif çalışan adlarını döndürür.
+ * Hasta kartlarındaki eski sabit personel sütunlarından bağımsızdır.
+ */
+function active_employee_names(): array
+{
+    ensure_employee_active_schema();
+
+    try {
+        $rows = db()->query('SELECT full_name FROM employees WHERE active=1 ORDER BY start_date DESC,id DESC')->fetchAll();
+        return array_values(array_filter(array_map(
+            static fn(array $employee): string => trim((string)($employee['full_name'] ?? '')),
+            $rows
+        )));
+    } catch (Throwable $e) {
+        return array_values(patient_staff_names());
+    }
 }
 
 function ensure_patient_staff_yeliz_schema(): void
