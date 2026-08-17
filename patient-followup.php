@@ -751,7 +751,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'service_status'=>trim((string)($_POST['result_name'] ?? 'Beklemede')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? 'Beklemede')),
         'performed_action'=>trim((string)($_POST['action_name'] ?? '')),
         'action_date'=>(string)($_POST['action_date'] ?? ''),
-        'opened_by'=>(string)($_SESSION['user']['name'] ?? ''),
+        'opened_by'=>$postedEditId
+            ? (trim((string)($serviceCard['opened_by'] ?? '')) ?: (string)($_SESSION['user']['name'] ?? ''))
+            : (string)($_SESSION['user']['name'] ?? ''),
         'branch_name'=>$branchNamesById[(int)($_POST['branch_id'] ?? 0)] ?? '',
         'appointment_date'=>$appointmentDate,
         'start_time'=>(string)($_POST['start_time'] ?? ''), 'end_time'=>(string)($_POST['end_time'] ?? ''),

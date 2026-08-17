@@ -1,28 +1,9 @@
 <?php
 declare(strict_types=1);
 
-const REPORT_STATUSES = ['Rapor getirdi', 'Rapor getirecek', 'Rapor gerekmedi', 'Özel reçete getirdi', 'Özel reçete getirecek'];
+require_once __DIR__ . '/patient-creator-schema.php';
 
-function ensure_patient_creator_schema(): void
-{
-    static $done = false;
-    if ($done) return;
-    $done = true;
-
-    $pdo = db();
-    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-        $columns = array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name');
-        if (!in_array('created_by', $columns, true)) {
-            $pdo->exec('ALTER TABLE patients ADD COLUMN created_by INTEGER NULL');
-        }
-        return;
-    }
-
-    if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'created_by'")->fetch()) {
-        $pdo->exec('ALTER TABLE patients ADD COLUMN created_by INT UNSIGNED NULL');
-        $pdo->exec('ALTER TABLE patients ADD KEY idx_patients_created_by (created_by)');
-    }
-}
+const REPORT_STATUSES = ['Rapor getirdi', 'Rapor getirecek', 'Rapor gerekmedi', 'Rapor hakkı yok', 'Rapor ödemesi yapıldı', 'Özel reçete getirdi', 'Özel reçete getirecek'];
 
 function ensure_patient_report_schema(): void
 {
@@ -35,16 +16,23 @@ function ensure_patient_report_schema(): void
     if ($driver === 'sqlite') {
         $columns = array_column($pdo->query('PRAGMA table_info(patients)')->fetchAll(), 'name');
         $tableSql = (string)$pdo->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'patients'")->fetchColumn();
-        if (in_array('report_status', $columns, true) && !str_contains($tableSql, "'Özel reçete getirecek'")) {
+        $reportSchemaCurrent = in_array('report_status', $columns, true)
+            && str_contains($tableSql, "'Rapor hakkı yok'")
+            && str_contains($tableSql, "'Rapor ödemesi yapıldı'");
+        if ($reportSchemaCurrent) return;
+        if (in_array('report_status', $columns, true)) {
             $pdo->exec('ALTER TABLE patients RENAME COLUMN report_status TO report_status_legacy');
             $columns = array_values(array_diff($columns, ['report_status']));
             $columns[] = 'report_status_legacy';
         }
         if (!in_array('report_status', $columns, true)) {
-            $pdo->exec("ALTER TABLE patients ADD COLUMN report_status TEXT NULL CHECK(report_status IN ('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel reçete getirdi','Özel reçete getirecek'))");
+            $pdo->exec("ALTER TABLE patients ADD COLUMN report_status TEXT NULL CHECK(report_status IN ('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Rapor hakkı yok','Rapor ödemesi yapıldı','Özel reçete getirdi','Özel reçete getirecek'))");
         }
     } else {
-        if (!$pdo->query("SHOW COLUMNS FROM patients LIKE 'report_status'")->fetch()) {
+        $reportStatusColumn = $pdo->query("SHOW COLUMNS FROM patients LIKE 'report_status'")->fetch();
+        $expectedType = "enum('rapor getirdi','rapor getirecek','rapor gerekmedi','rapor hakkı yok','rapor ödemesi yapıldı','özel reçete getirdi','özel reçete getirecek')";
+        if ($reportStatusColumn && mb_strtolower((string)$reportStatusColumn['Type'], 'UTF-8') === $expectedType) return;
+        if (!$reportStatusColumn) {
             $pdo->exec("ALTER TABLE patients ADD COLUMN report_status VARCHAR(190) NULL AFTER report_info");
         } else {
             // Canlı veritabanında eski veya beklenmeyen değerler bulunabilir. ENUM'a
@@ -59,6 +47,8 @@ function ensure_patient_report_schema(): void
         WHEN {$legacyColumn} = 'Var' OR {$legacyColumn} = 'Rapor getirdi' THEN 'Rapor getirdi'
         WHEN {$legacyColumn} = 'Yok' OR {$legacyColumn} = 'Rapor gerekmedi' THEN 'Rapor gerekmedi'
         WHEN {$legacyColumn} = 'Rapor getirecek' THEN 'Rapor getirecek'
+        WHEN {$legacyColumn} = 'Rapor hakkı yok' THEN 'Rapor hakkı yok'
+        WHEN {$legacyColumn} = 'Rapor ödemesi yapıldı' THEN 'Rapor ödemesi yapıldı'
         WHEN {$legacyColumn} = 'Özel Reçete' OR {$legacyColumn} = 'Özel reçete getirdi' THEN 'Özel reçete getirdi'
         WHEN {$legacyColumn} = 'Özel reçete getirecek' THEN 'Özel reçete getirecek'
         WHEN TRIM(COALESCE(report_info, '')) = '' THEN 'Rapor getirdi'
@@ -69,6 +59,8 @@ function ensure_patient_report_schema(): void
         WHEN UPPER(COALESCE(report_info, '')) LIKE '%TESTİ VAR%' THEN 'Rapor getirdi'
         WHEN UPPER(COALESCE(report_info, '')) LIKE '%RAPOR GELDİ%' THEN 'Rapor getirdi'
         WHEN UPPER(COALESCE(report_info, '')) LIKE '%RAPOR GETİRDİ%' THEN 'Rapor getirdi'
+        WHEN UPPER(COALESCE(report_info, '')) LIKE '%RAPOR ÖDEMESİ%'
+          OR UPPER(COALESCE(report_info, '')) LIKE '%RAPOR ODEMESI%' THEN 'Rapor ödemesi yapıldı'
         WHEN UPPER(COALESCE(report_info, '')) LIKE '%GETİRECEK%'
           OR UPPER(COALESCE(report_info, '')) LIKE '%ÇIKARILACAK%'
           OR UPPER(COALESCE(report_info, '')) LIKE '%ÇIKARACAK%' THEN 'Rapor getirecek'
@@ -77,8 +69,8 @@ function ensure_patient_report_schema(): void
         WHEN UPPER(COALESCE(report_info, '')) LIKE '%RAPOR YOK%'
           OR UPPER(COALESCE(report_info, '')) LIKE '%RAPORU YOK%'
           OR UPPER(COALESCE(report_info, '')) LIKE '%GEREKMED%'
-          OR UPPER(COALESCE(report_info, '')) LIKE '%KULLANMAYACAK%'
-          OR UPPER(COALESCE(report_info, '')) LIKE '%HAKKI YOK%' THEN 'Rapor gerekmedi'
+          OR UPPER(COALESCE(report_info, '')) LIKE '%KULLANMAYACAK%' THEN 'Rapor gerekmedi'
+        WHEN UPPER(COALESCE(report_info, '')) LIKE '%HAKKI YOK%' THEN 'Rapor hakkı yok'
         ELSE report_status END
         WHERE report_status IS NULL OR report_status = ''");
 
@@ -88,8 +80,8 @@ function ensure_patient_report_schema(): void
         $pdo->exec("UPDATE patients SET report_status = 'Özel reçete getirdi' WHERE report_status = 'Özel Reçete'");
         $pdo->exec("UPDATE patients SET report_status = NULL
             WHERE report_status IS NOT NULL
-              AND report_status NOT IN ('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel reçete getirdi','Özel reçete getirecek')");
-        $pdo->exec("ALTER TABLE patients MODIFY COLUMN report_status ENUM('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Özel reçete getirdi','Özel reçete getirecek') NULL");
+              AND report_status NOT IN ('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Rapor hakkı yok','Rapor ödemesi yapıldı','Özel reçete getirdi','Özel reçete getirecek')");
+        $pdo->exec("ALTER TABLE patients MODIFY COLUMN report_status ENUM('Rapor getirdi','Rapor getirecek','Rapor gerekmedi','Rapor hakkı yok','Rapor ödemesi yapıldı','Özel reçete getirdi','Özel reçete getirecek') NULL");
     } elseif ($legacyColumn === 'report_status_legacy') {
         try { $pdo->exec('ALTER TABLE patients DROP COLUMN report_status_legacy'); }
         catch (Throwable $e) { /* Eski SQLite sürümlerinde kolon saklanır; uygulama kullanmaz. */ }

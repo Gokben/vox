@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/config.php'; require_login(); require __DIR__ . '/patient-report-schema.php'; require __DIR__ . '/patient-layout.php';
+require __DIR__ . '/config.php'; require_login(); require __DIR__ . '/patient-creator-schema.php'; require __DIR__ . '/patient-layout.php';
 $pdo = db();
 $currentYear = (int)date('Y');
 $isCompanyManager = is_admin();

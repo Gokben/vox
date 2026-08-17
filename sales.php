@@ -8,6 +8,8 @@ require __DIR__ . '/patient-layout.php';
 $stocks = [];
 $stockTypes = [];
 $salesByStock = [];
+$isCompanyManager = is_admin();
+$currentUserName = trim((string)($_SESSION['user']['name'] ?? ''));
 $selectedStockType = trim((string)($_GET['stock_type'] ?? ''));
 $stockSaleKey = static fn(string $stockType, string $brand, string $model): string => mb_strtolower(
     trim($stockType) . '|' . trim($brand) . '|' . trim($model),
@@ -15,11 +17,20 @@ $stockSaleKey = static fn(string $stockType, string $brand, string $model): stri
 );
 try {
     $pdo = db();
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_patient_services_sales_owner ON patient_services(service_name,opened_by,service_date,id)');
+    } elseif (!$pdo->query("SHOW INDEX FROM patient_services WHERE Key_name='idx_patient_services_sales_owner'")->fetch()) {
+        $pdo->exec('ALTER TABLE patient_services ADD KEY idx_patient_services_sales_owner (service_name(40),opened_by(120),service_date(10),id)');
+    }
     $sql = "SELECT s.id,s.stock_code,s.stock_name,s.brand,s.model,s.stock_type,s.image_path,COALESCE(q.stock_quantity,0) AS stock_quantity FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>0";
     $sql .= ' ORDER BY s.stock_type,s.brand,s.model,s.stock_name';
     $statement = $pdo->query($sql);
     $stocks = $statement->fetchAll();
-    $salesStatement = $pdo->query("SELECT id,service_date,sales_details FROM patient_services WHERE service_name='Satış' AND COALESCE(sales_details,'')<>'' ORDER BY service_date DESC,id DESC");
+    $salesSql = "SELECT id,service_date,sales_details FROM patient_services WHERE service_name='Satış' AND COALESCE(sales_details,'')<>''";
+    if (!$isCompanyManager) $salesSql .= $currentUserName === '' ? ' AND 1=0' : ' AND opened_by=?';
+    $salesSql .= ' ORDER BY service_date DESC,id DESC';
+    $salesStatement = $pdo->prepare($salesSql);
+    $salesStatement->execute($isCompanyManager || $currentUserName === '' ? [] : [$currentUserName]);
     foreach ($salesStatement->fetchAll() as $sale) {
         $details = json_decode((string)$sale['sales_details'], true);
         if (!is_array($details)) continue;

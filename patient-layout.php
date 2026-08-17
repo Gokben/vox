@@ -469,7 +469,7 @@ if(settingsPages[currentSettingsPage]){
 <script>
 (()=>{
   const setupNewRecordAccordion=card=>{
-    if(card.dataset.newRecordAccordionReady)return;
+    if(card.dataset.newRecordAccordionReady||card.hasAttribute('data-static-form'))return;
     const header=card.querySelector(':scope > header');
     const form=card.querySelector(':scope > form');
     const title=header?.querySelector('h1,h2');
