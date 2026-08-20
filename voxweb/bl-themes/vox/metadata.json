@@ -1,0 +1,10 @@
+{
+  "author": "Vox İşitme",
+  "email": "bilgi@voxisitme.com",
+  "website": "https://voxisitme.com",
+  "version": "1.0.0",
+  "releaseDate": "2026-08-21",
+  "license": "MIT",
+  "compatible": "3.22",
+  "notes": "Vox İşitme için hafif, erişilebilir ve responsive özel tema"
+}
