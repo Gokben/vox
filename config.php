@@ -6,7 +6,7 @@ $configuredBasePath = getenv('APP_BASE_PATH');
 $host = $_SERVER['HTTP_HOST'] ?? '';
 $isLocalHost = str_starts_with($host, '127.0.0.1') || str_starts_with($host, 'localhost');
 $isLocalEnvironment = getenv('APP_ENV') === 'local' || $isLocalHost;
-define('BASE_PATH', $configuredBasePath !== false ? $configuredBasePath : ($isLocalHost ? '' : '/vox'));
+define('BASE_PATH', $configuredBasePath !== false ? $configuredBasePath : ($isLocalHost ? '' : '/crm'));
 
 $privateConfig = __DIR__ . '/config.local.php';
 if (is_file($privateConfig)) require $privateConfig;

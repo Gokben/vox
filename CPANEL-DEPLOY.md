@@ -1,23 +1,41 @@
-# cPanel Git Version Control ile yayın
+# Vox CRM — voxisitme.com kurulumu
 
-Hedef adres: `https://krpsoft.com.tr/lf`
+Hedef adres: `https://voxisitme.com/crm`
 
-## Güvenli dağıtım davranışı
+## Kod dağıtımı
 
-`.cpanel.yml` dosyası uygulamayı `$HOME/public_html/lf/` klasörüne kopyalar. Şu dosyalara dokunmaz:
+`.cpanel.yml` uygulama dosyalarını `$HOME/public_html/crm/` klasörüne kopyalar. CRM ile ilgisi olmayan `voxweb` klasörü dağıtıma dahil edilmez.
 
-- `config.php`
-- mevcut veritabanı ve veriler
-- SQL ve yerel kurulum dosyaları
+1. Odeaweb cPanel > Git Version Control bölümünde `https://github.com/Gokben/vox.git` repository'sini klonlayın.
+2. Dal olarak `main` kullanın.
+3. `Update from Remote`, ardından `Deploy HEAD Commit` çalıştırın.
 
-Dağıtım komutunda silme seçeneği yoktur; sunucudaki ek dosyalar otomatik silinmez.
+## Özel veritabanı ayarı
 
-## İlk kurulum
+`public_html/crm/config.local.php` dosyasını sunucuda oluşturun. Bu dosya Git tarafından takip edilmez:
 
-1. cPanel Git Version Control içinde GitHub depo adresini klonlayın.
-2. Repository ekranından `Update from Remote`, ardından `Deploy HEAD Commit` çalıştırın.
-3. `config.example.php` içeriğini örnek alarak `public_html/lf/config.php` dosyasını elle oluşturun.
-4. phpMyAdmin ile önce `database.sql`, ardından `database-item-definitions.sql` dosyasını seçilen boş veritabanına içe aktarın.
-5. Yönetici şifre özetini yerelde üretip `users` tablosuna ekleyin.
+```php
+<?php
+define('LOCAL_DB_DRIVER', 'mysql');
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'CPANEL_VERITABANI_ADI');
+define('DB_USER', 'CPANEL_VERITABANI_KULLANICISI');
+define('DB_PASS', 'GUCLU_VERITABANI_SIFRESI');
+```
 
-Canlı ve dolu bir veritabanında `database.sql` dosyasını tekrar çalıştırmayın. Şema değişiklikleri ayrıca hazırlanmış migration dosyalarıyla uygulanmalıdır.
+## Mevcut verileri taşıma
+
+1. Eski `krpsoft.com.tr/vox` kurulumunun kullandığı MySQL veritabanını phpMyAdmin ile dışa aktarın.
+2. Odeaweb'de boş bir MySQL veritabanı ve kullanıcı oluşturup kullanıcıya tüm yetkileri verin.
+3. Dışa aktarılan SQL dosyasını yeni veritabanına içe aktarın.
+4. Eski sunucudaki `assets/uploads/` içeriğini yeni sunucuda `public_html/crm/assets/uploads/` altına kopyalayın.
+5. Giriş ve örnek kayıtları doğrulamadan eski kurulumu kapatmayın.
+
+Canlı ve dolu veritabanında `database.sql` veya diğer toplu SQL dosyalarını çalıştırmayın; mevcut veri aktarımında yalnızca eski sistemden alınan tam dışa aktarımı kullanın.
+
+## Gereksinimler
+
+- PHP 8.1 veya üzeri
+- PDO MySQL ve Fileinfo uzantıları
+- MySQL 5.7+ veya MariaDB 10.4+
+- `public_html/crm/assets/uploads/` için PHP yazma izni
