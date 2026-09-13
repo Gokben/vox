@@ -10,6 +10,7 @@ require __DIR__ . '/complaint-bootstrap.php';
 require __DIR__ . '/anamnesis-bootstrap.php';
 require __DIR__ . '/cash-bootstrap.php';
 require_once __DIR__ . '/cash-payment-records.php';
+require_once __DIR__ . '/sale-consumables.php';
 require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/employee-patient-link.php';
 require __DIR__ . '/patient-layout.php';
@@ -894,6 +895,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $values['sales_details'] = null;
         }
     }
+    if ($postedServiceName === 'Satış') {
+        try {
+            $consumableLines = sale_consumable_lines(json_decode((string)$values['sales_details'], true) ?: []);
+            $checkConsumable = $pdo->prepare("SELECT id FROM stock_cards WHERE id=? AND stock_type IN ('Sarf Malzeme','Pil')");
+            foreach ($consumableLines as $line) {
+                $checkConsumable->execute([$line['stock_id']]);
+                if (!$checkConsumable->fetchColumn()) throw new RuntimeException('Sarf malzeme stok kartı bulunamadı.');
+            }
+        } catch (RuntimeException $error) {
+            $_SESSION['service_integrity_error'] = $error->getMessage();
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_sales_details=1' . $serviceNavigationContext);
+        }
+    }
     if ($values['record_no'] === '' || preg_match('/^HK\d+$/', $values['record_no'])) $values['record_no'] = next_service_record_no($pdo);
     $savedServiceId = $postedEditId;
     if ($postedEditId) {
@@ -941,11 +955,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $addDeviceExit('İşitme Cihazı', trim((string)($salesDetails["sales_device_{$deviceNumber}_brand"] ?? '')), trim((string)($salesDetails["sales_device_{$deviceNumber}_model"] ?? '')), trim((string)($salesDetails["sales_device_{$deviceNumber}_serial"] ?? '')));
             }
             $addDeviceExit('Şarj Cihazı', trim((string)($salesDetails['sales_charger_brand'] ?? '')), trim((string)($salesDetails['sales_charger_model'] ?? '')), trim((string)($salesDetails['sales_charger_serial'] ?? '')));
-            $consumableStockId = filter_var($salesDetails['sales_consumable_stock_id'] ?? null, FILTER_VALIDATE_INT);
-            $consumableQuantity = max(0, (int)($salesDetails['sales_consumable_quantity'] ?? 0));
-            if ($consumableStockId && $consumableQuantity > 0) {
-                $consumableDescription = $description . (trim((string)($salesDetails['sales_consumable_promotion'] ?? '')) === 'Evet' ? ' — Promosyonlu sarf malzeme' : '');
-                $addExit->execute([$consumableStockId, 'Çıkış', $consumableQuantity, $movementDate, $consumableDescription, $accountId, $invoiceNo ?: null, null, $savedServiceId]);
+            foreach (sale_consumable_lines($salesDetails) as $line) {
+                $consumableDescription = $description . ($line['promotion'] ? ' — Promosyonlu sarf malzeme' : '');
+                $addExit->execute([$line['stock_id'], 'Çıkış', $line['quantity'], $movementDate, $consumableDescription, $accountId, $invoiceNo ?: null, null, $savedServiceId]);
             }
     }
     if ((string)($_POST['ajax'] ?? '') === 'repair_fee_prepare') {
@@ -996,7 +1008,16 @@ if (!is_array($incomeValidationDraft)) $incomeValidationDraft = [];
 unset($_SESSION['income_validation_error']);
 unset($_SESSION['income_validation_draft']);
 unset($_SESSION['service_integrity_error']);
+// Keep already sold consumables selectable when their remaining stock is zero.
+$savedConsumableDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true) ?: [];
+try { $savedConsumableIds = array_column(sale_consumable_lines($savedConsumableDetails), 'stock_id'); } catch (RuntimeException $error) { $savedConsumableIds = []; }
+$missingConsumableIds = array_values(array_diff(array_unique($savedConsumableIds), array_column($consumableStocks, 'id')));
+if ($missingConsumableIds) {
+    $query = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s WHERE s.stock_type IN ('Sarf Malzeme','Pil') AND s.id IN (" . implode(',', array_fill(0,count($missingConsumableIds),'?')) . ")");
+    $query->execute($missingConsumableIds);$consumableStocks=array_merge($consumableStocks,$query->fetchAll());
+}
 patient_header($salesWindow ? 'Satış Kartı - ' . (string)$patient['full_name'] : 'Hizmetler', 'patients');
+if ($showForm) echo '<script src="' . e(url('assets/sale-device-payment-guard.js')) . '"></script>';
 if ($showForm) echo '<script src="' . e(url('assets/sale-payment-stages.js?v=' . filemtime(__DIR__ . '/assets/sale-payment-stages.js'))) . '" data-endpoint="' . e(url('patient-followup.php?id=' . $id)) . '" data-edit-id="' . $editId . '"></script>';
 if (!$showForm): ?>
 <style>
@@ -1988,7 +2009,7 @@ const initializeSalesScreen=()=>{
   const hasSecondHearingDevice=()=>!!detailsModal?.querySelector('#hearing-device-details-2:not([hidden])');
   let totalDiscountModeActive=false;
   const syncTotalDiscountMode=()=>{const enabled=hasSecondHearingDevice(),activeProduct=detailsModal?.dataset.productType||'',showTotalDiscount=enabled&&!['Sarf Malzeme','Şarj Cihazı'].includes(activeProduct),label=totalDiscountInput?.closest('label'),deviceDiscountFields=[...detailsModal?.querySelectorAll('[name="sales_device_discount_rate"],[name="sales_device_2_discount_rate"]')||[]];if(detailsModal)detailsModal.dataset.salesLayout=enabled?'dual-hearing':'single-hearing';if(enabled!==totalDiscountModeActive){if(enabled){const previousDiscount=deviceDiscountFields.map(field=>field.value.trim()).find(Boolean)||'';if(totalDiscountInput&&!totalDiscountInput.value.trim())totalDiscountInput.value=previousDiscount;deviceDiscountFields.forEach(field=>{field.value='';const netPriceField=detailsModal?.querySelector(`[name="${field.name.replace(/_discount_rate$/,'_net_price')}"]`),listPrice=parseTurkishMoney(netPriceField?.dataset.listPrice||netPriceField?.value),sgkField=detailsModal?.querySelector(`[name="${field.name.replace(/_discount_rate$/,'_sgk')}"]`),sgk=parseTurkishMoney(sgkField?.value)||0;if(netPriceField&&listPrice!==null)netPriceField.value=formatTurkishMoney(Math.max(0,listPrice-sgk));});}else if(totalDiscountInput)totalDiscountInput.value='';totalDiscountModeActive=enabled;}if(label){label.hidden=!showTotalDiscount;label.style.cssText=showTotalDiscount?'display:flex!important;flex-direction:column;gap:7px':'display:none!important';}deviceDiscountFields.forEach(field=>{const fieldLabel=field.closest('label');if(fieldLabel){field.disabled=enabled;fieldLabel.hidden=false;fieldLabel.style.cssText=enabled?'display:none!important':'display:flex!important;visibility:visible;pointer-events:auto;flex-direction:column;gap:7px';}});};
-  const updateTotalAmount=()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]');if(!totalField)return;syncTotalDiscountMode();const netFields=['sales_device_net_price','sales_device_2_net_price','sales_charger_net_price'],sgkFields=['sales_device_sgk','sales_device_2_sgk','sales_charger_sgk'];let total=netFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);const totalSgk=sgkFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);if(totalSgkInput)totalSgkInput.value=totalSgk>0?formatTurkishMoney(totalSgk):'';const consumablePrice=parseTurkishMoney(detailsModal?.querySelector('[name="sales_consumable_price"]')?.value)||0,consumableQuantity=Number(detailsModal?.querySelector('[name="sales_consumable_quantity"]')?.value)||0;total+=consumablePrice*consumableQuantity;if(hasSecondHearingDevice()){const raw=totalDiscountInput?.value.trim()||'',discount=parseTurkishMoney(raw);if(discount!==null&&raw!=='')total=Math.max(0,raw.includes('%')?total*(1-discount/100):total-discount);}totalField.value=total>0?formatTurkishMoney(total):'';if(salesGrandTotal)salesGrandTotal.textContent='Toplam Satış: '+formatTurkishMoney(totalSgk+total);const paymentType=detailsModal?.querySelector('[name="sales_payment_type"]'),paymentLocked=<?=json_encode($savedCashRecord !== [])?>;if(paymentType){if(total<=0)paymentType.value='';paymentType.disabled=paymentLocked||total<=0;paymentType.title=paymentLocked?'Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.':(total<=0?'Ürün ve toplam tutar olmadan ödeme şekli seçilemez.':'');}};
+  const updateTotalAmount=()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]');if(!totalField)return;syncTotalDiscountMode();const netFields=['sales_device_net_price','sales_device_2_net_price','sales_charger_net_price'],sgkFields=['sales_device_sgk','sales_device_2_sgk','sales_charger_sgk'];let total=netFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);const totalSgk=sgkFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);if(totalSgkInput)totalSgkInput.value=totalSgk>0?formatTurkishMoney(totalSgk):'';const consumablePrice=parseTurkishMoney(detailsModal?.querySelector('[name="sales_consumable_price"]')?.value)||0,consumableQuantity=Number(detailsModal?.querySelector('[name="sales_consumable_quantity"]')?.value)||0;const consumableTotal=detailsModal?.querySelector('[data-consumable-inline-total]')?.value;total+=detailsModal?.querySelector('[name="sales_consumable_stock_id"]')?.value?(consumableTotal?(parseTurkishMoney(consumableTotal)||0):consumablePrice*consumableQuantity):0;if(hasSecondHearingDevice()){const raw=totalDiscountInput?.value.trim()||'',discount=parseTurkishMoney(raw);if(discount!==null&&raw!=='')total=Math.max(0,raw.includes('%')?total*(1-discount/100):total-discount);}totalField.value=total>0?formatTurkishMoney(total):'';if(salesGrandTotal)salesGrandTotal.textContent='Toplam Satış: '+formatTurkishMoney(totalSgk+total);const paymentType=detailsModal?.querySelector('[name="sales_payment_type"]'),paymentLocked=<?=json_encode($savedCashRecord !== [])?>;if(paymentType){if(total<=0)paymentType.value='';paymentType.disabled=paymentLocked||total<=0;paymentType.title=paymentLocked?'Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.':(total<=0?'Ürün ve toplam tutar olmadan ödeme şekli seçilemez.':'');}};
   totalDiscountInput?.addEventListener('input',updateTotalAmount);
   totalDiscountInput?.addEventListener('focusout',()=>{const raw=totalDiscountInput.value.trim();if(raw===''||raw.includes('%'))return;const amount=parseTurkishMoney(raw);if(amount!==null)totalDiscountInput.value=formatTurkishMoney(amount);updateTotalAmount();});
   const salesDetailsBody=detailsModal?.querySelector('.repair-body');if(salesDetailsBody)new MutationObserver(()=>updateTotalAmount()).observe(salesDetailsBody,{childList:true});
@@ -2011,12 +2032,46 @@ const initializeSalesScreen=()=>{
   renameFieldLabel(chargerModelSelect,'Model');renameFieldLabel(chargerSerialInput,'Seri No');
   const consumableDetails=document.createElement('div');
   consumableDetails.id='consumable-details';consumableDetails.hidden=true;consumableDetails.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px';
-  consumableDetails.innerHTML='<label>Sarf Malzeme<select name="sales_consumable_stock_id"><option value="">Sarf malzeme veya pil seçiniz</option></select></label><label>Promosyon<select name="sales_consumable_promotion"><option>Hayır</option><option>Evet</option></select></label><label>Adet<input type="number" min="1" step="1" name="sales_consumable_quantity" value="1"></label><label>Birim<input name="sales_consumable_unit" value="Adet" readonly></label><label>Satış Fiyatı<input inputmode="decimal" name="sales_consumable_price" readonly></label><input type="hidden" name="sales_consumable_unit_description"><input type="hidden" data-consumable-inline-total>';
+  consumableDetails.innerHTML='<label>Sarf Malzeme<select name="sales_consumable_stock_id"><option value="">Sarf malzeme veya pil seçiniz</option></select></label><label>Promosyon<select name="sales_consumable_promotion"><option>Hayır</option><option>Evet</option></select></label><label>Adet<input type="number" min="1" step="1" name="sales_consumable_quantity" value="1"></label><label>Birim<input name="sales_consumable_unit" value="Adet" readonly></label><label>Satış Fiyatı<input inputmode="decimal" name="sales_consumable_price" readonly></label><input type="hidden" name="sales_consumable_unit_description"><input type="hidden" data-consumable-inline-total><input type="hidden" name="sales_consumable_items">';
   consumableDetails.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');
   detailsModal?.querySelector('.repair-body')?.prepend(consumableDetails);
   const consumableSelect=consumableDetails.querySelector('[name="sales_consumable_stock_id"]'),consumableQuantityInput=consumableDetails.querySelector('[name="sales_consumable_quantity"]'),consumablePriceInput=consumableDetails.querySelector('[name="sales_consumable_price"]'),consumablePromotionInput=consumableDetails.querySelector('[name="sales_consumable_promotion"]'),consumableUnitInput=consumableDetails.querySelector('[name="sales_consumable_unit"]'),consumableDescriptionInput=consumableDetails.querySelector('[name="sales_consumable_unit_description"]'),consumableInlineTotal=consumableDetails.querySelector('[data-consumable-inline-total]');
   consumableStocks.forEach(stock=>consumableSelect?.add(new Option(`[${stock.stock_type}] ${stock.stock_code} — ${stock.stock_name}`,stock.id)));
-  const syncConsumablePrice=()=>{const stock=consumableStocks.find(item=>String(item.id)===String(consumableSelect?.value||'')),isPromotion=consumablePromotionInput?.value==='Evet',price=isPromotion?formatTurkishMoney(0):(listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0)),quantity=Math.max(1,Number(consumableQuantityInput?.value)||1),amount=parseTurkishMoney(price)||0;if(consumablePriceInput)consumablePriceInput.value=price;if(consumableUnitInput)consumableUnitInput.value=stock?.unit||'Adet';if(consumableDescriptionInput)consumableDescriptionInput.value=stock?`${stock.stock_code} — ${stock.stock_name}`:'';if(consumableInlineTotal)consumableInlineTotal.value=formatTurkishMoney(amount*quantity);updateTotalAmount();};
+  const consumableItemsInput=consumableDetails.querySelector('[name="sales_consumable_items"]');
+  const additionalConsumables=document.createElement('div');additionalConsumables.dataset.consumableRows='1';
+  const consumableRowsStyle=document.createElement('style');
+  consumableRowsStyle.textContent='#consumable-details [data-consumable-rows] label{display:flex;flex-direction:column;gap:2px;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important;color:#26384a}';document.head.append(consumableRowsStyle);
+  additionalConsumables.style.cssText='grid-column:1/-1!important;display:grid;gap:6px';consumableDetails.append(additionalConsumables);
+  const syncConsumablePrice=()=>{
+    const quantity=Math.max(1,Math.min(1000,Number(consumableQuantityInput.value)||1));
+    consumableQuantityInput.max='1000';
+    let previous=[];try{previous=JSON.parse(consumableItemsInput.value||'[]');}catch(_){}
+    const rows=Array.from({length:quantity},(_,index)=>{
+      const stockId=index===0?consumableSelect.value:(previous[index]?.stock_id||consumableSelect.value);
+      const stock=consumableStocks.find(item=>String(item.id)===String(stockId));
+      const price=consumablePromotionInput.value==='Evet'?formatTurkishMoney(0):(listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0));
+      return {stock_id:String(stockId||''),price,unit:stock?.unit||'Adet'};
+    });
+    consumableItemsInput.value=JSON.stringify(rows);
+    consumablePriceInput.value=rows[0].price;consumableUnitInput.value=rows[0].unit;
+    consumableDescriptionInput.value=consumableSelect.selectedOptions[0]?.textContent||'';
+    consumableInlineTotal.value=formatTurkishMoney(rows.reduce((total,row)=>total+(parseTurkishMoney(row.price)||0),0));
+    while(additionalConsumables.children.length>quantity-1)additionalConsumables.lastElementChild.remove();
+    rows.slice(1).forEach((row,offset)=>{
+      const index=offset+1;let line=additionalConsumables.children[offset];
+      if(!line){
+        line=document.createElement('div');line.style.cssText='display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;border-top:1px solid #a9c7dd;padding-top:6px';
+        const label=document.createElement('label');label.textContent=(index+1)+'. Sarf Malzeme';
+        const select=document.createElement('select');select.innerHTML=consumableSelect.innerHTML;select.setAttribute('aria-label',(index+1)+'. Sarf Malzeme');label.append(select);
+        const unit=document.createElement('label');unit.textContent='Birim';const unitInput=document.createElement('input');unitInput.readOnly=true;unit.append(unitInput);
+        const price=document.createElement('label');price.textContent='Satış Fiyatı';const priceInput=document.createElement('input');priceInput.readOnly=true;price.append(priceInput);
+        line.append(label,unit,price);additionalConsumables.append(line);
+        select.addEventListener('change',()=>{const items=JSON.parse(consumableItemsInput.value);items[index].stock_id=select.value;consumableItemsInput.value=JSON.stringify(items);syncConsumablePrice();});
+      }
+      line.querySelector('select').value=row.stock_id;const inputs=line.querySelectorAll('input');inputs[0].value=row.unit;inputs[1].value=row.price;
+    });
+    updateTotalAmount();
+  };
   consumableSelect?.addEventListener('change',syncConsumablePrice);consumableQuantityInput?.addEventListener('input',syncConsumablePrice);consumablePromotionInput?.addEventListener('change',syncConsumablePrice);
   const toggleConsumableDetails=show=>{consumableDetails.hidden=!show;consumableDetails.style.display=show?'grid':'none';};
   const consumableModal=document.createElement('div');
@@ -2275,7 +2330,7 @@ const initializeSalesScreen=()=>{
   const addProductCancel=container=>{const isDevice=container.classList.contains('sales-device-details');container.classList.remove('has-product-delete');container.querySelectorAll('.sales-product-cancel').forEach(button=>button.remove());container.querySelectorAll('.sales-serial-delete-row').forEach(row=>row.replaceWith(...row.childNodes));if(isDevice&&!container.querySelector('.sales-product-section-heading')){const heading=document.createElement('strong');heading.className='sales-product-section-heading';heading.textContent=container.id==='hearing-device-details-2'?'İşitme Cihazı 2':'İşitme Cihazı 1';container.prepend(heading);}return container;};
   detailsModal?.addEventListener('change',event=>{if(event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)refreshProductDeleteButtons();});
   let consumableCancel=null;
-  const showConsumableDetails=()=>{chargerDetails?.after(consumableDetails);toggleConsumableDetails(true);consumableCancel??=addProductCancel(consumableDetails,['sales_consumable_stock_id','sales_consumable_quantity','sales_consumable_price'],()=>{toggleConsumableDetails(false);if(detailsModal?.dataset.productType==='Sarf Malzeme')setProductType('');});};
+  const showConsumableDetails=()=>{chargerDetails?.after(consumableDetails);toggleConsumableDetails(true);consumableCancel??=addProductCancel(consumableDetails,['sales_consumable_stock_id','sales_consumable_quantity','sales_consumable_price','sales_consumable_items'],()=>{toggleConsumableDetails(false);if(detailsModal?.dataset.productType==='Sarf Malzeme')setProductType('');});};
   let firstDeviceCancel=null;
   const showFirstDevice=()=>{if(!deviceDetails)return;toggleDeviceDetails(true);firstDeviceCancel??=addProductCancel(deviceDetails,['sales_brand','sales_model','sales_device_serial','sales_device_sgk','sales_device_discount_rate','sales_device_net_price'],()=>{toggleDeviceDetails(false);if(detailsModal?.dataset.productType==='İşitme Cihazı')setProductType('');});updateDeviceAddButton();};
   const addSecondDeviceButton=(()=>{if(!salesFooter)return null;const button=document.createElement('button');button.type='button';button.id='sales-add-second-hearing';button.dataset.salesProductAction='add-second-hearing';button.title='İkinci işitme cihazı ekle';button.setAttribute('aria-label','İkinci işitme cihazı ekle');button.textContent='+';salesFooter.insertBefore(button,salesFooter.querySelector('#sales-details-save'));return button;})();

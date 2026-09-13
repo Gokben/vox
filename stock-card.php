@@ -37,7 +37,7 @@ $hasProductCode = $sqlite
     : (bool)$pdo->query("SHOW COLUMNS FROM stock_cards LIKE 'product_code'")->fetch();
 if (!$hasProductCode) $pdo->exec('ALTER TABLE stock_cards ADD COLUMN product_code VARCHAR(100) NULL');
 
-$fields = ['stock_code','stock_name','brand','model','vat_rate','device_type','power_usage','product_color','product_code','min_stock','max_stock','stock_type'];
+$fields = ['stock_code','stock_name','brand','model','vat_rate','device_type','serial_no','power_usage','product_color','product_code','min_stock','max_stock','stock_type'];
 $brands = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY name')->fetchAll();
 $models = $pdo->query('SELECT MIN(id) AS id,brand_id,name,MAX(stock_type) AS stock_type FROM models GROUP BY brand_id,name ORDER BY name')->fetchAll();
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: 0;
@@ -62,11 +62,14 @@ if ($editing) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     foreach ($fields as $field) $form[$field] = trim((string)($_POST[$field] ?? ''));
-    $form['serial_no'] = $form['stock_code'];
+    $form['serial_no'] = $form['stock_type'] === 'Şarj Cihazı'
+        ? ($form['serial_no'] !== '' ? $form['serial_no'] : (string)($record['serial_no'] ?? $form['stock_code']))
+        : (string)($record['serial_no'] ?? $form['stock_code']);
     $form['min_stock'] = max(0, (int)$form['min_stock']);
     $form['max_stock'] = max(0, (int)$form['max_stock']);
     $form['vat_rate'] = in_array($form['vat_rate'], ['0', '10', '20'], true) ? $form['vat_rate'] : '';
     if ($form['stock_code'] === '' || $form['stock_name'] === '') $error = 'Stok kodu ve stok adı zorunludur.';
+    elseif (mb_strlen($form['serial_no']) > 190) $error = 'Seri no en fazla 190 karakter olabilir.';
     elseif (mb_strlen($form['product_code']) > 100) $error = 'Ürün kodu en fazla 100 karakter olabilir.';
     elseif ($form['vat_rate'] === '') $error = 'KDV oranı yalnız %0, %10 veya %20 olabilir.';
     elseif ($form['max_stock'] && $form['max_stock'] < $form['min_stock']) $error = 'Azami stok miktarı asgari stok miktarından düşük olamaz.';
@@ -96,13 +99,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare('UPDATE stock_cards SET ' . $assignments . ' WHERE id = ?')->execute($values);
                 $pdo->prepare('UPDATE stock_cards SET image_path = ? WHERE id = ?')->execute([$imagePath ?: null, $id]);
             } else {
-                $insertFields = [...$fields, 'serial_no', 'image_path'];
-                $values = array_map(static fn($field) => $form[$field], $fields); $values[] = $form['stock_code']; $values[] = $imagePath ?: null;
+                $insertFields = [...$fields, 'image_path'];
+                $values = array_map(static fn($field) => $form[$field], $fields); $values[] = $imagePath ?: null;
                 $pdo->prepare('INSERT INTO stock_cards (' . implode(',', $insertFields) . ') VALUES (' . implode(',', array_fill(0, count($insertFields), '?')) . ')')->execute($values);
             }
             if ($previousImagePath !== '' && $imagePath !== $previousImagePath && is_file(__DIR__ . '/' . $previousImagePath)) @unlink(__DIR__ . '/' . $previousImagePath);
             header('Location: ' . url('stocks.php?saved=1')); exit;
-        } catch (PDOException $exception) { $error = 'Stok kodu benzersiz olmalıdır.'; }
+        } catch (PDOException $exception) { $error = 'Stok kodu ve seri no benzersiz olmalıdır.'; }
     }
 }
 
@@ -116,7 +119,7 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
       <label>Stok Kodu *<input name="stock_code" value="<?=e($form['stock_code'])?>" required></label><label>Stok Adı *<input name="stock_name" value="<?=e($form['stock_name'])?>" placeholder="Cihazın tam ticari adı" required></label>
       <label>Marka<select name="brand" id="stock-brand"><option value="">Seçiniz</option><?php foreach ($brands as $brand): ?><option value="<?=e($brand['name'])?>" <?= $form['brand'] === $brand['name'] ? 'selected' : '' ?>><?=e($brand['name'])?></option><?php endforeach ?><?php if ($form['brand'] !== '' && !in_array($form['brand'], array_column($brands, 'name'), true)): ?><option value="<?=e($form['brand'])?>" selected><?=e($form['brand'])?></option><?php endif ?></select></label>
       <label>Model<select name="model" id="stock-model"><option value="">Model seçiniz</option><?php foreach ($models as $model): ?><option value="<?=e($model['name'])?>" data-brand-id="<?=e((string)$model['brand_id'])?>" <?= $form['model'] === $model['name'] ? 'selected' : '' ?>><?=e($model['name'])?></option><?php endforeach ?><?php if ($form['model'] !== '' && !in_array($form['model'], array_column($models, 'name'), true)): ?><option value="<?=e($form['model'])?>" selected><?=e($form['model'])?></option><?php endif ?></select></label><label>KDV Oranı<select name="vat_rate"><option value="0" <?=$form['vat_rate']==='0'?'selected':''?>>%0</option><option value="10" <?=$form['vat_rate']==='10'?'selected':''?>>%10</option><option value="20" <?=$form['vat_rate']==='20'?'selected':''?>>%20</option></select></label>
-      <label>Cihaz Tipi<select name="device_type"><option value="">Seçiniz</option><?php foreach (['Kulak arkası (BTE)','Kanal içi (CIC)','Kanal içi (ITC)','Kanal içi (CIC+TC)','Kanal İçi Alıcı RIC/RIE'] as $type): ?><option <?=$form['device_type'] === $type ? 'selected' : ''?>><?=e($type)?></option><?php endforeach ?></select></label><label>Güç Kullanımı<select name="power_usage"><option value="">Seçiniz</option><?php foreach (['Pilli','Şarjlı'] as $powerUsage): ?><option <?=$form['power_usage'] === $powerUsage ? 'selected' : ''?>><?=e($powerUsage)?></option><?php endforeach ?></select></label><label>Ürün Rengi<select name="product_color"><option value="">Seçiniz</option><?php foreach (['Bej','Siyah','Şampanya'] as $productColor): ?><option <?=$form['product_color'] === $productColor ? 'selected' : ''?>><?=e($productColor)?></option><?php endforeach ?></select></label><label>Ürün Kodu<input type="text" name="product_code" maxlength="100" value="<?=e($form['product_code'])?>"></label>
+      <label>Cihaz Tipi<select name="device_type"><option value="">Seçiniz</option><?php foreach (['Kulak arkası (BTE)','Kanal içi (CIC)','Kanal içi (ITC)','Kanal içi (CIC+TC)','Kanal İçi Alıcı RIC/RIE'] as $type): ?><option <?=$form['device_type'] === $type ? 'selected' : ''?>><?=e($type)?></option><?php endforeach ?></select></label><label data-charger-serial <?= $form['stock_type'] !== 'Şarj Cihazı' ? 'hidden' : '' ?>>Seri No<input name="serial_no" maxlength="190" value="<?=e($form['serial_no'] === $form['stock_code'] ? '' : $form['serial_no'])?>" autocomplete="off"></label><label>Güç Kullanımı<select name="power_usage"><option value="">Seçiniz</option><?php foreach (['Pilli','Şarjlı'] as $powerUsage): ?><option <?=$form['power_usage'] === $powerUsage ? 'selected' : ''?>><?=e($powerUsage)?></option><?php endforeach ?></select></label><label>Ürün Rengi<select name="product_color"><option value="">Seçiniz</option><?php foreach (['Bej','Siyah','Şampanya'] as $productColor): ?><option <?=$form['product_color'] === $productColor ? 'selected' : ''?>><?=e($productColor)?></option><?php endforeach ?></select></label><label>Ürün Kodu<input type="text" name="product_code" maxlength="100" value="<?=e($form['product_code'])?>"></label>
     </div>
     <h2>Finansal ve Depo Bilgileri</h2><div class="stock-grid">
       <label>Kritik / Asgari Stok<input type="number" min="0" name="min_stock" value="<?=e((string)$form['min_stock'])?>"></label><label>Azami Stok<input type="number" min="0" name="max_stock" value="<?=e((string)$form['max_stock'])?>"></label>
@@ -152,7 +155,8 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
   const renderBrands = () => {
     [...brand.options].forEach(option => {
       if (!option.value) return;
-      option.hidden = !matchesType(brandByName(option.value)?.stock_type);
+      const brandTypes=String(brandByName(option.value)?.stock_type||'').split(',').map(value=>value.trim());
+      option.hidden = type.value==='Şarj Cihazı' ? !(brandTypes.includes('İşitme Cihazı') && brandTypes.includes('Şarj Cihazı')) : !matchesType(brandByName(option.value)?.stock_type);
     });
     if (brand.selectedOptions[0]?.hidden) brand.value = '';
   };
@@ -170,3 +174,18 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
 <style>.stock-card-page{width:100%!important;max-width:1100px!important;min-height:100vh;margin:0 auto!important;padding:46px 20px 48px!important}.stock-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.stock-card>header{padding:22px 24px;border-bottom:1px solid #e1e2e8}.stock-card h1{margin:0 0 5px;font-size:21px;color:#2f2b3d}.stock-card>header p{margin:0;color:#7b7b8d}.stock-card form{padding:8px 24px 24px}.stock-card form h2{margin:20px 0 14px;padding-bottom:9px;border-bottom:1px solid #e1e2e8;color:#19a94b;font-size:14px}.stock-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}.stock-grid label{display:flex;flex-direction:column;gap:7px;font-size:14px;color:#2f2b3d}.stock-grid label[hidden]{display:none!important}.stock-grid input,.stock-grid select{height:42px;box-sizing:border-box;border:1px solid #d5d3de;border-radius:6px;padding:0 12px;background:#fff;font:inherit}.stock-grid input[type=file]{padding:9px 12px}.stock-product-image{grid-column:1/-1;display:flex;align-items:center;gap:20px;padding:14px;border:1px solid #e1e2e8;border-radius:7px;background:#fafafa}.stock-product-image>label{flex:1}.stock-product-image small{color:#7b7b8d}.stock-image-preview{display:flex;align-items:center;gap:12px}.stock-image-preview img{width:74px;height:74px;object-fit:cover;border:1px solid #d5d3de;border-radius:7px}.stock-image-preview .stock-image-remove{display:flex;flex-direction:row;align-items:center;gap:7px;white-space:nowrap;color:#d63f4d}.stock-image-remove input{width:16px;height:16px;padding:0}@media(max-width:720px){.stock-card-page{max-width:none!important;padding:92px 14px 30px!important}.stock-grid{grid-template-columns:1fr}.stock-product-image{align-items:stretch;flex-direction:column}.stock-product-image>label{width:100%}}.stock-card footer{display:flex;align-items:center;justify-content:flex-end;gap:14px;margin-top:24px}.stock-card footer a{color:#7b7b8d;text-decoration:none}.stock-alert{margin:16px 24px;padding:12px 14px;border-radius:7px}.stock-alert.error{background:#ffe3e3;color:#a21d1d}</style>
 <style>.stock-card>header{display:flex;align-items:center;justify-content:space-between;gap:24px}.stock-card>header .stock-product-image{display:flex;align-items:center;gap:12px;padding:0;border:0;background:transparent}.stock-card>header .stock-image-controls{flex:none;min-width:92px}.stock-card>header .stock-image-preview button{display:block;padding:0;border:0;background:transparent;cursor:zoom-in}.stock-card>header .stock-image-preview img{display:block;width:64px;height:64px}.stock-image-controls{display:flex;flex:1;flex-direction:column;gap:10px}.stock-image-add{display:inline-flex;align-items:center;justify-content:center;width:42px;min-height:42px;border-radius:6px;background:#19a94b;color:#fff;font-size:19px;cursor:pointer}.stock-image-add input{position:absolute;width:1px!important;height:1px!important;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.stock-image-remove{display:flex!important;flex-direction:row!important;align-items:center;gap:7px!important;white-space:nowrap;color:#d63f4d!important}.stock-image-remove input{width:16px!important;height:16px!important;padding:0!important}.stock-card-image-modal{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;padding:32px;background:#1f1d2dcc}.stock-card-image-modal[hidden]{display:none}.stock-card-image-modal-content{max-width:100%;max-height:100%;overflow:auto;background:#fff}.stock-card-image-modal-content img{display:block;width:auto;height:auto;max-width:none;max-height:none}.stock-card-image-modal-close{position:fixed;top:18px;right:22px;width:42px;height:42px;border:0;border-radius:50%;background:#fff;color:#2f2b3d;font-size:30px;line-height:1;cursor:pointer}@media(max-width:720px){.stock-card>header{align-items:flex-start;flex-direction:column}.stock-image-controls{width:100%}.stock-card-image-modal{padding:18px}}</style>
 <?php patient_footer(); ?>
+
+<script>
+(()=>{
+ const type=document.querySelector('[name="stock_type"]'),device=document.querySelector('[name="device_type"]')?.closest('label'),serial=document.querySelector('[data-charger-serial]');
+ if(!type||!device||!serial)return;
+ const sync=()=>{
+  const charger=type.value==='Şarj Cihazı';
+  const hideDevice=charger||['Pil','Sarf Malzeme'].includes(type.value);
+  device.hidden=hideDevice;device.style.setProperty('display',hideDevice?'none':'flex','important');
+  serial.hidden=!charger;serial.style.setProperty('display',charger?'flex':'none','important');
+  serial.querySelector('input').disabled=!charger;
+ };
+ type.addEventListener('change',sync);sync();
+})();
+</script>

@@ -32,7 +32,7 @@ Bu kurallar kullanıcı tarafından 2026 Temmuz Signia fiyat listesi aktarımın
 ## Aksesuarlar
 
 - PDF'deki aksesuarları da fiyat listesine dahil et.
-- Şarj cihazları dahil bütün aksesuar satırlarını `Sarf Malzeme` olarak kaydet. Yeni `Aksesuar` tipi oluşturma.
+- Şarj cihazlarını `Şarj Cihazı` stok tipiyle, Signia markasına bağlı şarj modelleri olarak kaydet. Charger (X-AX-IX) ve Multicharger (P-SP) için mevcut model ve stok kartlarını kullan; tekrar oluşturma. Diğer aksesuarları `Sarf Malzeme` olarak kaydet. Yeni `Aksesuar` tipi oluşturma.
 - Temmuz 2026 örnekleri: StreamLine TV / TV Sound, StreamLine Mic, Charger (X-AX-IX), Perfectdry Lux, Multicharger (P-SP), CROS/BICROS.
 
 ## Fiyat, dönem, açıklama ve görseller

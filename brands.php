@@ -87,6 +87,15 @@ foreach ($unclassifiedModels as $unclassifiedModel) {
         $setModelStockType->execute([$brandTypes[0], $unclassifiedModel['id']]);
     }
 }
+// Every hearing-device brand also supplies chargers; reuse the same brand record.
+$chargerBrandUpdate = $pdo->prepare('UPDATE brands SET stock_type=? WHERE id=?');
+foreach ($pdo->query('SELECT id,stock_type FROM brands')->fetchAll() as $brand) {
+    $types = array_values(array_filter(array_map('trim', explode(',', (string)$brand['stock_type']))));
+    if (in_array('İşitme Cihazı', $types, true) && !in_array('Şarj Cihazı', $types, true)) {
+        $types[] = 'Şarj Cihazı';
+        $chargerBrandUpdate->execute([implode(',', $types), $brand['id']]);
+    }
+}
 $message = '';
 $error = '';
 $editBrandId = (int)($_GET['edit_brand'] ?? $_GET['edit'] ?? 0);
@@ -112,6 +121,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'save') {
             $name = trim((string)($_POST['name'] ?? ''));
             $stockTypes = [(($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı'];
+            $manageCharger = ($_POST['group'] ?? 'hearing') !== 'battery';
+            if ($manageCharger) $stockTypes[] = 'Şarj Cihazı';
+            $mergeBrandTypes = static function (string $existing) use ($stockTypes, $manageCharger): array {
+                $types = array_filter(array_map('trim', explode(',', $existing)));
+                if ($manageCharger) $types = array_diff($types, ['Şarj Cihazı']);
+                return array_values(array_unique(array_merge($types, $stockTypes)));
+            };
             $stockType = implode(',', $stockTypes);
             if ($name === '') {
                 $error = 'Marka adı zorunludur.';
@@ -122,14 +138,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $existing->execute([$name, $id]);
                         $existingBrand = $existing->fetch();
                         if ($existingBrand) {
-                            $types = array_values(array_unique(array_merge(array_filter(explode(',', (string)$existingBrand['stock_type'])), $stockTypes)));
+                            $types = $mergeBrandTypes((string)$existingBrand['stock_type']);
                             $pdo->prepare('UPDATE brands SET stock_type=? WHERE id=?')->execute([implode(',', $types) ?: null, $existingBrand['id']]);
                             $message = 'Mevcut markaya stok tipi eklendi.';
                             $editBrandId = (int)$existingBrand['id'];
                         } else {
                             $current = $pdo->prepare('SELECT stock_type FROM brands WHERE id=?');
                             $current->execute([$id]);
-                            $types = array_values(array_unique(array_merge(array_filter(explode(',', (string)$current->fetchColumn())), $stockTypes)));
+                            $types = $mergeBrandTypes((string)$current->fetchColumn());
                             $pdo->prepare('UPDATE brands SET name=?, stock_type=? WHERE id=?')->execute([$name, implode(',', $types) ?: null, $id]);
                             $message = 'Marka güncellendi.';
                             $editBrandId = $id;
@@ -139,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $existing->execute([$name]);
                         $existingBrand = $existing->fetch();
                         if ($existingBrand) {
-                            $types = array_values(array_unique(array_merge(array_filter(explode(',', (string)$existingBrand['stock_type'])), $stockTypes)));
+                            $types = $mergeBrandTypes((string)$existingBrand['stock_type']);
                             $pdo->prepare('UPDATE brands SET stock_type=? WHERE id=?')->execute([implode(',', $types) ?: null, $existingBrand['id']]);
                             $message = 'Mevcut markaya stok tipi eklendi.';
                         } else {
@@ -159,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'save') {
             $brandId = (int)($_POST['brand_id'] ?? 0);
             $name = trim((string)($_POST['name'] ?? ''));
-            $stockType = (($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı';
+            $stockType = match ($_POST['group'] ?? 'hearing') { 'battery' => 'Pil', 'charger' => 'Şarj Cihazı', default => 'İşitme Cihazı' };
             $brandStatement = $pdo->prepare('SELECT stock_type FROM brands WHERE id=?');
             $brandStatement->execute([$brandId]);
             $brandStockTypes = array_filter(explode(',', (string)$brandStatement->fetchColumn()));
@@ -169,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($name === '') {
                 $error = 'Model adı zorunludur.';
                 $editModelId = $id;
-            } elseif (!in_array($stockType, ['İşitme Cihazı', 'Pil'], true) || !in_array($stockType, $brandStockTypes, true)) {
+            } elseif (!in_array($stockType, ['İşitme Cihazı', 'Pil', 'Şarj Cihazı'], true) || !in_array($stockType, $brandStockTypes, true)) {
                 $error = 'Model için markanın desteklediği geçerli bir stok tipi seçin.';
                 $editModelId = $id;
             } else {
@@ -210,7 +226,7 @@ if ($editModelId > 0) {
         'id' => 0,
         'brand_id' => (int)($_POST['brand_id'] ?? 0),
         'name' => trim((string)($_POST['name'] ?? '')),
-        'stock_type' => (($_POST['group'] ?? 'hearing') === 'battery') ? 'Pil' : 'İşitme Cihazı',
+        'stock_type' => match ($_POST['group'] ?? 'hearing') { 'battery' => 'Pil', 'charger' => 'Şarj Cihazı', default => 'İşitme Cihazı' },
     ];
 }
 
@@ -239,15 +255,21 @@ foreach ($brands as $brand) {
     if (in_array('Pil', $types, true)) $brandGroups['Pil Markaları'][] = $brand;
     if (!in_array('İşitme Cihazı', $types, true) && !in_array('Pil', $types, true)) $brandGroups['Diğer Markalar'][] = $brand;
 }
-$modelGroups = ['İşitme Cihazı Modelleri' => [], 'Pil Numaraları' => [], 'Diğer Modeller' => []];
+$modelGroups = ['İşitme Cihazı Modelleri' => [], 'Pil Numaraları' => [], 'Şarj Cihazı Modelleri' => [], 'Diğer Modeller' => []];
 foreach ($models as $model) {
     if ($model['model_stock_type'] === 'İşitme Cihazı') $modelGroups['İşitme Cihazı Modelleri'][] = $model;
+    elseif ($model['model_stock_type'] === 'Şarj Cihazı') $modelGroups['Şarj Cihazı Modelleri'][] = $model;
     elseif ($model['model_stock_type'] === 'Pil') $modelGroups['Pil Numaraları'][] = $model;
     else $modelGroups['Diğer Modeller'][] = $model;
 }
-$activeGroup = (($_POST['group'] ?? $_GET['group'] ?? 'hearing') === 'battery') ? 'battery' : 'hearing';
+$requestedGroup = $_POST['group'] ?? $_GET['group'] ?? 'hearing';
+$activeGroup = in_array($requestedGroup, ['hearing','battery','charger'], true) ? $requestedGroup : 'hearing';
 $visibleBrandGroups = $activeGroup === 'battery' ? ['Pil Markaları' => $brandGroups['Pil Markaları']] : ['İşitme Cihazı Markaları' => $brandGroups['İşitme Cihazı Markaları']];
 $visibleModelGroups = $activeGroup === 'battery' ? ['Pil Numaraları' => $modelGroups['Pil Numaraları']] : ['İşitme Cihazı Modelleri' => $modelGroups['İşitme Cihazı Modelleri']];
+if ($activeGroup === 'charger') {
+    $visibleBrandGroups = ['Şarj Cihazları' => array_values(array_filter($brandGroups['İşitme Cihazı Markaları'], static fn($brand) => in_array('Şarj Cihazı', array_map('trim', explode(',', (string)$brand['stock_type'])), true)))];
+    $visibleModelGroups = ['Şarj Cihazı Modelleri' => $modelGroups['Şarj Cihazı Modelleri']];
+}
 $visibleBrandCount = array_sum(array_map('count', $visibleBrandGroups));
 $visibleModelCount = array_sum(array_map('count', $visibleModelGroups));
 $activeSection = (
@@ -267,7 +289,7 @@ patient_header('Kurulum - Markalar', 'settings');
     <a class="<?=$activeSection === 'brands' ? 'active' : ''?>" href="<?=url('brands.php?tab=brands')?>">Markalar</a>
     <a class="<?=$activeSection === 'models' ? 'active' : ''?>" href="<?=url('brands.php?tab=models')?>">Modeller</a>
   </nav>
-  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeGroup=<?=json_encode($activeGroup)?>,items=[['hearing','İşitme Cihazı Markaları'],['battery','Pil Markaları']];nav.innerHTML='';items.forEach(([group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab=brands&group='+group;link.textContent=label;link.dataset.voxSameWindow='setup';link.className=<?=json_encode($selectedBrandId === 0)?>&&activeGroup===group?'active':'';nav.append(link)})})();</script>
+  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeGroup=<?=json_encode($activeGroup)?>,items=[['hearing','İşitme Cihazı Markaları'],['battery','Pil Markaları'],['charger','Şarj Cihazı Markaları']];nav.innerHTML='';items.forEach(([group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab=brands&group='+group;link.textContent=label;link.dataset.voxSameWindow='setup';link.className=<?=json_encode($selectedBrandId === 0)?>&&activeGroup===group?'active':'';nav.append(link)})})();</script>
 
   <?php if ($error): ?><p class="manage-message error"><?=e($error)?></p><?php endif; ?>
 
@@ -284,6 +306,7 @@ patient_header('Kurulum - Markalar', 'settings');
       <input type="hidden" name="action" value="save">
       <input type="hidden" name="id" value="<?=(int)$editBrand['id']?>">
       <label>Marka adı<input name="name" maxlength="190" required placeholder="Marka adı" value="<?=e($editBrand['name'])?>"></label>
+
       <div class="form-actions"><button type="submit" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy" aria-hidden="true"></i><span class="visually-hidden">Kaydet</span></button></div>
     </form>
   </details>
@@ -296,7 +319,7 @@ patient_header('Kurulum - Markalar', 'settings');
           <?php foreach ($visibleBrandGroups as $groupTitle => $groupBrands): ?>
             <?php if (!$groupBrands): ?><tr class="empty-row"><td colspan="4">Henüz kayıt bulunmuyor.</td></tr><?php endif; ?>
             <?php foreach ($groupBrands as $brand): ?>
-            <tr><td><?=(int)$brand['id']?></td><td><?=e($brand['name'])?></td><td><?=e($brand['stock_type'] ?: '—')?></td><td>
+            <tr><td><?=(int)$brand['id']?></td><td><?=e($brand['name'])?></td><td><?=e($activeGroup === 'charger' ? 'Şarj Cihazı' : ($brand['stock_type'] ?: '—'))?></td><td>
               <a class="row-action models" href="<?=url('brands.php?group='.$activeGroup.'&amp;brand_id='.(int)$brand['id'])?>" title="Modeller" aria-label="<?=e($brand['name'])?> modelleri"><i class="ti tabler-list-details"></i></a><a class="row-action edit" href="<?=url('brands.php?tab=brands&amp;group='.$activeGroup.'&amp;edit_brand='.(int)$brand['id'])?>" title="Düzenle" aria-label="<?=e($brand['name'])?> markasını düzenle"><?=action_icon('edit')?></a>
               <form method="post" onsubmit="return confirm('Bu marka silinsin mi?')">
                 <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="entity" value="brand"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$brand['id']?>">
