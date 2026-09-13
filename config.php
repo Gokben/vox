@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/app-version.php';
+require_once __DIR__ . '/date-format.php';
+vox_validate_request_dates();
+
 const APP_NAME = 'Vox';
 const SESSION_IDLE_TIMEOUT = 1800;
 $configuredBasePath = getenv('APP_BASE_PATH');
@@ -62,7 +66,7 @@ function db(): PDO
     return $pdo;
 }
 
-function url(string $path = ''): string { return BASE_PATH . ($path ? '/' . ltrim($path, '/') : ''); }
+function url(string $path = ''): string { return BASE_PATH . ($path ? '/' . vox_versioned_path(ltrim($path, '/')) : ''); }
 function e(?string $value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function format_date_tr(?string $value, bool $withTime = false): string {
     $value = trim((string)$value);

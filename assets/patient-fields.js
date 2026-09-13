@@ -1,0 +1,30 @@
+(() => {
+  const setup = () => {
+    const birth = document.querySelector('.classic-patient-form input[name="birth_date"]');
+    if (!birth) return;
+    const row = birth.closest('.icon-form-row');
+    const group = document.createElement('div');
+    group.className = 'patient-birth-controls';
+    const dateColumn = document.createElement('div');
+    while (row.firstChild) dateColumn.append(row.firstChild);
+    const ageColumn = document.createElement('div');
+    const label = document.createElement('label');
+    label.className = 'icon-form-label';
+    label.htmlFor = 'patient-calculated-age';
+    label.textContent = 'Yaş';
+    const holder = document.createElement('div');
+    holder.className = 'merged-input';
+    const age = document.createElement('input');
+    age.id = 'patient-calculated-age';
+    age.readOnly = true;
+    age.setAttribute('aria-label', 'Yaş');
+    age.setAttribute('aria-live', 'polite');
+    holder.append(age); ageColumn.append(label, holder);
+    group.append(dateColumn, ageColumn); row.append(group);
+    const refresh = () => { const years = VoxDateFormat.age(birth.value); age.value = years === null ? '' : String(years); };
+    birth.addEventListener('input', refresh); birth.addEventListener('change', refresh);
+    birth.form?.addEventListener('reset', () => setTimeout(refresh, 0));
+    refresh();
+  };
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', setup, { once: true }) : setup();
+})();

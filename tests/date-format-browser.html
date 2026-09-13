@@ -1,0 +1,25 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Tarih giriş testleri</title>
+<link rel="stylesheet" href="../assets/date-format.css"><script src="../assets/date-format.js?v=4" defer></script>
+<form id="testForm"><label>Tarih<input type="date" name="record_date" value="2026-09-13" required></label>
+<label>Fatura tarihi<input data-vox-date-text name="movement_date" required></label></form><ol id="results"></ol>
+<script>
+addEventListener('DOMContentLoaded', async () => {
+ const form=document.getElementById('testForm'), source=form.querySelector('[type=date]'), editor=source.nextElementSibling;
+ let failures=0;
+ const check=(name, fn)=>{const li=document.createElement('li');try{if(!fn())throw Error('unexpected result');li.textContent='PASS '+name;}catch(e){failures++;li.textContent='FAIL '+name+': '+e.message;}document.getElementById('results').append(li)};
+ const enter=v=>{editor.value=v;editor.dispatchEvent(new Event('input',{bubbles:true}));};
+ check('Initial ISO date displayed in Turkish',()=>editor.value==='13.09.2026');
+ enter('29.02.2024');check('Leap date and ISO transport',()=>editor.validity.valid && new FormData(form).get('record_date')==='2024-02-29');
+ for(const bad of ['31.02.2026','2026-09-13','13/09/2026']){enter(bad);check('Reject '+bad,()=>!editor.validity.valid && new FormData(form).get('record_date')===bad)}
+ enter('1.2.2026');check('Single digit date padded',()=>editor.value==='01.02.2026' && source.value==='2026-02-01');
+ enter('');check('Required empty date rejected',()=>!editor.validity.valid);
+ source.value='2025-01-02';check('Programmatic dates synchronize',()=>editor.value==='02.01.2025');
+ source.max='2024-12-31';await new Promise(r=>setTimeout(r,0));check('Changed maximum enforced',()=>!editor.validity.valid);
+ source.max='';source.value='2026-01-01';form.reset();await new Promise(r=>setTimeout(r,0));check('Reset restores formatted date',()=>editor.value==='13.09.2026');
+ const dynamic=document.createElement('input');dynamic.type='date';dynamic.name='term_date[]';dynamic.value='2026-10-01';form.append(dynamic);await new Promise(r=>setTimeout(r,0));check('Dynamic installment dates covered',()=>dynamic.nextElementSibling?.value==='01.10.2026');
+ const text=form.querySelector('[data-vox-date-text]');text.value='31.02.2026';text.dispatchEvent(new Event('input',{bubbles:true}));check('Text invoice date validated',()=>!text.validity.valid);
+ let changed=false;text.addEventListener('change',()=>changed=true);text.dispatchEvent(new Event('change',{bubbles:true}));check('Invalid AJAX date blocked before handler',()=>!changed);
+ let submitted=false;form.addEventListener('submit',()=>submitted=true);form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));check('Invalid submit blocked before handler',()=>!submitted);
+ document.title=failures ? failures+' FAILED' : 'All date input tests passed';
+});
+</script></html>

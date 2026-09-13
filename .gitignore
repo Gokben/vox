@@ -58,3 +58,8 @@ next-env.d.ts
 /error_log
 /tools/composer.phar
 /assets/uploads/
+
+# Generated release metadata (published per environment)
+/release.json
+/release.json.tmp
+/release.lock

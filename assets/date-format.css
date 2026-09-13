@@ -1,0 +1,7 @@
+input.vox-date-source { display: none !important; }
+input.vox-date-editor { min-width: 10ch; }
+input.vox-date-editor:user-invalid { outline: 1px solid #c52828; }
+
+.patient-birth-controls { display:grid; grid-template-columns:minmax(0,1fr) 48px; gap:6px; }
+.patient-birth-controls > div { min-width:0; }
+.patient-birth-controls input { width:100%; box-sizing:border-box; }

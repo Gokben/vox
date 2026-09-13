@@ -17,7 +17,7 @@ function source_definitions(): array
         // Yalnızca tablo ilk kez oluştuğunda eklenir; sonradan silinen kayıtlar geri gelmez.
         if ((int)$pdo->query('SELECT COUNT(*) FROM source_definitions')->fetchColumn() === 0) {
             $insert = $pdo->prepare('INSERT INTO source_definitions(name,active,sort_order) VALUES(?,?,?)');
-            foreach (['Pazarlama', 'Tabela', 'Belma Baysan', 'Tavsiye', 'Tanıdık'] as $order => $name) {
+            foreach (['Tabela', 'Belma Baysan', 'Tavsiye', 'Tanıdık'] as $order => $name) {
                 $insert->execute([$name, 1, $order + 1]);
             }
         }

@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/config.php';
 require __DIR__ . '/patient-report-schema.php';
+require_once __DIR__ . '/patient-identity.php';
 require __DIR__ . '/social-security-bootstrap.php';
 require __DIR__ . '/service-type-bootstrap.php';
 require __DIR__ . '/source-bootstrap.php';
@@ -76,11 +77,12 @@ try {
     error_log('patient-form.php staff schema: ' . $exception->getMessage());
 }
 
+ensure_patient_passport_schema(db());
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
 if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
 $isEmbeddedWindow = (string)($_POST['_vox_window'] ?? $_GET['_vox_window'] ?? '') === '1';
-$fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_detail','notes'];
+$fields = ['branch_id','record_date','full_name','national_id','passport_no','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_detail','notes'];
 $patient = array_fill_keys($fields, '');
 $patient['patient_status'] = 'active';
 $defaultRecordDate = (string)($_GET['date'] ?? '');
@@ -119,7 +121,7 @@ $sourceDefinitions = [];
 $sourceUnits = [];
 try {
     $sourceDefinitions=source_definitions();
-    $sourceUnits=db()->query('SELECT id,unit_no FROM units WHERE COALESCE(unit_no, \'\') <> \'\' ORDER BY unit_no')->fetchAll();
+    $sourceUnits=db()->query('SELECT id,name,last_name FROM units ORDER BY name,last_name,id')->fetchAll();
 } catch (Throwable $exception) {
     $formSetupErrors[] = 'source-options';
     error_log('patient-form.php source options: ' . $exception->getMessage());
@@ -152,6 +154,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     } else {
         $patient['source_unit_id'] = 0;
     }
+    if ($error === '') $error=patient_passport_error($patient['passport_no']);
+    if ($error === '') $error=patient_identity_validate(db(),$patient['national_id'],'patients',$id,$patient['passport_no']);
     if ($patient['full_name']==='') $error='Ad soyad alanı zorunludur.';
     elseif ($error === '') {
         $values=[]; foreach($fields as $field) $values[$field]=$patient[$field];
@@ -183,7 +187,7 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 <style>.patient-name-input{position:relative}.patient-name-display{position:absolute;z-index:2;left:46px;right:12px;top:50%;transform:translateY(-50%);color:var(--text);font:14px/24px Tahoma,'Segoe UI',sans-serif;white-space:nowrap;cursor:text;font-variant:normal;text-transform:none}.patient-name-input:not(:focus-within) input[name="full_name"]{color:transparent!important}.patient-name-input:focus-within .patient-name-display{display:none}</style>
 <style>.merged-input input[name="proximity_relation"],.merged-input input[name="proximity_relation_secondary"]{font-family:Tahoma,'Segoe UI',sans-serif!important;font-variant:normal!important;text-transform:none!important}</style>
 <style>
-.patient-rating{display:flex;align-items:center;gap:5px;min-height:40px}.patient-rating input{position:absolute;opacity:0}.patient-rating label{font-size:29px;line-height:1;color:#d7d6de;cursor:pointer;transition:color .15s,transform .15s}.patient-rating label.is-selected,.patient-rating label:hover{color:#f3a64a}.patient-rating label:hover{transform:scale(1.08)}.patient-rating:focus-within{outline:2px solid rgba(32,164,71,.35);outline-offset:5px;border-radius:5px}.merged-input textarea[name="patient_rating_comment"]{height:38px!important;min-height:38px!important;padding-top:8px!important;resize:none!important}
+.patient-rating{display:flex;align-items:center;gap:5px;min-height:40px}.patient-rating input{position:absolute;opacity:0}.patient-rating label{font-size:29px;line-height:1;color:#d7d6de;cursor:pointer;transition:color .15s,transform .15s}.patient-rating label.is-selected,.patient-rating label:hover{color:#f3a64a}.patient-rating label:hover{transform:scale(1.08)}.patient-rating:focus-within{outline:none;box-shadow:none}.patient-rating input:focus-visible+label{outline:2px solid #2c72b5;outline-offset:1px}.merged-input textarea[name="patient_rating_comment"]{height:38px!important;min-height:38px!important;padding-top:8px!important;resize:none!important}
 </style>
 <style>
 /* Referans klasik Windows Yeni Hasta formu */
@@ -217,10 +221,13 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 .classic-patient-form .phone-input input{padding-left:5px!important}
 .classic-patient-form .proximity-toggle{display:none!important}
 .classic-patient-form #proximity-row.is-hidden{display:block!important}
-.classic-patient-form #proximity-secondary-row{display:none!important}
-.classic-patient-form .field-address,.classic-patient-form .field-comment{grid-column:span 2!important}
+.classic-patient-form #proximity-secondary-row{display:block!important}
+.classic-patient-form .field-address{grid-column:span 2!important}
+.classic-patient-form .field-comment{grid-column:1 / -1!important}
+.classic-patient-form .field-notes{grid-column:1 / -1!important}
+.classic-patient-form .field-notes .merged-input,.classic-patient-form .field-notes textarea{width:100%!important;box-sizing:border-box!important}
 .classic-patient-form .field-address .merged-input textarea{height:39px!important;min-height:39px!important}
-.classic-patient-form .field-comment .merged-input textarea{height:23px!important;min-height:23px!important;padding-top:3px!important;resize:none!important}
+.classic-patient-form .field-comment .merged-input textarea{width:100%!important;box-sizing:border-box!important;height:90px!important;min-height:90px!important;padding-top:5px!important;resize:vertical!important}
 .classic-patient-form .patient-rating{height:29px!important;min-height:29px!important;gap:2px!important;padding:0!important}
 .classic-patient-form .patient-rating label{display:grid!important;place-items:center!important;width:18px!important;height:28px!important;border:1px solid #a5bdd4!important;background:linear-gradient(#fff,#dbe8f3)!important;color:#8fa5ba!important;font-size:20px!important;line-height:1!important}
 .classic-patient-form .patient-rating label.is-selected,.classic-patient-form .patient-rating label:hover{color:#f2a22d!important}
@@ -246,7 +253,7 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 <div class="icon-form-row"><label class="icon-form-label">Şube <span class="required-mark">*</span></label><div class="merged-input"><span class="merged-icon">⌂</span><select name="branch_id" required><option value="">Şube seçin</option><?php foreach($branches as $branch):?><option value="<?=(int)$branch['id']?>" <?=(int)$patient['branch_id']===(int)$branch['id']?'selected':''?>><?=e($branch['name'])?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Kayıt Tarihi</label><div class="merged-input"><span class="merged-icon">▣</span><input type="date" name="record_date" value="<?=e($patient['record_date'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Ad Soyad <span class="required-mark">*</span></label><div class="merged-input patient-name-input"><span class="merged-icon">♙</span><input id="patient-full-name" name="full_name" lang="tr" style="font-family:Tahoma,'Segoe UI',sans-serif!important;font-size:14px!important;line-height:24px!important;padding-top:6px!important;padding-bottom:6px!important;text-transform:none" value="<?=$patientFullNameHtml?>" required><span class="patient-name-display" role="button" tabindex="0" aria-label="Ad soyadı düzenle"><?=$patientFullNameHtml?></span></div></div>
-<div class="icon-form-row"><label class="icon-form-label">T.C. Kimlik No</label><div class="merged-input"><span class="merged-icon">▤</span><input name="national_id" maxlength="20" value="<?=e($patient['national_id'])?>"></div></div>
+<div class="icon-form-row"><label class="icon-form-label">T.C. Kimlik No</label><div class="merged-input"><span class="merged-icon">▤</span><input name="national_id" maxlength="11" minlength="11" pattern="[0-9]{11}" inputmode="numeric" value="<?=e($patient['national_id'])?>"><input name="passport_no" aria-label="Pasaport No" maxlength="64" value="<?=e($patient['passport_no'])?>" hidden></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Doğum Tarihi</label><div class="merged-input"><span class="merged-icon">◷</span><input type="date" name="birth_date" value="<?=e($patient['birth_date'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Telefon 1</label><div class="merged-input phone-input"><span class="merged-icon">⌕</span><input id="phone_primary" name="phone_primary" inputmode="tel" maxlength="14" placeholder="0546 638 67 75" value="<?=e($patient['phone_primary'])?>"><button id="proximity-toggle" class="proximity-toggle" type="button" title="Yakınlık derecesini aç/kapat" aria-label="Yakınlık derecesini aç/kapat" aria-controls="proximity-row" aria-expanded="false" <?=trim($patient['phone_primary'])===''?'disabled':''?>><i class="icon-base ti tabler-users"></i></button></div></div>
 <div id="proximity-row" class="icon-form-row proximity-row is-hidden"><label class="icon-form-label">Yakınlık Derecesi</label><div class="merged-input"><span class="merged-icon">♧</span><input id="proximity_relation" name="proximity_relation" value="<?=e($patient['proximity_relation'])?>"></div></div>
@@ -258,12 +265,20 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 <div class="icon-form-row"><span class="icon-form-label">Hasta</span><div class="check-row"><label><input type="radio" name="patient_status" value="active" <?=$patient['patient_status']==='active'?'checked':''?>> Aktif</label><label><input type="radio" name="patient_status" value="deceased" <?=$patient['patient_status']==='deceased'?'checked':''?>> Vefat</label></div></div>
 <h3 class="form-section-title">Hizmet Bilgileri</h3>
 <div class="icon-form-row"><label class="icon-form-label">Sosyal Güvence</label><div class="merged-input"><span class="merged-icon">◇</span><input name="social_security" value="<?=e($patient['social_security'])?>"></div></div>
-<div class="icon-form-row"><label class="icon-form-label">Rapor Bilgisi</label><div class="merged-input"><span class="merged-icon">▧</span><input name="report_info" value="<?=e($patient['report_info'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Rapor</label><div class="merged-input"><span class="merged-icon">✓</span><select name="report_status"><option value="">Seçiniz</option><?php foreach(REPORT_STATUSES as $reportStatus):?><option value="<?=e($reportStatus)?>" <?=$patient['report_status']===$reportStatus?'selected':''?>><?=e($reportStatus)?></option><?php endforeach?></select></div></div>
 <h3 class="form-section-title">Başvuru ve Açıklamalar</h3>
-<div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach($sourceDefinitions as $source):$isCurrent=(int)$patient['source_id']===(int)$source['id'];if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
-<div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ünite No seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e($unit['unit_no'])?></option><?php endforeach?></select></div></div>
-<div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><input name="source_detail" value="<?=e($patient['source_detail'])?>"></div></div>
+<div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach($sourceDefinitions as $source):if(mb_strtolower(trim((string)$source['name']),'UTF-8')==='pazarlama')continue;$isCurrent=(int)$patient['source_id']===(int)$source['id'];if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ad Soyad seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e(trim((string)$unit['name'].' '.(string)($unit['last_name']??'')))?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><select name="source_detail">
+<option value="">Seçiniz</option>
+<?php $sourceDetailOptions = ['Deneme', 'Test', 'Bilgi', 'Servis']; $currentSourceDetail = (string)($patient['source_detail'] ?? ''); ?>
+<?php if ($currentSourceDetail !== '' && !in_array($currentSourceDetail, $sourceDetailOptions, true)): ?>
+<option value="<?=e($currentSourceDetail)?>" selected><?=e($currentSourceDetail)?></option>
+<?php endif; ?>
+<?php foreach ($sourceDetailOptions as $sourceDetailOption): ?>
+<option value="<?=e($sourceDetailOption)?>" <?=$currentSourceDetail === $sourceDetailOption ? 'selected' : ''?>><?=e($sourceDetailOption)?></option>
+<?php endforeach; ?>
+</select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Açıklama</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="notes"><?=e($patient['notes'])?></textarea></div></div>
 <div class="vuexy-form-actions"><?php if($id):?><a class="patient-services-button" href="<?=e(url('patient-followup.php?id='.$id.'&from_patient_card=1'))?>" title="Hizmetler" aria-label="Hizmetler"><i class="icon-base ti tabler-heart-handshake" aria-hidden="true"></i><span>Hizmetler</span></a><?php endif?><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url($returnTo))?>">İptal</a></div></form></section></main>
 <script>
@@ -294,12 +309,12 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
   };
   makeSection('Temel Bilgiler','♟','classic-basic-grid',[
     ['full_name','field-name'],['national_id','field-national'],['branch_id','field-branch'],['record_date','field-record-date'],
-    ['birth_date','field-birth-date'],['phone_primary','field-phone-primary'],['proximity_relation','field-proximity'],['phone_secondary','field-phone-secondary'],
+    ['birth_date','field-birth-date'],['phone_primary','field-phone-primary'],['proximity_relation','field-proximity'],['phone_secondary','field-phone-secondary'],['proximity_relation_secondary','field-secondary-proximity'],
     ['address','field-address'],['patient_rating','field-rating'],['patient_rating_comment','field-comment'],['patient_status','field-status'],
-    ['proximity_relation_secondary','field-secondary-proximity']
+
   ]);
   makeSection('Hizmet Bilgileri','▪','classic-service-grid',[
-    ['social_security','field-social-security'],['report_status','field-report-status'],['report_info','field-report-info']
+    ['social_security','field-social-security'],['report_status','field-report-status']
   ]);
   makeSection('Başvuru ve Açıklamalar','▦','classic-application-grid',[
     ['source_id','field-source'],['source_detail','field-source-detail'],['source_unit_id','field-source-unit'],['notes','field-notes']
@@ -314,8 +329,6 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
   if(address)address.placeholder='Adres bilgilerini giriniz';
   const comment=document.querySelector('textarea[name="patient_rating_comment"]');
   if(comment)comment.placeholder='Yorum giriniz';
-  const detail=document.querySelector('input[name="source_detail"]');
-  if(detail)detail.placeholder='Başvuru detayı giriniz';
   const notes=document.querySelector('textarea[name="notes"]');
   if(notes)notes.placeholder='Açıklama giriniz';
   const save=actions?.querySelector('button.button');
@@ -398,8 +411,10 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
   });
 })();
 (()=>{const phone=document.getElementById('phone_primary'),toggle=document.getElementById('proximity-toggle'),row=document.getElementById('proximity-row'),relation=document.getElementById('proximity_relation');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else{row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
-(()=>{const phone=document.getElementById('phone_secondary'),toggle=document.getElementById('proximity-secondary-toggle'),row=document.getElementById('proximity-secondary-row'),relation=document.getElementById('proximity_relation_secondary');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else if(relation.value.trim()!==''){row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
+(()=>{const phone=document.getElementById('phone_secondary'),toggle=document.getElementById('proximity-secondary-toggle'),row=document.getElementById('proximity-secondary-row'),relation=document.getElementById('proximity_relation_secondary');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else{row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
 (()=>{const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-unit-row'),units=document.querySelector('select[name="source_unit_id"]');if(!source||!row||!units)return;const refresh=()=>{const label=(source.options[source.selectedIndex]?.textContent||'').trim();const show=/^(kaynak\s*)?ünite$/i.test(label);row.hidden=!show;if(!show)units.value='';};source.addEventListener('change',refresh);refresh()})();
 (()=>{const input=document.getElementById('patient-full-name'),display=document.querySelector('.patient-name-display');if(!input||!display)return;const edit=()=>{input.focus();input.setSelectionRange(input.value.length,input.value.length)};display.addEventListener('click',edit);display.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();edit()}})})();
 </script>
+<script src="<?=url('assets/patient-fields.js?v=1')?>" defer></script>
+<script src="<?=url('assets/patient-identity.js?v=5')?>" defer></script>
 <?php patient_footer();
