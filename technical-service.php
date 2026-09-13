@@ -70,6 +70,33 @@ if (isset($_GET['external_patient'])) {
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
+    $externalServiceId = (int)($_POST['external_service_id'] ?? 0);
+    if ($externalServiceId) {
+        $externalServiceStatement = $pdo->prepare('SELECT id,repair_details FROM external_technical_services WHERE id=?');
+        $externalServiceStatement->execute([$externalServiceId]);
+        $externalService = $externalServiceStatement->fetch();
+        if ($externalService) {
+            $externalRepairDetails = json_decode((string)($externalService['repair_details'] ?? ''), true);
+            if (!is_array($externalRepairDetails)) $externalRepairDetails = [];
+            $amount = trim((string)($externalRepairDetails['repair_service_fee'] ?? ''));
+            $paymentType = trim((string)($externalRepairDetails['repair_service_fee_payment_type'] ?? ''));
+            $normalizedAmount = (float)str_replace(',', '.', preg_replace('/[^0-9,.-]/', '', $amount) ?? '0');
+            if ($paymentType !== '' && $normalizedAmount > 0) {
+                redirect('technical-service.php?delete_error=external_repair_payment');
+            }
+            $pdo->prepare('DELETE FROM external_technical_services WHERE id=?')->execute([$externalServiceId]);
+        }
+        redirect('technical-service.php');
+    }
+    $pendingExternalPatientId = (int)($_POST['pending_external_patient_id'] ?? 0);
+    if ($pendingExternalPatientId) {
+        $deletePending = $pdo->prepare('DELETE FROM external_technical_patients WHERE id=? AND NOT EXISTS(SELECT 1 FROM external_technical_services WHERE external_patient_id=?)');
+        $deletePending->execute([$pendingExternalPatientId, $pendingExternalPatientId]);
+        if ($deletePending->rowCount() !== 1) {
+            redirect('technical-service.php?delete_error=repair_created');
+        }
+        redirect('technical-service.php');
+    }
     $serviceId = (int)($_POST['service_id'] ?? 0);
     if ($serviceId) {
         $serviceStatement = $pdo->prepare("SELECT id,patient_id FROM patient_services WHERE id=? AND service_name='Tamir'");
@@ -190,8 +217,11 @@ $repairLegalDaysByRecord = [];
 foreach ($repairDeviceData as $repairDevice) $repairLegalDaysByRecord[(string)($repairDevice['record_no'] ?? '')] = $repairDevice['legal_remaining'] ?? null;
 function repair_value(string $details,string $key): string {$data=json_decode($details,true);if($key==='repair_delivery_date')$key='repair_branch_delivery_date';$value=is_array($data)?($data[$key]??''):'';return is_array($value)?implode(', ', array_values(array_unique(array_filter(array_map('trim', $value), static fn(string $item): bool => $item !== '')))):(string)$value;}
 if (($_GET['delete_error'] ?? '') === 'repair_payment') echo '<script>window.addEventListener("DOMContentLoaded",()=>alert("Bu Tamir kartına bağlı tahsilat var. Önce tahsilatı iptal etmeden kayıt silinemez."));</script>';
+if (($_GET['delete_error'] ?? '') === 'external_repair_payment') echo '<script>window.addEventListener("DOMContentLoaded",()=>alert("Bu dış hasta Teknik Servis Formunda ödeme bilgisi bulunduğu için kayıt silinemez."));</script>';
+if (($_GET['delete_error'] ?? '') === 'repair_created') echo '<script>window.addEventListener("DOMContentLoaded",()=>alert("Bu kayıt için Teknik Servis Formu oluşturulduğu için bekleme kaydı silinemez."));</script>';
 patient_header('Teknik Servis','stock');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-technical-service.css?v=20260823-4')?>">
 <main class="patient-container technical-service-page"><section class="technical-card"><header><h1><i class="ti tabler-tools"></i> Teknik Servis</h1><p>Hizmet kartlarında kaydedilmiş tamir kabul formları.</p></header><div class="technical-table-wrap"><table><thead><tr><th>KAYIT NO</th><th>TARİH</th><th>HASTA</th><th>CİHAZ</th><th>ARIZA / ŞİKAYET</th><th>TESLİM TARİHİ</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach($services as $service):$details=(string)($service['repair_details']??'');?><tr><td><?=e($service['record_no'])?></td><td><?=e(format_date_tr($service['service_date']))?></td><td><?=e($service['full_name'])?></td><td><?=e(repair_value($details,'repair_device'))?:'—'?></td><td><?=e(repair_value($details,'repair_customer_issues[]'))?:e(repair_value($details,'repair_note'))?:'—'?></td><td><?=e(format_date_tr(repair_value($details,'repair_delivery_date')))?></td><td><div class="technical-actions"><a href="<?=e(url('patient-followup.php?id='.(int)$service['patient_id'].'&edit='.(int)$service['id']))?>" title="Düzenle"><i class="ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu teknik servis kaydı silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="service_id" value="<?=(int)$service['id']?>"><button title="Sil"><i class="ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$services):?><tr><td class="empty" colspan="7">Henüz teknik servis kaydı bulunmuyor.</td></tr><?php endif?></tbody></table></div></section></main>
 <style>.technical-service-page{width:100%!important;max-width:1180px!important;min-height:100vh;margin:0 auto!important;padding:46px 20px 48px!important}.technical-card{background:#fff;border:1px solid #e1e2e8;border-radius:10px;box-shadow:0 3px 12px #1e283c0f;overflow:hidden}.technical-card>header{padding:22px 24px;border-bottom:1px solid #e1e2e8}.technical-card h1{margin:0 0 5px;color:#2f2b3d;font-size:21px;line-height:1.25}.technical-card h1 .ti{vertical-align:-3px;margin-right:7px}.technical-card p{margin:0;color:#7b7b8d}.technical-table-wrap{overflow:auto}.technical-card table{width:100%;min-width:900px;border-collapse:collapse}.technical-card th,.technical-card td{padding:14px 18px;border-bottom:1px solid #e1e2e8;text-align:left;white-space:nowrap}.technical-card th{font-size:12px;color:#5d5b6d}.technical-card tbody tr:hover{background:#f8fcf9}.technical-actions{display:flex;align-items:center;gap:8px}.technical-actions form{margin:0!important;padding:0!important;width:40px!important;height:42px!important}.technical-actions a,.technical-actions button{display:grid;place-items:center;width:40px;height:42px;padding:0;border:0;border-radius:7px;background:#19a94b;color:#fff;text-decoration:none;cursor:pointer}.technical-actions button{background:#e04f55;margin:0!important;transform:translateX(-8px)!important}.empty{text-align:center;color:#7b7b8d}@media(max-width:720px){.technical-service-page{max-width:none!important;padding:92px 14px 30px!important}}</style>
 <div id="technical-form-modal" class="technical-modal" hidden><div class="technical-modal-backdrop"></div><section><header><h2>Yeni Teknik Servis Formu</h2><button type="button" class="technical-modal-close" aria-label="Kapat">×</button></header><form method="get" action="<?=e(url('patient-followup.php'))?>"><input type="hidden" name="new" value="1"><input type="hidden" name="service_name" value="Tamir"><label>Hasta<select name="id" required><option value="">Hasta seçiniz</option><?php foreach($patients as $patient):?><option value="<?=(int)$patient['id']?>"><?=e($patient['full_name'])?><?=trim((string)$patient['phone_primary'])?' — '.e($patient['phone_primary']):''?></option><?php endforeach?></select></label><footer><button type="button" class="technical-modal-close">İptal</button><button class="button">Tamir Formunu Aç</button></footer></form></section></div>
@@ -225,6 +255,22 @@ document.addEventListener('DOMContentLoaded',()=>{
   const syncExternalForm=()=>{const isExternal=external.checked;externalName.hidden=!isExternal;externalName.required=isExternal;form.action=isExternal?<?=json_encode(url('external-technical-patient.php'))?>:regularAction;};
   external.addEventListener('change',syncExternalForm);
   syncExternalForm();
+  form.addEventListener('submit',event=>{
+    if(!external.checked)return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target=new URL(form.action,location.href);
+    new FormData(form).forEach((value,key)=>target.searchParams.set(key,String(value)));
+    const title='Yeni Dış Hasta Kaydı';
+    if(window.parent!==window){
+      window.parent.postMessage({type:'vox-open-window',url:target.href,title},location.origin);
+    }else if(typeof window.voxOpenWindow==='function'){
+      window.voxOpenWindow(target.href,title);
+    }else{
+      window.open(target.href,'_blank','noopener');
+    }
+    modal.hidden=true;
+  });
 });
 </script>
 <script>
@@ -247,7 +293,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     const iconElement=document.createElement('i'); iconElement.className='ti '+icon;
     field.before(wrapper); wrapper.append(iconElement,field);
   };
-  decorate(modal.querySelector('.technical-patient-search'),'tabler-search');
   decorate(modal.querySelector('select[name="id"]'),'tabler-user');
   const search=modal.querySelector('.technical-patient-search');
   const select=modal.querySelector('select[name="id"]');
@@ -267,7 +312,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const results=document.createElement('div');
   results.className='technical-patient-results'; results.hidden=true;
   Object.assign(results.style,{maxHeight:'220px',overflowY:'auto',marginTop:'6px',border:'1px solid #d9d7e1',borderRadius:'7px',background:'#fff'});
-  search.closest('.technical-icon-field')?.after(results);
+  (search.closest('.technical-icon-field')||search).after(results);
   const renderResults=()=>{
     const query=patientSearchKey(search.value);
     results.replaceChildren();
@@ -465,7 +510,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('.technical-card tbody tr').forEach(row=>{
-    if (!row.cells[0]?.textContent.trim().startsWith('DS-')) return;
+    const recordNumber=row.cells[0]?.textContent.trim()||'';
+    if (!recordNumber.startsWith('DS-')) return;
+    const pending=recordNumber.startsWith('DS-BEKLEME-');
     const actions=row.querySelector('.technical-actions');
     const edit=actions?.querySelector('a');
     if (!edit) return;
@@ -473,7 +520,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     const patientId=parameters.get('id');
     const editId=parameters.get('edit');
     if (patientId) edit.href='external-technical-repair.php?id='+encodeURIComponent(patientId)+(editId?'&edit='+encodeURIComponent(editId):'');
-    actions.querySelector('form')?.remove();
+    const deleteForm=actions.querySelector('form');
+    if(pending&&deleteForm&&patientId){
+      const idInput=deleteForm.querySelector('input[name="service_id"]');
+      if(idInput){idInput.name='pending_external_patient_id';idInput.value=patientId;}
+      deleteForm.onsubmit=()=>confirm('Teknik Servis Formu Bekliyor kaydı silinsin mi? Dış hasta bekleme kaydı kalıcı olarak kaldırılacaktır.');
+      deleteForm.querySelector('button')?.setAttribute('title','Bekleme kaydını sil');
+    }else if(deleteForm&&editId){
+      const idInput=deleteForm.querySelector('input[name="service_id"]');
+      if(idInput){idInput.name='external_service_id';idInput.value=editId;}
+      deleteForm.onsubmit=()=>confirm('Bu dış hasta Teknik Servis Formu silinsin mi? Dış hasta kartı korunacaktır.');
+      deleteForm.querySelector('button')?.setAttribute('title','Teknik Servis Formunu sil');
+    }else{
+      deleteForm?.remove();
+    }
   });
 });
 </script>
@@ -531,11 +591,30 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
 </script>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
+  const openIndependentWindow=(rawUrl,title)=>{
+    const url=new URL(rawUrl,location.href).href;
+    if(window.parent!==window){
+      window.parent.postMessage({type:'vox-open-window',url,title},location.origin);
+      return;
+    }
+    if(typeof window.voxOpenWindow==='function'){
+      window.voxOpenWindow(url,title);
+      return;
+    }
+    window.open(url,'_blank','noopener');
+  };
   document.querySelectorAll('.technical-card tbody tr').forEach(row=>{
-    if(!row.cells[0]?.textContent.trim().startsWith('DS-'))return;
     const actions=row.querySelector('.technical-actions');
     const edit=actions?.querySelector('a');
-    if(!actions||!edit||actions.querySelector('.external-patient-card-link'))return;
+    if(!actions||!edit)return;
+    const patientName=(row.cells[2]?.textContent||'').replace(/\s*\(Dış Hasta\)\s*/giu,'').trim();
+    edit.addEventListener('click',event=>{
+      if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+      event.preventDefault();
+      event.stopPropagation();
+      openIndependentWindow(edit.href,'Teknik Servis Tamir Formu'+(patientName?' - '+patientName:''));
+    });
+    if(!row.cells[0]?.textContent.trim().startsWith('DS-')||actions.querySelector('.external-patient-card-link'))return;
     const patientId=new URL(edit.href,window.location.origin).searchParams.get('id');
     if(!patientId)return;
     const card=document.createElement('a');
@@ -543,6 +622,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     card.href='external-technical-patient.php?id='+encodeURIComponent(patientId);
     card.title='Dış Hasta Kartı';card.setAttribute('aria-label','Dış Hasta Kartı');
     card.innerHTML='<i class="ti tabler-user-circle"></i>';
+    card.addEventListener('click',event=>{
+      if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+      event.preventDefault();
+      event.stopPropagation();
+      openIndependentWindow(card.href,'Dış Hasta Kartı'+(patientName?' - '+patientName:''));
+    });
     actions.insertBefore(card, edit);
   });
 });

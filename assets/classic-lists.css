@@ -1,0 +1,448 @@
+/* VOX ortak klasik liste görünümü */
+@media (min-width:901px){
+  body#vox-app.vox-classic-list-page > main{
+    padding:8px!important;
+    overflow:hidden!important;
+  }
+  body#vox-app.vox-classic-list-page .patient-topbar{
+    padding-right:82px!important;
+  }
+  body#vox-app .vox-shared-list-controls{
+    position:absolute!important;
+    top:4px!important;
+    right:5px!important;
+    display:flex!important;
+    gap:3px!important;
+    z-index:5!important;
+  }
+  body#vox-app .vox-shared-list-controls button{
+    width:21px!important;
+    min-width:21px!important;
+    height:21px!important;
+    min-height:21px!important;
+    margin:0!important;
+    padding:0!important;
+    display:grid!important;
+    place-items:center!important;
+    border:1px solid rgba(255,255,255,.72)!important;
+    border-radius:2px!important;
+    background:linear-gradient(#4b8f7d,#155445)!important;
+    color:#fff!important;
+    box-shadow:inset 1px 1px rgba(255,255,255,.25)!important;
+    font:700 12px/18px Tahoma,"Segoe UI",sans-serif!important;
+    text-shadow:1px 1px #06382e!important;
+    cursor:pointer!important;
+  }
+  body#vox-app .vox-shared-list-controls button:hover{background:linear-gradient(#69aa96,#1a6653)!important}
+  body#vox-app .vox-shared-list-controls [data-window-action="close"]:hover{background:linear-gradient(#ed8a76,#a82f21)!important}
+  body#vox-app.vox-shared-list-minimized .patient-topbar,
+  body#vox-app.vox-shared-list-minimized > main{display:none!important}
+  body#vox-app.vox-shared-list-maximized .patient-topbar{top:0!important;right:0!important;left:0!important;width:auto!important;border-radius:0!important}
+  body#vox-app.vox-shared-list-maximized > main{top:31px!important;right:0!important;bottom:31px!important;left:0!important;width:auto!important;height:auto!important;border:0!important;box-shadow:none!important}
+  body#vox-app.vox-shared-list-dragging,body#vox-app.vox-shared-list-resizing{user-select:none!important;cursor:move!important}
+  body#vox-app .vox-shared-window-grip{
+    position:fixed!important;
+    z-index:50!important;
+    width:17px!important;
+    height:17px!important;
+    cursor:nwse-resize!important;
+    background:linear-gradient(135deg,transparent 0 44%,rgba(11,70,56,.48) 45% 52%,transparent 53% 62%,rgba(11,70,56,.72) 63% 70%,transparent 71%)!important;
+  }
+}
+
+body#vox-app.vox-classic-list-page .vox-classic-scroll{
+  position:relative!important;
+  width:100%!important;
+  max-width:100%!important;
+  height:calc(100vh - 185px)!important;
+  min-height:240px!important;
+  overflow:auto!important;
+  border:1px solid #aebfb8!important;
+  background:#fff!important;
+  scrollbar-gutter:stable!important;
+}
+body#vox-app.vox-classic-list-page table.vox-classic-table{
+  width:max-content!important;
+  min-width:100%!important;
+  margin:0!important;
+  border-collapse:separate!important;
+  border-spacing:0!important;
+  table-layout:auto;
+  background:#fff!important;
+  color:#172f28!important;
+  font-family:Tahoma,"Segoe UI",sans-serif!important;
+}
+body#vox-app.vox-classic-list-page table.vox-classic-table thead th{
+  position:sticky!important;
+  z-index:12!important;
+  top:0!important;
+  height:22px!important;
+  min-height:22px!important;
+  padding:2px 20px 2px 5px!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-right:1px solid #cbd8d2!important;
+  border-bottom:1px solid #aebfb8!important;
+  background:linear-gradient(#fdfefe,#e1e8e5)!important;
+  color:#17382f!important;
+  text-align:left!important;
+  text-transform:none!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font:700 11px/16px Tahoma,"Segoe UI",sans-serif!important;
+  vertical-align:middle!important;
+}
+body#vox-app.vox-classic-list-page table.vox-classic-table tbody td{
+  height:21px!important;
+  min-height:21px!important;
+  padding:2px 5px!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-right:1px solid #e1e9e5!important;
+  border-bottom:1px solid #d9e2de!important;
+  background:#fff!important;
+  color:#172f28!important;
+  text-align:left!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font:11px/15px Tahoma,"Segoe UI",sans-serif!important;
+  vertical-align:middle!important;
+}
+body#vox-app.vox-classic-list-page table.vox-classic-table tbody tr:nth-child(even) td{background:#fbfdfc!important}
+body#vox-app.vox-classic-list-page table.vox-classic-table tbody tr:hover td{background:#eaf7f0!important}
+body#vox-app.vox-classic-list-page table.vox-classic-table tbody tr.vox-sort-selected td{color:#003cff!important}
+body#vox-app.vox-classic-list-page table.vox-classic-table a{font:inherit!important}
+body#vox-app.vox-classic-list-page table.vox-classic-table th.vox-column-hidden,
+body#vox-app.vox-classic-list-page table.vox-classic-table td.vox-column-hidden{display:none!important}
+
+.vox-shared-column-trigger{
+  position:absolute!important;
+  top:2px!important;
+  right:2px!important;
+  width:16px!important;
+  min-width:16px!important;
+  height:17px!important;
+  min-height:17px!important;
+  margin:0!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  border:1px solid #7ba997!important;
+  border-radius:1px!important;
+  background:linear-gradient(#fff,#dceae4)!important;
+  color:#0d4d3d!important;
+  opacity:0!important;
+  pointer-events:none!important;
+  font:9px/1 Tahoma,sans-serif!important;
+  cursor:pointer!important;
+}
+th:hover > .vox-shared-column-trigger,th:focus-within > .vox-shared-column-trigger,th.vox-column-open > .vox-shared-column-trigger{opacity:1!important;pointer-events:auto!important}
+.vox-shared-column-resizer{
+  position:absolute!important;
+  z-index:14!important;
+  top:0!important;
+  right:-2px!important;
+  width:5px!important;
+  height:100%!important;
+  cursor:col-resize!important;
+}
+.vox-shared-column-resizer:hover{background:rgba(21,116,89,.32)!important}
+.vox-shared-column-menu{
+  position:fixed!important;
+  z-index:2500!important;
+  min-width:205px!important;
+  max-width:280px!important;
+  padding:3px!important;
+  border:1px solid #7f9f93!important;
+  background:#f4f7f5!important;
+  box-shadow:3px 4px 10px rgba(0,0,0,.26)!important;
+  color:#132f26!important;
+  font:11px/1.25 Tahoma,"Segoe UI",sans-serif!important;
+}
+.vox-shared-column-menu[hidden]{display:none!important}
+.vox-shared-column-menu button,.vox-shared-column-menu label{
+  width:100%!important;
+  min-height:23px!important;
+  margin:0!important;
+  padding:4px 7px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#132f26!important;
+  text-align:left!important;
+  font:inherit!important;
+}
+.vox-shared-column-menu button:hover,.vox-shared-column-menu label:hover{background:#dcece5!important}
+.vox-shared-column-menu hr{height:1px;margin:3px 0;border:0;background:#bdcdc6}
+.vox-shared-columns-box{max-height:330px;overflow:auto}
+.vox-shared-columns-box input{width:13px!important;height:13px!important;margin:0!important;accent-color:#166e56!important}
+
+@media (max-width:900px){
+  .vox-shared-list-controls,.vox-shared-window-grip,.vox-shared-column-trigger,.vox-shared-column-resizer{display:none!important}
+}
+
+/* Hasta listesi sunucudan gelirken eski kart görünümünün bir kare dahi görünmesini engeller. */
+@media (min-width:901px){
+  html.vox-patient-list body#vox-app > main.vox-patient-list-page{
+    box-sizing:border-box!important;width:100%!important;max-width:none!important;height:100%!important;
+    min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#dcebf8!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page > .vox-patient-list-card{
+    display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:100%!important;
+    height:100%!important;min-height:0!important;margin:0!important;border:0!important;border-radius:0!important;
+    background:#dcebf8!important;box-shadow:none!important;overflow:hidden!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-toolbar{
+    display:flex!important;flex:0 0 40px!important;align-items:center!important;justify-content:flex-start!important;
+    gap:7px!important;box-sizing:border-box!important;width:100%!important;min-height:40px!important;margin:0!important;
+    padding:4px 8px!important;border:0!important;border-bottom:1px solid #aebfb8!important;background:#e7f2ed!important;
+    color:#17382f!important;font:11px/16px Tahoma,"Segoe UI",sans-serif!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-new-button{
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;height:29px!important;
+    padding:0 10px!important;border:1px solid #19782b!important;border-radius:3px!important;
+    background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;
+    font:700 11px Tahoma,"Segoe UI",sans-serif!important;text-decoration:none!important;text-shadow:1px 1px #176726!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-length,
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-search{
+    display:flex!important;align-items:center!important;gap:5px!important;height:29px!important;margin:0!important;
+    color:#17382f!important;font:11px/16px Tahoma,"Segoe UI",sans-serif!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-search{margin-left:auto!important}
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-length select,
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-search input,
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .year-select{
+    box-sizing:border-box!important;height:27px!important;margin:0!important;padding:2px 6px!important;
+    border:1px solid #8daece!important;border-radius:2px!important;background:#fff!important;
+    color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-scroll{
+    flex:1 1 auto!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
+    margin:0!important;border:0!important;overflow:auto!important;background:#fff!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page table.vox-patient-table{
+    width:max-content!important;min-width:100%!important;margin:0!important;border-collapse:separate!important;
+    border-spacing:0!important;table-layout:auto!important;background:#fff!important;color:#172f28!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-table th{
+    height:22px!important;min-height:22px!important;padding:2px 20px 2px 5px!important;
+    border:0!important;border-right:1px solid #cbd8d2!important;border-bottom:1px solid #aebfb8!important;
+    background:linear-gradient(#fdfefe,#e1e8e5)!important;color:#17382f!important;text-transform:none!important;
+    white-space:nowrap!important;font:700 11px/16px Tahoma,"Segoe UI",sans-serif!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-table td{
+    height:35px!important;min-height:35px!important;padding:2px 5px!important;
+    border:0!important;border-right:1px solid #e1e9e5!important;border-bottom:1px solid #d9e2de!important;
+    background:#fff!important;color:#172f28!important;white-space:nowrap!important;
+    font:11px/15px Tahoma,"Segoe UI",sans-serif!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-actions{
+    display:flex!important;align-items:center!important;justify-content:center!important;flex-wrap:nowrap!important;
+    gap:6px!important;width:146px!important;min-width:146px!important;height:32px!important;margin:0 auto!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-actions > a,
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-actions > form,
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-actions > form > button{
+    flex:0 0 32px!important;margin:0!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-footer{
+    display:flex!important;align-items:center!important;justify-content:space-between!important;
+    flex:0 0 34px!important;min-height:34px!important;margin:0!important;padding:3px 8px!important;
+    background:#edf5f1!important;font:11px/16px Tahoma,"Segoe UI",sans-serif!important
+  }
+  html.vox-patient-list body#vox-app main.vox-patient-list-page .vox-patient-list-pagination{display:flex!important;gap:3px!important}
+}
+
+/* Hasta Kartları: ortak Windows liste şablonunun kompakt yerleşimi. */
+@media (min-width:901px){
+  body#vox-app.vox-classic-list-page main.vox-patient-list-page.vox-patient-classic-list,
+  body#vox-app.vox-embedded-window.vox-classic-list-page main.vox-patient-list-page.vox-patient-classic-list{
+    display:block!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:none!important;
+    height:100%!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    overflow:hidden!important;
+    background:#dcebf8!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list>.vox-patient-list-card{
+    display:flex!important;
+    flex-direction:column!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    height:100%!important;
+    min-height:0!important;
+    margin:0!important;
+    border:0!important;
+    border-radius:0!important;
+    background:#dcebf8!important;
+    box-shadow:none!important;
+    overflow:hidden!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-toolbar{
+    position:relative!important;
+    display:flex!important;
+    flex:0 0 40px!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    gap:7px!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    min-height:40px!important;
+    margin:0!important;
+    padding:4px 8px!important;
+    border:0!important;
+    border-bottom:1px solid #aebfb8!important;
+    background:#e7f2ed!important;
+    color:#17382f!important;
+    font:11px/16px Tahoma,"Segoe UI",sans-serif!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-toolbar>.vox-patient-new-button{
+    order:-10!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    box-sizing:border-box!important;
+    width:auto!important;
+    min-width:91px!important;
+    height:29px!important;
+    min-height:29px!important;
+    margin:0!important;
+    padding:0 10px!important;
+    border:1px solid #19782b!important;
+    border-radius:3px!important;
+    background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;
+    color:#fff!important;
+    font:700 11px Tahoma,"Segoe UI",sans-serif!important;
+    text-decoration:none!important;
+    text-shadow:1px 1px #176726!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-length,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-search{
+    display:flex!important;
+    align-items:center!important;
+    gap:5px!important;
+    height:29px!important;
+    margin:0!important;
+    color:#17382f!important;
+    font:11px/16px Tahoma,"Segoe UI",sans-serif!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-search{margin-left:auto!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-length select,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .year-select,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-search input{
+    box-sizing:border-box!important;
+    height:27px!important;
+    min-height:27px!important;
+    margin:0!important;
+    padding:2px 6px!important;
+    border:1px solid #8daece!important;
+    border-radius:2px!important;
+    background:#fff!important;
+    color:#26384a!important;
+    font:11px/15px Tahoma,"Segoe UI",sans-serif!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-length select{width:64px!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .year-select{width:154px!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-search input{width:220px!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .excel-export-button{
+    display:grid!important;
+    place-items:center!important;
+    box-sizing:border-box!important;
+    width:29px!important;
+    min-width:29px!important;
+    height:29px!important;
+    min-height:29px!important;
+    margin:0!important;
+    border-radius:3px!important;
+    background:#16883d!important;
+    color:#fff!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .excel-export-button svg{width:17px!important;height:17px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.9!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-scroll.vox-classic-scroll{
+    flex:1 1 auto!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    margin:0!important;
+    border:0!important;
+    overflow:auto!important;
+    background:#fff!important;
+    scrollbar-gutter:stable!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list table.vox-patient-table.vox-classic-table{
+    width:max-content!important;
+    min-width:100%!important;
+    table-layout:auto!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list table.vox-patient-table.vox-classic-table thead th{
+    height:22px!important;
+    min-height:22px!important;
+    padding:2px 20px 2px 5px!important;
+    text-transform:none!important;
+    font:700 11px/16px Tahoma,"Segoe UI",sans-serif!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list table.vox-patient-table.vox-classic-table tbody td{
+    height:35px!important;
+    min-height:35px!important;
+    padding:2px 5px!important;
+    font:11px/15px Tahoma,"Segoe UI",sans-serif!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list table.vox-patient-table.vox-classic-table th:last-child,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list table.vox-patient-table.vox-classic-table td:last-child{
+    position:sticky!important;
+    z-index:15!important;
+    right:0!important;
+    box-sizing:border-box!important;
+    width:158px!important;
+    min-width:158px!important;
+    max-width:158px!important;
+    background:#f7fbf9!important;
+    text-align:center!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list table.vox-patient-table.vox-classic-table th:last-child{z-index:18!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-actions{
+    display:flex!important;align-items:center!important;justify-content:center!important;flex-wrap:nowrap!important;
+    gap:6px!important;width:146px!important;min-width:146px!important;height:32px!important;margin:0 auto!important
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-actions>a,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-actions>form,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-actions>form>button{flex:0 0 32px!important;margin:0!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-footer{
+    display:flex!important;
+    flex:0 0 34px!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    box-sizing:border-box!important;
+    width:100%!important;
+    min-height:34px!important;
+    margin:0!important;
+    padding:3px 8px!important;
+    border-top:1px solid #aebfb8!important;
+    background:#edf5f1!important;
+    color:#17382f!important;
+    font:11px/16px Tahoma,"Segoe UI",sans-serif!important;
+  }
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-pagination{gap:3px!important}
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-pagination a,
+  body#vox-app.vox-classic-list-page .vox-patient-classic-list .vox-patient-list-pagination span{
+    display:grid!important;
+    place-items:center!important;
+    box-sizing:border-box!important;
+    min-width:25px!important;
+    height:25px!important;
+    margin:0!important;
+    padding:0 5px!important;
+    border-radius:2px!important;
+    font:11px Tahoma,"Segoe UI",sans-serif!important;
+  }
+}

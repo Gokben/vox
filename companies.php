@@ -160,4 +160,6 @@ document.querySelectorAll('.company-actions').forEach(actions => {
 .company-field:has([name="company_type"]),.company-field:has([name="short_name"]){display:none!important}
 .company-actions-row>.button,.company-actions-row>.cancel-link{display:grid!important;place-items:center!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;max-width:36px!important;max-height:36px!important;padding:0!important;box-sizing:border-box!important}
 </style>
+<?php if ($showForm): ?><script>document.querySelector('main.company-page')?.classList.add('vox-form-page');</script><?php endif; ?>
+<link rel="stylesheet" href="<?=url('assets/classic-field-actions.css?v=20260824-3')?>">
 <?php patient_footer(); ?>

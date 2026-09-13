@@ -1,0 +1,155 @@
+/* VOX Windows layout for Cari Kartlar and dependent screens. */
+body#vox-app { --ca-bg:#dcebf8;--ca-line:#78aee0;--ca-toolbar:#e5f2ed;--ca-text:#153a34; }
+
+body#vox-app.vox-classic-list-page > main.account-page,
+body#vox-app.vox-classic-list-page > main.cam-page,
+body#vox-app.vox-classic-list-page > main.account-documents-page {
+  box-sizing:border-box!important;width:100%!important;max-width:none!important;height:100vh!important;min-height:0!important;
+  margin:0!important;padding:4px!important;overflow:hidden!important;background:var(--ca-bg)!important;color:var(--ca-text)!important;
+  font:12px/1.2 Arial,Helvetica,sans-serif!important;
+}
+
+body#vox-app .account-head { display:none!important; }
+body#vox-app .account-card,
+body#vox-app .cam-card,
+body#vox-app .account-documents-card {
+  display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:100%!important;height:100%!important;min-height:0!important;
+  margin:0!important;padding:0!important;border:1px solid var(--ca-line)!important;border-radius:0!important;background:var(--ca-bg)!important;box-shadow:none!important;overflow:hidden!important;
+}
+
+body#vox-app .account-card>.list-head,
+body#vox-app .cam-card>header,
+body#vox-app .account-documents-card>header {
+  display:flex!important;flex:0 0 38px!important;align-items:center!important;box-sizing:border-box!important;min-height:38px!important;
+  gap:8px!important;margin:0!important;padding:4px 7px!important;border:0!important;border-bottom:1px solid #a9c8df!important;background:var(--ca-toolbar)!important;
+}
+body#vox-app .account-card>.list-head>h2 { display:none!important; }
+body#vox-app .new-account-card { margin-left:auto!important; }
+body#vox-app .new-account-card>summary {
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;height:28px!important;min-height:28px!important;
+  margin:0!important;padding:0 10px!important;border:1px solid #087c38!important;border-radius:3px!important;background:linear-gradient(#28bc62,#07943e)!important;
+  color:#fff!important;font:700 12px Arial,sans-serif!important;box-shadow:inset 0 1px rgba(255,255,255,.45)!important;
+}
+body#vox-app .new-account-card>summary i { font-size:15px!important; }
+
+body#vox-app .account-card>.table-wrap,
+body#vox-app .cam-card>div:not(.account-balance),
+body#vox-app .account-documents-card>.documents-grid {
+  flex:1 1 auto!important;min-height:0!important;overflow:auto!important;background:#fff!important;
+}
+body#vox-app :is(.account-card,.cam-card) table { width:100%!important;border-collapse:collapse!important;background:#fff!important; }
+body#vox-app :is(.account-card,.cam-card) table :is(th,td) {
+  box-sizing:border-box!important;height:34px!important;padding:3px 6px!important;border-right:1px solid #d4dfdc!important;border-bottom:1px solid #d4dfdc!important;
+  text-align:left!important;white-space:nowrap!important;font:12px/1.15 Arial,sans-serif!important;
+}
+body#vox-app :is(.account-card,.cam-card) table th { background:linear-gradient(#f8fbfa,#e7efec)!important;color:var(--ca-text)!important;font-weight:700!important; }
+body#vox-app :is(.account-card,.cam-card) table tbody tr:hover>td { background:#eaf6f0!important; }
+body#vox-app .account-card table th:last-child,
+body#vox-app .account-card table td:last-child { width:140px!important;min-width:140px!important;max-width:140px!important; }
+body#vox-app .account-actions { display:flex!important;align-items:center!important;justify-content:center!important;gap:12px!important;white-space:nowrap!important; }
+body#vox-app .account-actions form,
+body#vox-app .account-actions :is(a,button) {
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;
+  width:28px!important;min-width:28px!important;height:28px!important;min-height:28px!important;margin:0!important;padding:0!important;border-radius:5px!important;
+}
+body#vox-app .account-actions form { display:inline-flex!important;margin:0!important; }
+body#vox-app .account-actions i { font-size:16px!important;line-height:1!important; }
+
+body#vox-app .new-account-card[open] {
+  position:fixed!important;z-index:200!important;inset:0!important;display:flex!important;flex-direction:column!important;box-sizing:border-box!important;
+  margin:0!important;padding:4px!important;border:0!important;border-radius:0!important;background:var(--ca-bg)!important;overflow:hidden!important;
+}
+body#vox-app .new-account-card[open]>summary {
+  flex:0 0 30px!important;justify-content:flex-start!important;width:100%!important;max-width:none!important;height:30px!important;margin:0!important;padding:4px 8px!important;
+  border:1px solid var(--ca-line)!important;border-radius:0!important;background:linear-gradient(#f4faff,#d8eafa)!important;color:#07508a!important;font:700 13px Arial,sans-serif!important;
+}
+body#vox-app .new-account-card[open]>.account-form {
+  box-sizing:border-box!important;flex:1 1 auto!important;width:100%!important;max-width:none!important;min-height:0!important;margin:0!important;padding:4px!important;
+  border:1px solid var(--ca-line)!important;border-top:0!important;border-radius:0!important;background:var(--ca-bg)!important;box-shadow:none!important;overflow:auto!important;
+}
+body#vox-app .account-form>section { margin:0 0 4px!important;padding:0!important;border:1px solid var(--ca-line)!important; }
+body#vox-app .account-form>section+section { margin-top:0!important; }
+body#vox-app .account-form>section>h2 {
+  box-sizing:border-box!important;min-height:25px!important;margin:0!important;padding:4px 8px!important;border-bottom:1px solid var(--ca-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;color:#07508a!important;font:700 13px Arial,sans-serif!important;
+}
+body#vox-app .account-form .grid { grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px 8px!important;padding:6px!important; }
+body#vox-app .account-form .grid label { gap:2px!important;color:var(--ca-text)!important;font:700 12px Arial,sans-serif!important; }
+body#vox-app .account-form .grid :is(input,select,textarea) {
+  box-sizing:border-box!important;width:100%!important;height:27px!important;min-height:27px!important;padding:3px 6px!important;border:1px solid #79a9d4!important;
+  border-radius:0!important;background:#fff!important;color:var(--ca-text)!important;font:12px Arial,sans-serif!important;
+}
+body#vox-app .account-form .grid textarea { height:48px!important;min-height:48px!important;resize:vertical!important; }
+body#vox-app .account-form .technical-service-options>span { font-size:12px!important; }
+body#vox-app .account-form .technical-service-options>div { min-height:27px!important;padding:3px 6px!important;border-color:#79a9d4!important;border-radius:0!important;background:#fff!important; }
+body#vox-app .account-form>.save,
+body#vox-app .account-form>.account-documents-button {
+  float:right!important;box-sizing:border-box!important;width:36px!important;min-width:36px!important;height:30px!important;min-height:30px!important;margin:2px 0 0 6px!important;padding:0!important;border-radius:4px!important;
+}
+
+body#vox-app .cam-card>header>div:first-child { display:flex!important;align-items:center!important;gap:7px!important; }
+body#vox-app .cam-card>header h1 { display:none!important; }
+body#vox-app .cam-card>header p { margin:0!important;color:var(--ca-text)!important;font:700 12px Arial,sans-serif!important; }
+body#vox-app .account-balance {
+  display:flex!important;flex-direction:row!important;align-items:center!important;min-width:0!important;gap:7px!important;margin-left:auto!important;padding:4px 8px!important;
+  border:1px solid #9bbfa7!important;border-radius:3px!important;background:#f4fff6!important;
+}
+body#vox-app .account-balance span { font-size:11px!important; }
+body#vox-app .account-balance strong { font-size:14px!important; }
+body#vox-app .cam-card>div:not(.account-balance)>table { min-width:1050px!important; }
+body#vox-app .cam-card .invoice-details-toggle { width:26px!important;height:26px!important;border-radius:4px!important;font-size:16px!important; }
+body#vox-app .cam-card .invoice-gross-value { width:100px!important;height:25px!important;padding:0 5px!important;border-radius:0!important;font-size:12px!important; }
+body#vox-app .cam-card .invoice-detail-row>td { padding:0!important;background:#fff8ed!important; }
+body#vox-app .cam-card .invoice-items :is(th,td) { height:27px!important;padding:3px 6px!important; }
+body#vox-app .cam-card .item-discount-inline input { width:65px!important;height:25px!important;border-radius:0!important;font-size:12px!important; }
+
+body#vox-app .account-documents-card>header>div { display:flex!important;align-items:center!important;gap:6px!important; }
+body#vox-app .account-documents-card>header h1 { display:none!important; }
+body#vox-app .account-documents-card>header p { margin:0!important;color:var(--ca-text)!important;font:700 12px Arial,sans-serif!important; }
+body#vox-app .documents-back,
+body#vox-app .documents-upload-form button {
+  box-sizing:border-box!important;width:30px!important;min-width:30px!important;height:28px!important;min-height:28px!important;margin:0!important;padding:0!important;border-radius:4px!important;
+}
+body#vox-app .documents-back { margin-left:auto!important;background:linear-gradient(#ffc45b,#f4a136)!important;color:#111!important; }
+body#vox-app .documents-upload-form {
+  display:flex!important;flex:0 0 auto!important;align-items:end!important;box-sizing:border-box!important;gap:7px!important;margin:0!important;padding:6px 8px!important;
+  border-bottom:1px solid var(--ca-line)!important;background:var(--ca-toolbar)!important;
+}
+body#vox-app .documents-upload-form label { gap:2px!important;min-width:min(100%,520px)!important;font:700 12px Arial,sans-serif!important; }
+body#vox-app .documents-upload-form input { box-sizing:border-box!important;height:28px!important;padding:3px 6px!important;border:1px solid #79a9d4!important;border-radius:0!important;background:#fff!important;font-size:12px!important; }
+body#vox-app .documents-upload-form small { width:auto!important;margin-left:auto!important;font-size:11px!important;color:#557086!important; }
+body#vox-app .account-documents-card>.documents-grid {
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-content:start!important;gap:6px!important;padding:6px!important;
+}
+body#vox-app .document-item { gap:4px!important;padding:6px!important;border:1px solid #9ebed8!important;border-radius:0!important;background:#f7fbff!important; }
+body#vox-app .document-preview { height:118px!important;border-radius:0!important;background:#edf4fa!important; }
+body#vox-app .document-item :is(strong,small) { font-size:12px!important; }
+body#vox-app .documents-notice { flex:0 0 auto!important;margin:3px 6px!important;padding:5px 8px!important;border-radius:0!important; }
+
+@media(max-width:900px){body#vox-app.vox-classic-list-page>main.account-page,body#vox-app.vox-classic-list-page>main.cam-page,body#vox-app.vox-classic-list-page>main.account-documents-page{height:auto!important;min-height:100vh!important;overflow:visible!important}.account-form .grid{grid-template-columns:1fr!important}}
+
+/* Cari formlarındaki ana kayıt eylemi diğer VOX kartlarıyla aynı ölçüde kalır. */
+body#vox-app .account-form>.save.vox-classic-save {
+  width:104px!important;
+  min-width:104px!important;
+  padding:0 9px!important;
+  white-space:nowrap!important;
+  font-size:12px!important;
+}
+
+/* Ortak düğme kuralları tarih sıralama düğmesini büyütmemeli. */
+body#vox-app.vox-classic-list-page .cam-card table.vox-classic-table .current-date-sort {
+  display:inline-flex!important;
+  align-items:center!important;
+  width:auto!important;
+  min-width:0!important;
+  height:17px!important;
+  min-height:17px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:inherit!important;
+  font:inherit!important;
+}

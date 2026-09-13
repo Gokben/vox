@@ -49,7 +49,7 @@ if ($editId) {
 }
 $rows = db()->query('SELECT * FROM social_security_definitions ORDER BY sort_order,name')->fetchAll();
 
-patient_header('Ayarlar - Sosyal Güvence', 'settings');
+patient_header('Kurulum - Sosyal Güvence', 'settings');
 ?>
 <main class="patient-container personnel-page">
   <nav class="settings-tabs"></nav>
@@ -76,11 +76,11 @@ patient_header('Ayarlar - Sosyal Güvence', 'settings');
     <header class="form-card-title"><h2>Sosyal Güvence Listesi</h2><p><?= count($rows) ?> kayıt</p></header>
     <div class="table-responsive">
       <table class="personnel-table">
-        <thead><tr><th>Tanım</th><th>Sıra</th><th>Durum</th><th>İşlemler</th></tr></thead>
+        <thead><tr><th>Sıra</th><th>Tanım</th><th>Durum</th><th>İşlemler</th></tr></thead>
         <tbody><?php foreach ($rows as $row): ?>
           <tr>
-            <td><?= e($row['name']) ?></td>
             <td><?= (int)$row['sort_order'] ?></td>
+            <td><?= e($row['name']) ?></td>
             <td><span class="status-pill <?= $row['active'] ? 'active' : 'passive' ?>"><?= $row['active'] ? 'Aktif' : 'Pasif' ?></span></td>
             <td><a class="edit-personnel" href="<?= url('social-securities.php?edit=' . (int)$row['id']) ?>">Düzenle</a><form method="post" class="social-delete" onsubmit="return confirm('Bu tanım silinsin mi?')"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button>Sil</button></form></td>
           </tr>

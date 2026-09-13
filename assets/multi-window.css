@@ -1,0 +1,95 @@
+/* VOX masaüstü çoklu pencere yöneticisi */
+@media (min-width:901px){
+  body#vox-app:not(.vox-embedded-window){background-color:#003c30!important}
+  /* Tam ekran bir liste açıkken Başlat menüsü üstte kalır ve pencere menünün sağına yerleşir. */
+  body#vox-app.desktop-menu-open .patient-nav{z-index:410!important}
+  html body#vox-app.desktop-menu-open.vox-list-maximized .patient-topbar,
+  html body#vox-app.desktop-menu-open.vox-shared-list-maximized .patient-topbar{left:238px!important;right:0!important;width:auto!important}
+  html body#vox-app.desktop-menu-open.vox-list-maximized>main.datatable-page,
+  html body#vox-app.desktop-menu-open.vox-shared-list-maximized>main{left:238px!important;right:0!important;width:auto!important}
+  body#vox-app.desktop-menu-open .vox-mdi-window.vox-mdi-maximized{left:238px!important;right:0!important;width:auto!important}
+  body#vox-app.vox-list-maximized .patient-topbar,
+  body#vox-app.vox-list-maximized>main.datatable-page,
+  body#vox-app.vox-shared-list-maximized .patient-topbar,
+  body#vox-app.vox-shared-list-maximized>main,
+  body#vox-app .vox-mdi-window.vox-mdi-maximized{transition:left .18s ease,width .18s ease!important}
+
+  body#vox-app .vox-window-workspace{position:fixed;z-index:80;inset:0 0 31px;pointer-events:none}
+  body#vox-app .vox-mdi-window{
+    position:fixed;
+    z-index:90;
+    width:min(78vw,1120px);
+    height:min(78vh,760px);
+    min-width:620px;
+    min-height:350px;
+    overflow:hidden;
+    border:1px solid #d7b463;
+    border-radius:5px 5px 0 0;
+    background:#f6efe1;
+    box-shadow:4px 7px 18px rgba(0,0,0,.42);
+    pointer-events:auto;
+  }
+  body#vox-app .vox-mdi-window.vox-mdi-active{box-shadow:5px 9px 22px rgba(0,0,0,.52)}
+  body#vox-app .vox-mdi-window.vox-mdi-sizing{visibility:hidden!important}
+  body#vox-app .vox-mdi-window.vox-mdi-minimized{display:none!important}
+  body#vox-app .vox-mdi-window.vox-mdi-maximized{top:0!important;right:0!important;bottom:31px!important;left:0!important;width:auto!important;height:auto!important;border:0!important;border-radius:0!important}
+  body#vox-app .vox-mdi-titlebar{
+    height:31px;
+    padding:3px 76px 3px 9px;
+    overflow:hidden;
+    border-bottom:1px solid #d7b463;
+    background:linear-gradient(180deg,#267563 0%,#0e4b3d 48%,#083329 100%);
+    color:#fff;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font:700 12px/24px Tahoma,"Segoe UI",sans-serif;
+    text-shadow:1px 1px #062f27;
+    cursor:move;
+    user-select:none;
+  }
+  body#vox-app .vox-mdi-window:not(.vox-mdi-active) .vox-mdi-titlebar{background:linear-gradient(#5f877b,#315f52)}
+  body#vox-app .vox-mdi-controls{position:absolute;z-index:3;top:4px;right:5px;display:flex;gap:3px}
+  body#vox-app .vox-mdi-controls button{
+    width:21px!important;min-width:21px!important;height:21px!important;min-height:21px!important;margin:0!important;padding:0!important;
+    display:grid!important;place-items:center!important;border:1px solid rgba(255,255,255,.72)!important;border-radius:2px!important;
+    background:linear-gradient(#4b8f7d,#155445)!important;color:#fff!important;font:700 12px/18px Tahoma,sans-serif!important;
+    text-shadow:1px 1px #06382e!important;box-shadow:inset 1px 1px rgba(255,255,255,.25)!important;cursor:pointer!important
+  }
+  body#vox-app .vox-mdi-controls button:hover{background:linear-gradient(#69aa96,#1a6653)!important}
+  body#vox-app .vox-mdi-controls [data-mdi-action="close"]:hover{background:linear-gradient(#ed8a76,#a82f21)!important}
+  body#vox-app .vox-mdi-frame{display:block;width:100%;height:calc(100% - 31px);border:0;background:#f6efe1}
+  body#vox-app .vox-mdi-resizer{position:absolute;z-index:4;right:0;bottom:0;width:17px;height:17px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 0 43%,rgba(11,70,56,.45) 44% 51%,transparent 52% 61%,rgba(11,70,56,.75) 62% 70%,transparent 71%)}
+  body#vox-app .vox-mdi-maximized .vox-mdi-resizer{display:none}
+  body#vox-app .vox-mdi-window.vox-mdi-vertical-resize-only .vox-mdi-resizer{cursor:ns-resize;background:linear-gradient(90deg,transparent 0 32%,rgba(11,70,56,.5) 33% 42%,transparent 43% 57%,rgba(11,70,56,.78) 58% 67%,transparent 68%)}
+  body#vox-app .desktop-taskbar{z-index:300!important;overflow:hidden!important}
+  body#vox-app .vox-mdi-task{
+    min-width:120px!important;max-width:210px!important;height:25px!important;min-height:25px!important;margin:0!important;padding:4px 9px!important;
+    overflow:hidden!important;justify-content:flex-start!important;border:1px solid #0a3a2f!important;border-radius:1px!important;
+    background:linear-gradient(#337d68,#145342)!important;color:#fff!important;text-overflow:ellipsis!important;white-space:nowrap!important;
+    font:11px Tahoma,"Segoe UI",sans-serif!important;box-shadow:none!important
+  }
+  body#vox-app .vox-mdi-task.vox-mdi-task-active{background:linear-gradient(#4d9a82,#1c6854)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.32)!important}
+  body#vox-app .vox-mdi-task.vox-mdi-task-minimized{opacity:.68}
+  body#vox-app.vox-mdi-dragging,body#vox-app.vox-mdi-resizing{user-select:none!important}
+}
+
+/* Alt pencere içeriği: ikinci bir masaüstü kabuğu göstermeden yalnızca iş ekranı. */
+html:has(body.vox-embedded-window),body#vox-app.vox-embedded-window{height:100%!important;overflow:hidden!important}
+body#vox-app.vox-embedded-window{margin:0!important;padding:0!important;background:#f6efe1!important}
+body#vox-app.vox-embedded-window::before,
+body#vox-app.vox-embedded-window>.patient-header,
+body#vox-app.vox-embedded-window>.desktop-taskbar,
+body#vox-app.vox-embedded-window .vox-list-window-controls,
+body#vox-app.vox-embedded-window .vox-shared-list-controls,
+body#vox-app.vox-embedded-window .vox-work-window-close,
+body#vox-app.vox-embedded-window>.vox-window-resize-grip,
+body#vox-app.vox-embedded-window>.vox-shared-window-grip{display:none!important}
+body#vox-app.vox-embedded-window>main{
+  position:absolute!important;z-index:1!important;inset:0!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+  margin:0!important;padding:8px!important;overflow:auto!important;border:0!important;border-radius:0!important;background:#f6efe1!important;box-shadow:none!important
+}
+body#vox-app.vox-embedded-window.vox-list-minimized>main,
+body#vox-app.vox-embedded-window.vox-shared-list-minimized>main,
+body#vox-app.vox-embedded-window.vox-work-window-closed>main{display:block!important}
+
+@media (max-width:900px){.vox-window-workspace,.vox-mdi-window,.vox-mdi-task{display:none!important}}

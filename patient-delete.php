@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/config.php';
-require_login();
+require_admin();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('patients.php');
 verify_csrf();
 

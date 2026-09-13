@@ -2,11 +2,12 @@
 declare(strict_types=1);
 
 const APP_NAME = 'Vox';
+const SESSION_IDLE_TIMEOUT = 1800;
 $configuredBasePath = getenv('APP_BASE_PATH');
 $host = $_SERVER['HTTP_HOST'] ?? '';
 $isLocalHost = str_starts_with($host, '127.0.0.1') || str_starts_with($host, 'localhost');
 $isLocalEnvironment = getenv('APP_ENV') === 'local' || $isLocalHost;
-define('BASE_PATH', $configuredBasePath !== false ? $configuredBasePath : ($isLocalHost ? '' : '/crm'));
+define('BASE_PATH', $configuredBasePath !== false ? $configuredBasePath : ($isLocalHost ? '' : '/erp'));
 
 $privateConfig = __DIR__ . '/config.local.php';
 if (is_file($privateConfig)) require $privateConfig;
@@ -21,6 +22,17 @@ if ($isLocalEnvironment) {
     if (!is_dir(__DIR__ . '/storage')) mkdir(__DIR__ . '/storage', 0775, true);
     session_save_path(__DIR__ . '/storage');
 }
+$cookieSecure = !$isLocalEnvironment && (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (string)($_SERVER['SERVER_PORT'] ?? '') === '443'
+);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => BASE_PATH ?: '/',
+    'secure' => $cookieSecure,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_name('krp_vox');
 session_start();
 
@@ -71,7 +83,22 @@ function roles(): array { return [ROLE_COMPANY_MANAGER => 'Firma Yöneticisi', R
 function normalize_role(string $role): string { return match ($role) { 'Admin' => ROLE_COMPANY_MANAGER, 'User' => ROLE_SECRETARY, default => array_key_exists($role, roles()) ? $role : ROLE_SECRETARY }; }
 function role_label(?string $role): string { return roles()[normalize_role((string)$role)] ?? 'Sekreter'; }
 function current_role(): string { $role = normalize_role((string)($_SESSION['user']['role'] ?? ROLE_SECRETARY)); if (!empty($_SESSION['user'])) $_SESSION['user']['role'] = $role; return $role; }
-function require_login(): void { if (empty($_SESSION['user'])) redirect('login.php'); current_role(); }
+function require_login(): void {
+    if (empty($_SESSION['user'])) redirect('login.php');
+    $now = time();
+    $lastActivity = (int)($_SESSION['last_activity'] ?? $now);
+    if (($now - $lastActivity) >= SESSION_IDLE_TIMEOUT) {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', $now - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+        redirect('login.php?timeout=1');
+    }
+    $_SESSION['last_activity'] = $now;
+    current_role();
+}
 function is_admin(): bool { return current_role() === ROLE_COMPANY_MANAGER; }
 function ensure_role_schema(): void { static $done = false; if ($done) return; $done = true; $pdo = db(); $pdo->exec("UPDATE users SET role = 'company_manager' WHERE role = 'Admin'"); $pdo->exec("UPDATE users SET role = 'secretary' WHERE role = 'User' OR role IS NULL OR role = ''"); if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $pdo->exec("ALTER TABLE users MODIFY role ENUM('company_manager','audiometrist','secretary','accounting') NOT NULL DEFAULT 'secretary'"); }
 function ensure_branch_schema(): void {

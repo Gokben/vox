@@ -11,34 +11,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         session_regenerate_id(true);
         unset($user['password_hash']);
         $_SESSION['user'] = $user;
+        $_SESSION['last_activity'] = time();
         redirect('index.php');
     }
     $error = 'E-posta veya şifre hatalı.';
 }
 ?>
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Giriş | <?= APP_NAME ?></title><link rel="icon" type="image/png" href="<?= url('assets/favicon.png') ?>"><link rel="stylesheet" href="<?= url('assets/style.css') ?>"><link rel="stylesheet" href="<?= url('assets/login.css') ?>"><link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce/icon/icomoon/style.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce/css/bootstrap.min.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce/css/styles.css')?>"><link rel="stylesheet" href="<?=url('assets/amerce-lf.css')?>"><link rel="stylesheet" href="<?=url('assets/green-buttons.css?v=20260712-3')?>"><link rel="stylesheet" href="<?=url('assets/design-system.css?v=2')?>"><script src="<?=url('assets/theme.js?v=20260712-2')?>"></script></head>
-<link rel="stylesheet" href="<?=url('assets/login.css?v=20260815-1')?>">
-<body class="login-page" style="background-image:linear-gradient(rgba(4,12,24,.12),rgba(4,12,24,.22)),url('<?=url('assets/vox-login-signia-1920x1080.jpg?v=20260713-4')?>')!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important;background-attachment:fixed!important">
+<link rel="stylesheet" href="<?=url('assets/login.css?v=20260823-green-button-gradient')?>">
+<body class="login-page">
 <main class="login-card">
   <div class="sofitel-brand">
-    <img src="<?= url('assets/vox-logo-02.png?v=20260713-5') ?>" alt="VOX">
+    <img src="<?= url('assets/vox-logo-02.png?v=20260823-green-pillow-transparent') ?>" alt="VOX">
   </div>
-  <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
+  <h1 class="login-heading">Kullanıcı Girişi</h1>
+  <p class="login-subtitle">Vox yönetim sistemine erişmek için giriş yapın.</p>
   <form method="post">
     <input type="hidden" name="csrf" value="<?= csrf() ?>">
-    <label>E-posta adresi
-      <input type="email" name="email" autocomplete="username" placeholder="ornek@sofitel.com" required>
+    <label class="login-field">E-posta adresi
+      <input type="email" name="email" autocomplete="username" required autofocus>
     </label>
-    <label>Şifre
-      <span class="password-field">
-        <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Şifrenizi girin" required>
-        <button class="password-toggle" type="button" aria-label="Şifreyi göster" onclick="togglePassword(this)"><span class="eye-icon" aria-hidden="true"></span></button>
-      </span>
+    <label class="login-field">Şifre
+      <input id="password" type="password" name="password" autocomplete="current-password" placeholder="Şifrenizi girin" required>
     </label>
-    <label class="remember"><input type="checkbox" name="remember" value="1"> <span>Beni hatırla</span></label>
-    <button class="login-submit" type="submit">Giriş yap</button>
+    <div class="login-options">
+      <label class="remember"><input type="checkbox" name="remember" value="1"> <span>Kullanıcı adını hatırla</span></label>
+      <span>Güvenli oturum</span>
+    </div>
+    <button class="login-submit" type="submit">Giriş Yap</button>
   </form>
-  <small class="secure-note">Yalnızca yetkili personel erişebilir</small>
+  <?php if ($error): ?><p class="login-error" role="alert"><?= e($error) ?></p><?php endif; ?>
 </main>
-<script>function togglePassword(button){const input=document.getElementById('password');const visible=input.type==='text';input.type=visible?'password':'text';button.classList.toggle('is-visible',!visible);button.setAttribute('aria-label',visible?'Şifreyi göster':'Şifreyi gizle')}</script>
 </body></html>

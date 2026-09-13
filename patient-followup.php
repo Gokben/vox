@@ -48,6 +48,10 @@ $staffNames = patient_staff_names(true);
 $anamnesisQuestions = array_values(array_filter(anamnesis_question_definitions(), static fn(array $question): bool => (int)$question['active'] === 1));
 $anamnesisTextFields = array_values(array_filter(anamnesis_text_field_definitions(), static fn(array $field): bool => (int)$field['active'] === 1));
 $anamnesisPrintSettings = anamnesis_print_settings();
+$anamnesisConfiguredLogoPath = ltrim(str_replace('\\', '/', trim((string)($anamnesisPrintSettings['company_logo_path'] ?? ''))), '/');
+$anamnesisCompanyLogoPath = $anamnesisConfiguredLogoPath !== '' && is_file(__DIR__ . '/' . $anamnesisConfiguredLogoPath)
+    ? $anamnesisConfiguredLogoPath
+    : 'assets/uploads/anamnesis/company-logo-e4237f98cab63e0e7e3baa16.jpg';
 $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS patient_services (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER NOT NULL, service_date TEXT NOT NULL, service_status TEXT NOT NULL, performed_action TEXT, action_date TEXT, opened_by TEXT, branch_name TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)'
@@ -61,7 +65,7 @@ if ((int)$pdo->query('SELECT COUNT(*) FROM service_card_type_definitions')->fetc
 }
 $serviceCardTypes = $pdo->query('SELECT * FROM service_card_type_definitions WHERE active=1 ORDER BY sort_order,name')->fetchAll();
 
-$extraColumns = ['record_no VARCHAR(60) NULL','appointment_date DATE NULL','start_time VARCHAR(10) NULL','end_time VARCHAR(10) NULL','service_type VARCHAR(150) NULL','service_location VARCHAR(150) NULL','branch_id INT NULL','contact_person VARCHAR(190) NULL','appointment_status VARCHAR(100) NULL','complaint TEXT NULL','anamnesis_form TEXT NULL','observation TEXT NULL','service_name VARCHAR(150) NULL','stock_id BIGINT NULL','sales_details TEXT NULL','sales_locked TINYINT(1) NOT NULL DEFAULT 0','result_name VARCHAR(100) NULL','related_personnel TEXT NULL','satisfaction TINYINT NULL','action_name VARCHAR(150) NULL','repair_details TEXT NULL','description TEXT NULL'];
+$extraColumns = ['record_no VARCHAR(60) NULL','appointment_date DATE NULL','start_time VARCHAR(10) NULL','end_time VARCHAR(10) NULL','service_type VARCHAR(150) NULL','service_location VARCHAR(150) NULL','branch_id INT NULL','contact_person VARCHAR(190) NULL','appointment_status VARCHAR(100) NULL','complaint TEXT NULL','anamnesis_form TEXT NULL','observation TEXT NULL','service_name VARCHAR(150) NULL','stock_id BIGINT NULL','sales_details TEXT NULL','sales_locked TINYINT(1) NOT NULL DEFAULT 0','result_name VARCHAR(100) NULL','related_personnel TEXT NULL','satisfaction TINYINT NULL','action_name VARCHAR(150) NULL','mold_date DATE NULL','mold_form_data TEXT NULL','installation_date DATE NULL','repair_details TEXT NULL','description TEXT NULL'];
 $knownColumns = $sqlite ? array_column($pdo->query('PRAGMA table_info(patient_services)')->fetchAll(), 'name') : array_column($pdo->query('SHOW COLUMNS FROM patient_services')->fetchAll(), 'Field');
 foreach ($extraColumns as $definition) {
     $column = explode(' ', $definition, 2)[0];
@@ -340,6 +344,8 @@ $serviceActions = array_filter(service_action_definitions(), static fn(array $ac
 $repairIssueDefinitions = array_filter(complaint_definitions(), static fn(array $issue): bool => (int)$issue['active'] === 1);
 $openIncomeRecord = isset($_GET['open_income_record']);
 $openSalesDetails = isset($_GET['open_sales_details']);
+$salesWindow = isset($_GET['sales_window']);
+$anamnesisWindow = isset($_GET['anamnesis_window']);
 $fromSgkList = isset($_GET['from_sgk_list']);
 $editId = (int)($_GET['edit'] ?? 0);
 if ($openIncomeRecord && !$editId) {
@@ -348,6 +354,9 @@ if ($openIncomeRecord && !$editId) {
     $editId = (int)$latestSaleStatement->fetchColumn();
 }
 $showForm = isset($_GET['new']) || $editId > 0;
+$fromPatientCard = (string)($_GET['from_patient_card'] ?? $_POST['from_patient_card'] ?? '') === '1';
+$fromPatientList = (string)($_GET['from_patient_list'] ?? $_POST['from_patient_list'] ?? '') === '1';
+$serviceNavigationContext = ($fromPatientCard ? '&from_patient_card=1' : '') . ($fromPatientList ? '&from_patient_list=1' : '');
 $serviceCard = [];
 if ($editId) {
     $editStatement = $pdo->prepare('SELECT * FROM patient_services WHERE id=? AND patient_id=?');
@@ -508,15 +517,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => $statement->rowCount() >= 0, 'message' => 'Anamnez kaydedildi.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($action === 'save_mold_form') {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($postedEditId <= 0) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Önce hizmet kartını kaydedin.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $moldData = json_decode((string)($_POST['mold_form_data'] ?? ''), true);
+        if (!is_array($moldData) || count($moldData) > 80) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Kalıp formu verisi geçersiz.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $safeMoldData = [];
+        foreach ($moldData as $key => $value) {
+            if (!is_string($key) || !preg_match('/^mold-(?:[0-9]+|mark-[0-9]+)$/', $key) || !is_scalar($value)) continue;
+            $safeMoldData[$key] = mb_substr(trim((string)$value), 0, 2000, 'UTF-8');
+        }
+        $statement = $pdo->prepare('UPDATE patient_services SET mold_form_data=? WHERE id=? AND patient_id=?');
+        $statement->execute([json_encode($safeMoldData, JSON_UNESCAPED_UNICODE), $postedEditId, $id]);
+        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($action === 'cash_delete_only' && $cashDeleteId) {
         $cashDeleteStatement = $pdo->prepare("DELETE FROM cash_transactions WHERE id=? AND transaction_type='income' AND source_url=?");
         $cashDeleteStatement->execute([$cashDeleteId, url('patient-followup.php?id=' . $id)]);
-        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
+        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1' . $serviceNavigationContext);
     }
     if ($action === 'cash_cancel_income' && $postedEditId > 0) {
         $cancelIncomeStatement = $pdo->prepare("DELETE FROM cash_transactions WHERE transaction_type='income' AND source_url=?");
         $cancelIncomeStatement->execute([url('patient-followup.php?id=' . $id)]);
-        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . $serviceNavigationContext);
     }
     if ($action === 'cash_term_schedule_only') {
         $cashId = (int)($_POST['cash_id'] ?? 0);
@@ -557,7 +589,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'current_account_id' => (string)($_POST['cash_update_extra_current_account_id'] ?? ''),
                 'term_schedule' => $extraSchedule,
             ];
-            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1' . $serviceNavigationContext);
         }
     }
     $cashUpdateId = (int)($_POST['cash_update_id'] ?? 0);
@@ -637,7 +669,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => true, 'records' => $cashRefreshStatement->fetchAll()]);
             exit;
         }
-        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
+        redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1' . $serviceNavigationContext);
     }
     $savedServiceName = '';
     if ($postedEditId) {
@@ -652,7 +684,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete' && $postedEditId) {
         if ($linkedSaleState['sale'] && $linkedSaleState['cash']) {
             $_SESSION['service_integrity_error'] = 'Bu satışa bağlı kasa tahsilatı bulunuyor. Önce tahsilatı iptal etmeden satış kartı silinemez.';
-            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . $serviceNavigationContext);
         }
         if ($savedServiceName === 'Tamir') {
             try {
@@ -660,7 +692,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $repairPayment->execute([url('patient-followup.php?id=' . $id) . '&repair=' . $postedEditId]);
                 if ($repairPayment->fetchColumn()) {
                     $_SESSION['service_integrity_error'] = 'Bu Tamir kartı için hastadan tahsilat yapılmış. Önce tahsilatı iptal etmeden kart silinemez.';
-                    redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+                    redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . $serviceNavigationContext);
                 }
             } catch (Throwable $exception) {
                 error_log('repair delete payment check: ' . $exception->getMessage());
@@ -674,7 +706,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([$postedEditId, 'Hizmet kartı satışı: ' . $recordNo . '%']);
         }
         $pdo->prepare('DELETE FROM patient_services WHERE id=? AND patient_id=?')->execute([$postedEditId, $id]);
-        redirect('patient-followup.php?id=' . $id);
+        redirect('patient-followup.php?id=' . $id . $serviceNavigationContext);
     }
     $postedServiceName = trim((string)($_POST['service_name'] ?? ''));
     // Satış penceresinin Kaydet düğmesi bu işareti gönderir; hizmet türü
@@ -725,8 +757,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $requiredSerialCount = max(1, min(2, (int)($postedRepairDetails['repair_patient_device_quantity'] ?? 1)));
             $selectedSerialCount = count((array)($postedRepairDetails['repair_selected_device_serials[]'] ?? []));
             if ($selectedSerialCount !== $requiredSerialCount) {
+                if ((string)($_POST['ajax'] ?? '') === 'repair_fee_prepare') {
+                    http_response_code(422);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Hizmet bedeli kaydından önce cihaz adedine uygun seri numarası seçmelisiniz.',
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
                 $_SESSION['service_integrity_error'] = 'Tamir kaydını kaydetmek için adet bilgisine uygun seri numarası seçmelisiniz.';
-                redirect('patient-followup.php?id=' . $id . ($postedEditId ? '&edit=' . $postedEditId : '&new=1'));
+                redirect('patient-followup.php?id=' . $id . ($postedEditId ? '&edit=' . $postedEditId : '&new=1') . $serviceNavigationContext);
             }
         }
     }
@@ -751,6 +792,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'service_status'=>trim((string)($_POST['result_name'] ?? 'Beklemede')) === 'Red' ? 'Ret' : trim((string)($_POST['result_name'] ?? 'Beklemede')),
         'performed_action'=>trim((string)($_POST['action_name'] ?? '')),
         'action_date'=>(string)($_POST['action_date'] ?? ''),
+        'mold_date'=>$postedServiceName === 'Satış' && trim((string)($_POST['mold_date'] ?? '')) !== '' ? trim((string)$_POST['mold_date']) : null,
+        'installation_date'=>$postedServiceName === 'Satış' && trim((string)($_POST['installation_date'] ?? '')) !== '' ? trim((string)$_POST['installation_date']) : null,
         'opened_by'=>$postedEditId
             ? (trim((string)($serviceCard['opened_by'] ?? '')) ?: (string)($_SESSION['user']['name'] ?? ''))
             : (string)($_SESSION['user']['name'] ?? ''),
@@ -768,6 +811,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $savedDetailsForInvoice = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
         $postedDetailsForInvoice = json_decode((string)($values['sales_details'] ?? ''), true);
         $invoiceOnlyUpdate = false;
+        $linkedSaleDetailsChanged = false;
         if (is_array($savedDetailsForInvoice) && is_array($postedDetailsForInvoice)) {
             $savedInvoice = trim((string)($savedDetailsForInvoice['sales_invoice_no'] ?? ''));
             $postedInvoice = trim((string)($postedDetailsForInvoice['sales_invoice_no'] ?? ''));
@@ -775,10 +819,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ksort($savedDetailsForInvoice);
             ksort($postedDetailsForInvoice);
             $invoiceOnlyUpdate = $savedInvoice !== $postedInvoice && $savedDetailsForInvoice === $postedDetailsForInvoice;
+            $linkedSaleDetailsChanged = $savedDetailsForInvoice !== $postedDetailsForInvoice;
+        } else {
+            $linkedSaleDetailsChanged = (string)($serviceCard['sales_details'] ?? '') !== (string)($values['sales_details'] ?? '');
         }
-        if (!$invoiceOnlyUpdate && (string)($_POST['confirm_linked_sale_change'] ?? '') !== '1') {
+        if ($linkedSaleDetailsChanged && !$invoiceOnlyUpdate && (string)($_POST['confirm_linked_sale_change'] ?? '') !== '1') {
             $_SESSION['service_integrity_error'] = 'Bu satış kartı kasa tahsilatı veya stok çıkışı ile bağlıdır. Değişikliğin tüm bağlı kayıtları etkileyebileceğini onaylamalısınız.';
-            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId);
+            redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . $serviceNavigationContext);
         }
         if ($linkedSaleState['cash'] && $postedServiceName === 'Satış') {
             $newDetails = json_decode((string)$values['sales_details'], true);
@@ -788,7 +835,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cashTotal = (float)$cashTotalStatement->fetchColumn();
             if ($newSaleTotal > 0 && abs($newSaleTotal - $cashTotal) > 0.009) {
                 $_SESSION['service_integrity_error'] = 'Satış toplamı ile kasa tahsilatı farklı olamaz. Önce Gelir Kayıt ekranından tahsilatı güncelleyin.';
-                redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1');
+                redirect('patient-followup.php?id=' . $id . '&edit=' . $postedEditId . '&open_income_record=1' . $serviceNavigationContext);
             }
         }
     }
@@ -929,8 +976,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => $savedServiceId > 0, 'service_id' => $savedServiceId], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    if (isset($_POST['return_to_sales_details']) && $savedServiceId > 0) redirect('patient-followup.php?id=' . $id . '&edit=' . $savedServiceId . '&open_sales_details=1');
-    redirect('patient-followup.php?id=' . $id);
+    if (isset($_POST['return_to_sales_details']) && $savedServiceId > 0) redirect('patient-followup.php?id=' . $id . '&edit=' . $savedServiceId . '&open_sales_details=1' . $serviceNavigationContext);
+    redirect('patient-followup.php?id=' . $id . $serviceNavigationContext);
 }
 
 $servicesStatement = $pdo->prepare('SELECT * FROM patient_services WHERE patient_id=? ORDER BY service_date DESC,id DESC');
@@ -972,11 +1019,21 @@ if (!is_array($incomeValidationDraft)) $incomeValidationDraft = [];
 unset($_SESSION['income_validation_error']);
 unset($_SESSION['income_validation_draft']);
 unset($_SESSION['service_integrity_error']);
-patient_header('Hizmetler', 'patients');
+patient_header($salesWindow ? 'Satış Kartı - ' . (string)$patient['full_name'] : 'Hizmetler', 'patients');
+if (!$showForm): ?>
+<style>
+@media(min-width:901px){
+  body#vox-app .patient-topbar .service-window-patient-name{position:absolute!important;z-index:4!important;top:3px!important;left:50%!important;display:block!important;box-sizing:border-box!important;max-width:52%!important;margin:0!important;padding:0 8px!important;overflow:hidden!important;transform:translateX(-50%)!important;color:#fff!important;text-align:center!important;text-overflow:ellipsis!important;white-space:nowrap!important;font:700 12px/24px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #083329!important;pointer-events:none!important}
+}
+</style>
+<script>
+(()=>{const topbar=document.querySelector('.patient-topbar');if(!topbar||topbar.querySelector('.service-window-patient-name'))return;const owner=document.createElement('strong');owner.className='service-window-patient-name';owner.textContent=<?=json_encode((string)$patient['full_name'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;owner.title=owner.textContent;topbar.append(owner);})();
+</script>
+<?php endif;
 if ($serviceIntegrityError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>alert(<?=json_encode($serviceIntegrityError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0));</script><?php endif;
 if ($incomeValidationError !== ''): ?><script>window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{const openIncome=()=>{const form=document.querySelector('form[action*="cash.php"]'),modal=form?.parentElement;if(!modal){setTimeout(openIncome,50);return;}modal.hidden=false;modal.style.display='grid';setTimeout(()=>alert(<?=json_encode($incomeValidationError, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>),0);};openIncome();},350));</script><?php endif;
 $requestedServiceName = trim((string)($_GET['service_name'] ?? ''));
-$form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>(string)($patient['branch_id'] ?? ''),'contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'anamnesis_form'=>'','observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'repair_details'=>'','description'=>''], $serviceCard);
+$form = array_merge(['record_no'=>next_service_record_no($pdo),'service_date'=>date('Y-m-d'),'appointment_date'=>date('Y-m-d'),'start_time'=>'15:00','end_time'=>'17:00','service_type'=>'','service_location'=>(string)($patient['service_location'] ?? ''),'branch_id'=>(string)($patient['branch_id'] ?? ''),'contact_person'=>patient_staff_list($patient, $staffNames),'appointment_status'=>'','complaint'=>(string)($patient['anamnesis'] ?? ''),'anamnesis_form'=>'','observation'=>'','service_name'=>$requestedServiceName,'stock_id'=>null,'sales_details'=>'','result_name'=>$patientOutcome ?: 'Beklemede','related_personnel'=>patient_staff_list($patient, $staffNames),'satisfaction'=>1,'action_name'=>'','action_date'=>date('Y-m-d'),'mold_date'=>'','installation_date'=>'','repair_details'=>'','description'=>''], $serviceCard);
 $showRepairDetailsButton = $showForm && trim((string)$form['service_name']) === 'Tamir' && trim((string)$form['repair_details']) !== '';
 if ($form['result_name'] === 'Red') $form['result_name'] = 'Ret';
 if ($editId && trim((string)$form['service_location']) === '') $form['service_location'] = (string)($patient['service_location'] ?? '');
@@ -1052,8 +1109,82 @@ if ($currentContactPerson !== '') {
 [data-theme=dark] .service-name-locked input{background:#393c59!important;color:#c5c6d3!important}
 </style>
 <style>.service-form footer .button{box-sizing:border-box!important;width:36px!important;min-width:36px!important;max-width:36px!important;height:36px!important;min-height:36px!important;max-height:36px!important;padding:0!important;display:inline-grid!important;place-items:center!important}</style>
-<main class="patient-container services-page"><section class="services-card">
-<?php if($showForm): ?><header class="services-head service-form-head"><h2><?= $editId ? 'Hizmet Kartı Düzenle' : 'Yeni Hizmet Kartı' ?> - <?=e($patient['full_name'])?></h2><span class="service-form-actions"><a class="service-back-link" href="<?=e(url('patient-followup.php?id='.$id))?>">Listeye dön</a></span></header><form id="service-card-form" class="service-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=$editId?>"><input type="hidden" id="repair_details" name="repair_details" value="<?=e((string)$form['repair_details'])?>"><input type="hidden" id="sales_stock_id" name="stock_id" value="<?=e((string)($form['stock_id'] ?? ''))?>"><input type="hidden" id="sales_details" name="sales_details" value="<?=e((string)($form['sales_details'] ?? ''))?>">
+<?php if($showForm): ?><style>
+/* Hasta Kartındaki klasik Windows form şablonu. */
+html body#vox-app>main.services-form-page{box-sizing:border-box!important;width:auto!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#dcebf8!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+html body#vox-app.vox-embedded-window>main.services-form-page{box-sizing:border-box!important;width:100%!important;max-width:none!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#dcebf8!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+html body#vox-app>main.services-form-page .services-card,
+html body#vox-app.vox-embedded-window>main.services-form-page .services-card{display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;min-height:0!important;margin:0!important;border:0!important;border-radius:0!important;background:#dcebf8!important;box-shadow:none!important;overflow:hidden!important}
+.services-form-page .service-form-head{display:none!important}
+.services-form-page .service-form.classic-service-form{display:flex!important;flex:1 1 auto!important;flex-direction:column!important;gap:4px!important;min-height:0!important;margin:0!important;padding:4px!important;background:#dcebf8!important;overflow:auto!important}
+.classic-service-section{margin:0!important;padding:0 7px 7px!important;border:1px solid #79a5d0!important;border-radius:2px!important;background:#edf5fd!important;box-shadow:inset 0 1px #fff!important}
+.classic-service-section-title{height:23px!important;margin:0 -7px 7px!important;padding:3px 9px!important;border-bottom:1px solid #79a5d0!important;background:linear-gradient(#f8fcff,#cfe4f8)!important;color:#124c82!important;font:700 13px/17px Tahoma,"Segoe UI",sans-serif!important}
+.classic-service-section-title i{display:inline-block;width:17px;margin-right:4px;color:#1769a8!important;text-align:center;font-style:normal}
+.classic-service-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px 8px!important;align-items:start!important}
+.classic-service-form .service-field.classic-service-field{display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+.classic-service-form .service-field.classic-service-field>input,
+.classic-service-form .service-field.classic-service-field>select,
+.classic-service-form .service-field.classic-service-field>textarea,
+.classic-service-form .service-input-with-icon{box-sizing:border-box!important;grid-column:auto!important;width:100%!important;min-width:0!important;min-height:23px!important;height:23px!important;margin:0!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important;overflow:hidden!important}
+.classic-service-form .service-input-icon{display:none!important}
+.classic-service-form .service-input-with-icon input,
+.classic-service-form .service-input-with-icon select,
+.classic-service-form .service-input-with-icon textarea,
+.classic-service-form .service-field.classic-service-field>input,
+.classic-service-form .service-field.classic-service-field>select,
+.classic-service-form .service-field.classic-service-field>textarea{box-sizing:border-box!important;grid-column:auto!important;width:100%!important;height:21px!important;min-height:21px!important;margin:0!important;padding:2px 5px!important;border:0!important;border-radius:0!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important;box-shadow:none!important}
+.classic-service-form .service-field.classic-service-field>textarea,
+.classic-service-form .service-input-with-icon textarea{height:39px!important;min-height:39px!important;padding-top:4px!important;resize:vertical!important}
+.classic-service-form .service-field:has(textarea){grid-column:span 2!important}
+.classic-service-form .service-field.field-description{grid-column:1/-1!important;width:100%!important;max-width:none!important}
+.classic-service-form .field-description .service-input-with-icon,
+.classic-service-form .field-description textarea{width:100%!important;max-width:none!important;height:39px!important;min-height:39px!important}
+.classic-service-form .service-name-locked,
+.classic-service-form .service-name-income-slot{display:flex!important;grid-column:auto!important;align-items:stretch!important;gap:4px!important;width:100%!important;height:23px!important;min-width:0!important}
+.classic-service-form .service-name-locked input,
+.classic-service-form .service-name-income-slot select,
+.classic-service-form .service-name-income-slot>.service-input-with-icon{height:23px!important;min-height:23px!important;flex:1 1 auto!important}
+.classic-service-form .service-detail-button,
+.classic-service-form .sales-details-link{box-sizing:border-box!important;flex:0 0 23px!important;width:23px!important;min-width:23px!important;max-width:23px!important;height:23px!important;min-height:23px!important;max-height:23px!important;border-radius:2px!important;font-size:14px!important}
+.classic-service-form .action-box:empty,.classic-service-form .service-three:empty{display:none!important}
+.classic-service-form .sale-technical-field>span{height:15px!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+.classic-service-form .sale-schedule-field[hidden]{display:none!important}
+.classic-service-form .sale-technical-service-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;box-sizing:border-box!important;width:100%!important;height:23px!important;min-height:23px!important;margin:0!important;padding:0 8px!important;border:1px solid #087d3c!important;border-radius:3px!important;background:linear-gradient(#31c765,#0e9c3f)!important;color:#fff!important;font:700 11px/21px Tahoma,"Segoe UI",sans-serif!important;white-space:nowrap!important;cursor:pointer!important}
+.classic-service-form .sale-technical-service-button:hover{background:linear-gradient(#45d475,#118b3b)!important}.classic-service-form .sale-technical-service-button .ti{font-size:14px!important;line-height:1!important}
+.classic-service-form .classic-satisfaction{display:flex!important;grid-column:1/-1!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-width:0!important;margin:2px 0 1px!important;padding:0!important;text-align:center!important}
+.classic-service-form .classic-satisfaction>label{height:18px!important;margin:0!important;color:#26384a!important;text-align:center!important;font:700 11px/16px Tahoma,"Segoe UI",sans-serif!important}
+.classic-service-form .classic-satisfaction .faces{display:flex!important;justify-content:center!important;align-items:center!important;gap:8px!important;width:100%!important;height:43px!important}
+.classic-service-form .classic-satisfaction .faces label{display:grid!important;place-items:center!important;box-sizing:border-box!important;width:40px!important;height:40px!important;margin:0!important;border:1px solid #8daece!important;border-radius:4px!important;font-size:25px!important;line-height:1!important;cursor:pointer!important}
+.classic-service-form .classic-satisfaction .faces input:checked+label{outline:3px solid #188c42!important;outline-offset:1px!important;box-shadow:none!important}
+.classic-service-form>footer{order:99!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;border:1px solid #79a5d0!important;border-radius:2px!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
+.classic-service-form>footer::before{content:'Zorunlu alanlar * ile gösterilmiştir.';margin-right:auto;color:#5b6875;font:11px Tahoma,"Segoe UI",sans-serif!important}
+.classic-service-form>footer .button,
+.classic-service-form>footer .vox-classic-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:114px!important;max-width:none!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0 10px!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;box-shadow:inset 1px 1px rgba(255,255,255,.55),1px 1px 2px rgba(0,0,0,.18)!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important}
+.classic-service-form>footer .button:hover{background:linear-gradient(#78df80,#27ac40 55%,#168d30)!important}
+.classic-service-form>footer .cancel-link{display:none!important}
+@media(max-width:900px){.classic-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:560px){.classic-service-grid{grid-template-columns:1fr!important}.classic-service-form .service-field:has(textarea),.classic-service-form .field-description{grid-column:auto!important}}
+</style><?php endif; ?>
+<?php if(!$showForm): ?><style>
+@media(min-width:901px){
+html body#vox-app>main.services-list-page{box-sizing:border-box!important;width:100%!important;max-width:none!important;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important}
+html body#vox-app>main.services-list-page .services-card{display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;min-height:0!important;margin:0!important;border:0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;overflow:hidden!important}
+html body#vox-app>main.services-list-page .services-toolbar{display:flex!important;align-items:center!important;justify-content:flex-start!important;flex:0 0 36px!important;gap:10px!important;min-height:36px!important;padding:4px 8px!important;border:0!important;border-bottom:1px solid #b9c9c3!important;background:#e8f2ed!important;color:#18392f!important;font:11px Tahoma,"Segoe UI",sans-serif!important}
+html body#vox-app>main.services-list-page .services-toolbar .service-toolbar-patient-name{position:absolute!important;z-index:2!important;left:50%!important;display:block!important;box-sizing:border-box!important;max-width:52%!important;margin:0!important;padding:0 10px!important;overflow:hidden!important;transform:translateX(-50%)!important;color:#124c3d!important;text-align:center!important;text-overflow:ellipsis!important;white-space:nowrap!important;font:700 12px/26px Tahoma,"Segoe UI",sans-serif!important;pointer-events:none!important}
+html body#vox-app>main.services-list-page .services-toolbar .service-new-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:26px!important;min-height:26px!important;padding:0 9px!important;border:1px solid #0f7b4d!important;border-radius:3px!important;background:linear-gradient(#27af70,#138655)!important;color:#fff!important;text-decoration:none!important;font-weight:700!important}
+html body#vox-app>main.services-list-page .services-table-scroll.vox-classic-scroll{flex:1 1 auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;border:0!important;overflow:auto!important}
+html body#vox-app>main.services-list-page .services-table tbody td{height:38px!important;min-height:38px!important;padding-top:3px!important;padding-bottom:3px!important}
+html body#vox-app>main.services-list-page .services-table th:last-child,html body#vox-app>main.services-list-page .services-table td:last-child{box-sizing:border-box!important;width:132px!important;min-width:132px!important;max-width:132px!important;text-align:center!important;overflow:visible!important}
+html body#vox-app>main.services-list-page .services-table a.patient-card-return-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:32px!important;min-width:32px!important;max-width:32px!important;height:32px!important;min-height:32px!important;max-height:32px!important;margin:0!important;padding:0!important;border:1px solid #e39122!important;border-radius:5px!important;background:#f3a64a!important;color:#202020!important;text-decoration:none!important}
+html body#vox-app>main.services-list-page .services-table a.patient-card-return-button:hover{background:#df8f2b!important;color:#111!important}
+html body#vox-app>main.services-list-page .services-table a.patient-card-return-button .ti{display:block!important;width:17px!important;height:17px!important;min-width:17px!important;min-height:17px!important;background-color:#fff!important;color:#fff!important;font-size:17px!important;line-height:17px!important}
+html body#vox-app>main.services-list-page .services-table .service-row-actions{display:flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;width:100%!important;height:32px!important;margin:0!important;padding:0!important;white-space:nowrap!important}
+html body#vox-app>main.services-list-page .services-table .service-row-actions>a,html body#vox-app>main.services-list-page .services-table .service-row-actions>form>button{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;flex:0 0 32px!important;width:32px!important;min-width:32px!important;max-width:32px!important;height:32px!important;min-height:32px!important;max-height:32px!important;margin:0!important;padding:0!important;border-radius:5px!important;vertical-align:top!important}
+html body#vox-app>main.services-list-page .services-table .service-row-actions>form{display:block!important;flex:0 0 32px!important;width:32px!important;height:32px!important;margin:0!important;padding:0!important}
+}
+</style><?php endif; ?>
+<main class="patient-container services-page<?=$showForm?' services-form-page':' services-list-page'?>"><section class="services-card">
+<?php if($showForm): ?><header class="services-head service-form-head"><h2><?= $editId ? 'Hizmet Kartı Düzenle' : 'Yeni Hizmet Kartı' ?> - <?=e($patient['full_name'])?></h2><span class="service-form-actions"><a class="service-back-link" href="<?=e(url('patient-followup.php?id='.$id.$serviceNavigationContext))?>">Listeye dön</a></span></header><form id="service-card-form" class="service-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=$editId?>"><?php if($fromPatientCard):?><input type="hidden" name="from_patient_card" value="1"><?php endif?><?php if($fromPatientList):?><input type="hidden" name="from_patient_list" value="1"><?php endif?><input type="hidden" id="repair_details" name="repair_details" value="<?=e((string)$form['repair_details'])?>"><input type="hidden" id="sales_stock_id" name="stock_id" value="<?=e((string)($form['stock_id'] ?? ''))?>"><input type="hidden" id="sales_details" name="sales_details" value="<?=e((string)($form['sales_details'] ?? ''))?>">
 <label class="service-field">Kayıt No<input name="record_no" value="<?=e((string)$form['record_no'])?>"></label><label class="service-field">Kayıt Tarihi<input type="date" name="record_date" value="<?=e((string)$form['service_date'])?>"></label>
 <div class="service-three"><label class="service-field">Randevu Tarihi<input type="date" name="appointment_date" value="<?=e((string)$form['appointment_date'])?>"></label><label class="service-field">Başlangıç Saati<select name="start_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if($hour===19&&$minute>0)continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['start_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label><label class="service-field">Bitiş Saati<select name="end_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if(($hour===9&&$minute<15)||($hour===19&&$minute>0))continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['end_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label></div>
 <label class="service-field">Hizmet Tipi<select name="service_type"><option value="">Seçiniz</option><?php foreach($serviceCardTypes as $type):?><option value="<?=e($type['name'])?>" <?=((string)$form['service_type']===(string)$type['name'])?'selected':''?>><?=e($type['name'])?></option><?php endforeach?></select></label><label class="service-field">Hizmet Yeri<select name="service_location"><option value="">Seçiniz</option><?php foreach($serviceLocations as $location):?><option value="<?=e($location['name'])?>" <?=((string)$form['service_location']===(string)$location['name'])?'selected':''?>><?=e($location['name'])?></option><?php endforeach?></select></label>
@@ -1061,14 +1192,168 @@ if ($currentContactPerson !== '') {
 <label class="service-field">İlgilenen Kişi<select name="contact_person"><option value="">Seçiniz</option><?php foreach($contactPersonOptions as $person):?><option value="<?=e($person)?>" <?=((string)$form['contact_person']===(string)$person)?'selected':''?>><?=e($person)?></option><?php endforeach?></select></label><label class="service-field">Randevu Durumu<select name="appointment_status"><option value="" <?=((string)$form['appointment_status']==='')?'selected':''?>>Seçiniz</option><?php foreach(['Beklemede','Onaylandı','Tamamlandı','İptal'] as $status):?><option <?=((string)$form['appointment_status']===$status)?'selected':''?>><?=$status?></option><?php endforeach?></select></label>
 <label class="service-field service-wide">Anamnez<textarea name="complaint" placeholder="Anamnez Girin"><?=e((string)$form['complaint'])?></textarea></label><label class="service-field service-wide">Gözlem<textarea name="observation" placeholder="Gözlem Girin"><?=e((string)$form['observation'])?></textarea></label>
 <?php if ($serviceNameLocked): ?><label class="service-field">Hizmet Adı<span class="service-name-locked"><input value="<?=e((string)$form['service_name'])?>" readonly aria-label="Kilitli hizmet adı"><input type="hidden" name="service_name" value="<?=e((string)$form['service_name'])?>"><button type="button" class="service-detail-button" id="service-detail-button" title="Satış detayını aç" aria-label="Satış detayını aç"><i class="ti tabler-file-search"></i></button></span></label><?php else: ?><label class="service-field">Hizmet Adı<span class="service-name-income-slot"><select name="service_name"><option value="">Seçiniz</option><?php foreach($serviceNames as $serviceName):?><option value="<?=e($serviceName['name'])?>" <?=((string)$form['service_name']===(string)$serviceName['name'])?'selected':''?>><?=e($serviceName['name'])?></option><?php endforeach?></select><?php if($showSalesDetailsButton): ?><button type="button" class="sales-details-link" id="sales-details-link" title="Satış Kartını Aç" aria-label="Satış Kartını Aç"><i class="ti tabler-file-search"></i></button><?php endif ?></span></label><?php endif; ?><label class="service-field">Sonuç<select name="result_name"><?php foreach(['Beklemede','Onay','Düşünecek','Ret','Tamamlandı','İptal'] as $result):?><option <?=((string)$form['result_name']===$result)?'selected':''?>><?=$result?></option><?php endforeach?></select></label>
-<section class="action-box"><label class="service-field">Aksiyon<select name="action_name"><option value="">Seçiniz</option><?php foreach($serviceActions as $serviceAction):?><option value="<?=e($serviceAction['name'])?>" <?=((string)$form['action_name']===(string)$serviceAction['name'])?'selected':''?>><?=e($serviceAction['name'])?></option><?php endforeach?></select></label><label class="service-field">Aksiyon Tarihi<input type="date" name="action_date" value="<?=e((string)$form['action_date'])?>"></label></section>
+<section class="action-box"><label class="service-field">Aksiyon<select name="action_name"><option value="">Seçiniz</option><?php foreach($serviceActions as $serviceAction):?><option value="<?=e($serviceAction['name'])?>" <?=((string)$form['action_name']===(string)$serviceAction['name'])?'selected':''?>><?=e($serviceAction['name'])?></option><?php endforeach?></select></label><label class="service-field">Aksiyon Tarihi<input type="date" name="action_date" value="<?=e((string)$form['action_date'])?>"></label><div class="service-field sale-schedule-field sale-technical-field"><span>Kalıp Alma</span><button type="button" name="mold_date" class="sale-technical-service-button"><i class="ti tabler-tools" aria-hidden="true"></i> Kalıp Alma</button></div><div class="service-field sale-schedule-field sale-technical-field"><span>Montaj</span><button type="button" name="installation_date" class="sale-technical-service-button"><i class="ti tabler-tools" aria-hidden="true"></i> Montaj</button></div></section>
 <div class="satisfaction"><label>Memnuniyet</label><div class="faces"><?php foreach(['🙂','😐','🙁','😡'] as $score=>$face):?><input id="s<?=$score+1?>" type="radio" name="satisfaction" value="<?=$score+1?>" <?=((int)$form['satisfaction']===$score+1)?'checked':''?>><label for="s<?=$score+1?>"><?=$face?></label><?php endforeach?></div></div>
-<label class="service-field service-wide">Açıklama<textarea name="description"><?=e((string)$form['description'])?></textarea></label><footer><button class="button"><?=$editId ? 'Güncelle' : 'Kaydet'?></button><a class="cancel-link" href="<?=e(url('patient-followup.php?id='.$id))?>">İptal</a></footer></form>
-<script>(()=>{const iconByField={record_no:'tabler-hash',record_date:'tabler-calendar',appointment_date:'tabler-calendar-event',start_time:'tabler-clock',end_time:'tabler-clock',service_type:'tabler-phone',service_location:'tabler-building',branch_id:'tabler-building-community',contact_person:'tabler-user',appointment_status:'tabler-calendar-check',complaint:'tabler-notes',observation:'tabler-eye',service_name:'tabler-clipboard-list',result_name:'tabler-circle-check',action_name:'tabler-bolt',action_date:'tabler-calendar-event',description:'tabler-file-text'};document.querySelectorAll('.service-form input[name],.service-form select[name],.service-form textarea[name]').forEach(field=>{if(field.type==='hidden'||field.closest('.service-input-with-icon'))return;const icon=iconByField[field.name];if(!icon)return;const wrapper=document.createElement('span');wrapper.className='service-input-with-icon';const iconSlot=document.createElement('span');iconSlot.className='service-input-icon';iconSlot.innerHTML=`<i class="ti ${icon}" aria-hidden="true"></i>`;field.parentNode.insertBefore(wrapper,field);wrapper.append(iconSlot,field);});})();</script>
-<script>document.addEventListener('DOMContentLoaded',()=>{const openSalesDetails=()=>{const modal=document.getElementById('sales-details-modal');if(!modal)return;modal.hidden=false;modal.setAttribute('aria-hidden','false');};document.getElementById('service-detail-button')?.addEventListener('click',openSalesDetails);document.getElementById('sales-details-link')?.addEventListener('click',openSalesDetails);if(<?=json_encode($showRepairDetailsButton)?>){const slot=document.querySelector('.service-name-income-slot');if(slot&&!document.getElementById('repair-details-link')){const button=document.createElement('button');button.type='button';button.id='repair-details-link';button.className='sales-details-link';button.title='Tamir detaylarını aç';button.setAttribute('aria-label','Tamir detaylarını aç');button.innerHTML='<i class="ti tabler-tools"></i>';button.addEventListener('click',()=>{const modal=document.getElementById('repair-modal');if(modal){modal.hidden=false;modal.setAttribute('aria-hidden','false');}});slot.append(button);}}});</script>
-<?php else: ?><header class="services-head"><h2>Hasta Hizmet Kartı Yönetimi - <?=e($patient['full_name'])?></h2><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&new=1'))?>">＋ Yeni Hizmet Kartı Ekle</a></header><div class="services-toolbar"><span>Toplam <?=count($services)?> kayıt</span><span>Ara: <input type="search" placeholder="Ara"></span></div><table class="services-table"><thead><tr><th>SIRA</th><th>TARİH</th><th>DURUM</th><th>YAPILAN İŞLEM</th><th>AKSİYON</th><th>İLGİLENEN</th><th>ŞUBE</th><th>İŞLEM</th></tr></thead><tbody><?php foreach($services as $index=>$service):?><tr data-edit-url="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id']))?>"><td><?=$index+1?></td><td><?=e(format_date_tr($service['service_date']))?></td><td><?=e($service['service_status'])?></td><td><?=e($service['service_name'] ?? '')?:'—'?></td><td><?=e(format_date_tr($service['action_date']))?></td><td><?=e($service['contact_person'] ?? '')?></td><td><?=e($service['branch_name'])?></td><td><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" style="display:inline" onsubmit="return confirm('Bu hizmet kartı silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="edit_id" value="<?=(int)$service['id']?>"><button class="button" style="background:#e04f55" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></td></tr><?php endforeach;if(!$services):?><tr><td colspan="8" class="service-empty">Henüz hizmet kartı bulunmuyor.</td></tr><?php endif?></tbody></table><script>document.querySelectorAll('.services-table tbody tr[data-edit-url]').forEach(row=>{row.style.cursor='pointer';row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});</script><?php endif; ?>
+<label class="service-field service-wide">Açıklama<textarea name="description"><?=e((string)$form['description'])?></textarea></label><footer><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url('patient-followup.php?id='.$id.$serviceNavigationContext))?>">İptal</a></footer></form>
+<script>(()=>{const iconByField={record_no:'tabler-hash',record_date:'tabler-calendar',appointment_date:'tabler-calendar-event',start_time:'tabler-clock',end_time:'tabler-clock',service_type:'tabler-phone',service_location:'tabler-building',branch_id:'tabler-building-community',contact_person:'tabler-user',appointment_status:'tabler-calendar-check',complaint:'tabler-notes',observation:'tabler-eye',service_name:'tabler-clipboard-list',result_name:'tabler-circle-check',action_name:'tabler-bolt',action_date:'tabler-calendar-event',mold_date:'tabler-calendar-event',installation_date:'tabler-calendar-event',description:'tabler-file-text'};document.querySelectorAll('.service-form input[name],.service-form select[name],.service-form textarea[name]').forEach(field=>{if(field.type==='hidden'||field.closest('.service-input-with-icon'))return;const icon=iconByField[field.name];if(!icon)return;const wrapper=document.createElement('span');wrapper.className='service-input-with-icon';const iconSlot=document.createElement('span');iconSlot.className='service-input-icon';iconSlot.innerHTML=`<i class="ti ${icon}" aria-hidden="true"></i>`;field.parentNode.insertBefore(wrapper,field);wrapper.append(iconSlot,field);});})();</script>
+<script>
+(()=>{
+  const form=document.getElementById('service-card-form');
+  if(!form||form.dataset.classicReady==='1')return;
+  form.dataset.classicReady='1';
+  form.classList.add('classic-service-form');
+  const footer=form.querySelector(':scope > footer');
+  const rowFor=name=>form.querySelector(`[name="${name}"]`)?.closest('.service-field');
+  const makeSection=(title,icon,fields,extraNodes=[])=>{
+    const section=document.createElement('section');
+    section.className='classic-service-section';
+    const heading=document.createElement('h3');
+    heading.className='classic-service-section-title';
+    heading.innerHTML=`<i aria-hidden="true">${icon}</i>${title}`;
+    const grid=document.createElement('div');
+    grid.className='classic-service-grid';
+    fields.forEach(([name,fieldClass])=>{
+      const row=rowFor(name);
+      if(!row)return;
+      row.classList.add('classic-service-field',fieldClass||`field-${name.replaceAll('_','-')}`);
+      grid.append(row);
+    });
+    extraNodes.forEach(node=>{if(node)grid.append(node);});
+    section.append(heading,grid);
+    form.insertBefore(section,footer);
+  };
+  makeSection('Temel Bilgiler','♟',[
+    ['record_no'],['record_date'],['appointment_date'],['branch_id'],
+    ['start_time'],['end_time'],['contact_person'],['appointment_status']
+  ]);
+  const satisfaction=form.querySelector(':scope > .satisfaction');
+  satisfaction?.classList.add('classic-satisfaction');
+  makeSection('Hizmet Bilgileri','▪',[
+    ['service_type'],['service_location'],['service_name'],['result_name'],
+    ['action_name'],['action_date'],['mold_date'],['installation_date']
+  ],[satisfaction]);
+  makeSection('Anamnez ve Açıklamalar','▦',[
+    ['complaint'],['observation'],['description','field-description']
+  ]);
+  form.querySelectorAll(':scope > .service-three:empty,:scope > .action-box:empty').forEach(node=>node.remove());
+})();
+</script>
+<script>(()=>{const form=document.getElementById('service-card-form');if(!form)return;const serviceName=form.querySelector('select[name="service_name"],input[type="hidden"][name="service_name"]');const saleFields=[form.querySelector('[name="mold_date"]')?.closest('.service-field'),form.querySelector('[name="installation_date"]')?.closest('.service-field')].filter(Boolean);const sync=()=>{const visible=(serviceName?.value||'').trim()==='Satış';saleFields.forEach(field=>field.hidden=!visible);};serviceName?.addEventListener('change',sync);sync();})();</script>
+<script>(()=>{const technicalServiceUrl=<?=json_encode(url('technical-service.php'))?>;document.querySelectorAll('.sale-technical-service-button[name="installation_date"]').forEach(button=>button.addEventListener('click',()=>{const message={type:'vox-open-window',url:technicalServiceUrl,title:'Teknik Servis'};if(window.parent!==window){window.parent.postMessage(message,location.origin);return;}if(typeof window.voxOpenWindow==='function'){window.voxOpenWindow(technicalServiceUrl,'Teknik Servis');return;}location.href=technicalServiceUrl;}));})();</script>
+<script>
+(()=>{
+  let initRetries=0;
+  const init=()=>{
+  const trigger=document.querySelector('.sale-technical-service-button[name="mold_date"]');
+  if(!trigger){if(initRetries++<20)window.setTimeout(init,50);return;}
+  document.body.dataset.moldPreviewReady='1';
+  const data=<?=json_encode([
+    'patientName'=>(string)($patient['full_name'] ?? ''),
+    'phone'=>trim((string)($patient['phone_primary'] ?? ($patient['phone'] ?? ''))),
+    'branch'=>trim((string)($form['branch_name'] ?? ($branchNamesById[(int)($form['branch_id'] ?? 0)] ?? ''))),
+    'service'=>trim((string)($form['service_name'] ?? '')),
+    'device'=>(string)$latestDeviceBrandModel,
+    'serials'=>implode(' / ', array_filter($latestDeviceSerials)),
+  ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  const value=value=>String(value||'—').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+  const today=new Intl.DateTimeFormat('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date());
+  const modal=document.createElement('section');
+  modal.id='mold-print-modal';modal.hidden=true;
+  modal.innerHTML=`<div class="mold-print-backdrop"></div><div class="mold-print-shell" role="dialog" aria-modal="true" aria-label="Kalıp formu önizlemesi"><header class="mold-print-toolbar"><strong>Kalıp Formu Önizleme</strong><span><button type="button" class="mold-print-action" data-mold-print title="Yazdır" aria-label="Yazdır"><i class="ti tabler-printer"></i></button><button type="button" class="mold-print-action mold-print-close" title="Kapat" aria-label="Kapat">×</button></span></header><article class="mold-a4-sheet" contenteditable="true" spellcheck="false"><div class="mold-logo-row"><i></i><img src="<?=e(url('assets/vox-logo-02.png?v=20260823-green-pillow-transparent'))?>" alt="Vox İşitme Cihazları"><i></i></div><h1>TEKNİK SERVİS <b>KALIP</b> FORMU</h1><section class="mold-meta"><p><b>SERVİS ADI:</b> ${value(data.branch||data.service)}</p><p><b>TARİH:</b> ${today}</p><p><b>HASTA ADI:</b> ${value(data.patientName)}</p><p><b>İLETİŞİM:</b> ${value(data.phone)}</p><p><b>CİHAZ BİLGİLERİ:</b></p><p><b>MARKA / MODEL:</b> ${value(data.device)}</p><p><b>SERİ NO:</b> ${value(data.serials)}</p></section><div class="mold-choice-grid"><section><h2>BTE</h2><div class="mold-columns"><div><b>SOL</b><strong>BİOPOR</strong><span>Tam Konka</span><span>Yarım Konka</span><span>Micro</span></div><div><b>SAĞ</b><strong>SERT KALIP</strong><span>Tam Konka</span><span>Yarım Konka</span><span>Micro</span><span>Tam İskelet</span><span>Yarım İskelet</span></div></div></section><section><div class="mold-acuity"><b>NORMAL</b><b>ÇOK AÇI</b><b>AÇI</b></div><h2>RIC</h2><div class="mold-columns"><div><b>SAĞ</b><strong>BİOPOR</strong><span>Tam Konka</span><span>Yarım Konka</span><span>Micro</span></div><div><b>SOL</b><strong>SERT KALIP</strong><span>Tam Konka</span><span>Yarım Konka</span><span>Micro</span></div></div></section></div><p class="mold-vent"><b>Ventilasyon:</b><span></span></p><section class="mold-note"><b>NOT:</b><div></div></section></article></div>`;
+  document.body.append(modal);
+  const openModal=()=>{if(!modal.isConnected)document.body.append(modal);modal.hidden=false;document.body.classList.add('mold-printing');};
+  trigger.addEventListener('click',openModal);
+  document.addEventListener('click',event=>{if(event.target.closest('.sale-technical-service-button[name="mold_date"]')){event.preventDefault();openModal();}});
+  const sheet=modal.querySelector('.mold-a4-sheet');
+  const acuityLabels=sheet.querySelectorAll('.mold-acuity b');
+  if(acuityLabels.length===3){acuityLabels[1].textContent='ÇOK ACİL';acuityLabels[2].textContent='ACİL';}
+  acuityLabels.forEach(label=>{const title=document.createElement('span'),mark=document.createElement('span');title.className='mold-acuity-label';title.textContent=label.textContent;mark.className='mold-acuity-mark';mark.setAttribute('aria-label',title.textContent+' seçimi');label.replaceChildren(title,mark);});
+  sheet.contentEditable='false';
+  let savedMoldData={};
+  try{savedMoldData=JSON.parse(<?=json_encode((string)($form['mold_form_data'] ?? ''), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>)||{};}catch(_){}
+  const editable=[];
+  const addEditable=node=>{if(!node)return;node.contentEditable='true';node.spellcheck=false;node.classList.add('mold-editable');editable.push(node);};
+  sheet.querySelectorAll('.mold-meta p').forEach(row=>{const label=row.querySelector('b'),text=[...row.childNodes].filter(node=>node!==label).map(node=>node.textContent).join('').trim();row.replaceChildren(label||'',document.createTextNode(' '));const field=document.createElement('span');field.textContent=text;row.append(field);});
+  sheet.querySelectorAll('.mold-choice-grid strong,.mold-choice-grid span').forEach(node=>{if(node.closest('.mold-acuity'))return;const mark=document.createElement('i');mark.className='mold-choice-mark';mark.setAttribute('aria-label',node.textContent+' seçimi');node.append(mark);});
+  sheet.querySelectorAll('.mold-vent span,.mold-note div').forEach(addEditable);
+  editable.forEach((field,index)=>{const key='mold-'+index;field.dataset.moldKey=key;if(typeof savedMoldData[key]==='string')field.textContent=savedMoldData[key];});
+  const selectionMarks=[...sheet.querySelectorAll('.mold-acuity-mark,.mold-choice-mark')];
+  selectionMarks.forEach((mark,index)=>{const key='mold-mark-'+index;mark.dataset.moldKey=key;mark.setAttribute('role','checkbox');const checked=savedMoldData[key]==='1';mark.classList.toggle('is-checked',checked);mark.setAttribute('aria-checked',String(checked));mark.addEventListener('click',()=>{const next=!mark.classList.contains('is-checked');mark.classList.toggle('is-checked',next);mark.setAttribute('aria-checked',String(next));});});
+  const saveButton=document.createElement('button');
+  saveButton.type='button';saveButton.className='mold-print-action';saveButton.title='Formu kaydet';saveButton.setAttribute('aria-label','Formu kaydet');saveButton.innerHTML='<i class="ti tabler-device-floppy"></i>';
+  modal.querySelector('[data-mold-print]')?.before(saveButton);
+  saveButton.addEventListener('click',async()=>{const editId=<?=json_encode($editId)?>;if(!editId){alert('Önce hizmet kartını kaydedin.');return;}const formData=new FormData(),moldPayload=Object.fromEntries(editable.map(field=>[field.dataset.moldKey,field.textContent]));selectionMarks.forEach(mark=>{moldPayload[mark.dataset.moldKey]=mark.classList.contains('is-checked')?'1':'0';});formData.set('csrf',<?=json_encode(csrf())?>);formData.set('action','save_mold_form');formData.set('edit_id',String(editId));formData.set('mold_form_data',JSON.stringify(moldPayload));saveButton.disabled=true;try{const response=await fetch(location.href,{method:'POST',body:formData,credentials:'same-origin'}),result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Form kaydedilemedi.');saveButton.title='Form kaydedildi';}catch(error){alert(error.message||'Form kaydedilemedi.');}finally{saveButton.disabled=false;}});
+  const close=()=>{modal.hidden=true;document.body.classList.remove('mold-printing');};
+  modal.querySelector('.mold-print-close')?.addEventListener('click',close);
+  modal.querySelector('.mold-print-backdrop')?.addEventListener('click',close);
+  modal.querySelector('[data-mold-print]')?.addEventListener('click',()=>window.print());
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
+<style>
+  .mold-choice-grid>section:nth-child(2){position:relative}
+  .mold-choice-grid>section:nth-child(2) .mold-acuity{position:absolute;right:0;bottom:100%;left:0;margin:0}
+  .mold-choice-grid{margin-top:150px}
+  .mold-a4-sheet .mold-meta{margin-top:5px}
+  .mold-meta{font-size:12px}
+  .mold-a4-sheet .mold-meta p{border-bottom:0}
+  .mold-a4-sheet .mold-acuity{border:0}
+  .mold-note{font-size:13px}
+  .mold-vent{font-size:13px}
+  .mold-a4-sheet .mold-columns strong{background:#fff}
+  .mold-columns strong,.mold-columns span{display:flex;align-items:center;justify-content:space-between;gap:5px}
+  .mold-choice-mark{display:block;flex:0 0 14px;width:14px;height:14px;box-sizing:border-box;border:1px solid #222;background:#fff;color:#111;font-size:12px;font-style:normal;line-height:12px;text-align:center}
+  .mold-acuity-mark,.mold-choice-mark{cursor:pointer}
+  .mold-acuity-mark.is-checked::after,.mold-choice-mark.is-checked::after{content:'✓';font-weight:700}
+  @media print{.mold-a4-sheet .mold-choice-grid h2{color:#000!important}}
+  .mold-acuity b{display:grid;grid-template-rows:auto 24px;justify-items:center;gap:3px;padding:4px 5px}
+  .mold-a4-sheet .mold-acuity b{background:#fff;color:#111}
+  .mold-acuity-mark{display:block;width:22px;height:22px;box-sizing:border-box;border:1px solid #222;background:#fff;color:#111;font-size:17px;line-height:20px;text-align:center}
+#mold-print-modal{position:fixed;z-index:5000;inset:0;display:grid;place-items:center;padding:24px;background:rgba(15,35,29,.52)}#mold-print-modal[hidden]{display:none}.mold-print-backdrop{position:absolute;inset:0}.mold-print-shell{position:relative;z-index:1;width:min(900px,96vw);max-height:94vh;overflow:auto;background:#dfe9e5;box-shadow:0 20px 58px rgba(0,0,0,.42)}.mold-print-toolbar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#0d5a45;color:#fff}.mold-print-toolbar span{display:flex;gap:7px}.mold-print-action{display:grid;place-items:center;width:31px;height:29px;border:1px solid rgba(255,255,255,.5);border-radius:3px;background:#198a66;color:#fff;cursor:pointer}.mold-print-close{font-size:20px;line-height:1}.mold-a4-sheet{box-sizing:border-box;width:210mm;min-height:297mm;margin:16px auto;padding:20mm 18mm;border:1px solid #111;background:#fff;color:#253446;font:10px Arial,sans-serif}.mold-logo-row{display:flex;align-items:center;gap:14px;margin:4mm 0 8mm}.mold-logo-row i{height:7px;flex:1;background:#90ca4c}.mold-logo-row img{width:92px;height:auto}.mold-a4-sheet h1{margin:0 0 10px;padding:7px;background:#8c8c8c;color:#fff;text-align:center;font-size:15px;font-weight:400}.mold-a4-sheet h1 b{font-size:20px}.mold-meta{display:grid;grid-template-columns:1fr 145px;gap:7px 18px;margin:0 2px 28px}.mold-meta p{margin:0;border-bottom:1px dotted #777;min-height:15px}.mold-meta p:nth-child(3),.mold-meta p:nth-child(4),.mold-meta p:nth-child(5),.mold-meta p:nth-child(6),.mold-meta p:nth-child(7){grid-column:1/3}.mold-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px}.mold-choice-grid h2{margin:0;background:#8c8c8c;color:#fff;text-align:center;font-size:16px}.mold-columns{display:grid;grid-template-columns:1fr 1fr;border:1px solid #111}.mold-columns div{display:flex;min-height:160px;flex-direction:column;border-right:1px solid #111}.mold-columns div:last-child{border:0}.mold-columns b,.mold-columns strong{padding:6px;background:#bbb;text-align:center;font-size:10px}.mold-columns strong{font-weight:400}.mold-columns span{padding:6px 5px}.mold-acuity{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:1px;border:1px solid #111}.mold-acuity b{padding:5px;border-right:1px solid #111;background:#999;color:#fff;text-align:center;font-size:10px}.mold-acuity b:last-child{border:0}.mold-vent{display:flex;align-items:center;width:45%;margin:22px 0 34px;border:1px solid #111}.mold-vent b{padding:5px;background:#bbb}.mold-vent span{flex:1;min-height:22px}.mold-note{display:grid;grid-template-columns:104px 1fr;border:1px solid #111;min-height:108px}.mold-note>b{padding:7px;background:#bbb}.mold-note div{border-left:1px solid #111}@media print{body.mold-printing>*:not(#mold-print-modal){display:none!important}#mold-print-modal{position:static!important;display:block!important;padding:0!important;background:none!important}.mold-print-backdrop,.mold-print-toolbar{display:none!important}.mold-print-shell{width:auto!important;max-height:none!important;overflow:visible!important;box-shadow:none!important;background:none!important}.mold-a4-sheet{margin:0!important;border:0!important;box-shadow:none!important;page-break-after:always}}
+</style>
+<script>document.addEventListener('DOMContentLoaded',()=>{if(<?=json_encode($showRepairDetailsButton)?>){const slot=document.querySelector('.service-name-income-slot');if(slot&&!document.getElementById('repair-details-link')){const button=document.createElement('button');button.type='button';button.id='repair-details-link';button.className='sales-details-link';button.title='Tamir detaylarını aç';button.setAttribute('aria-label','Tamir detaylarını aç');button.innerHTML='<i class="ti tabler-tools"></i>';button.addEventListener('click',()=>{const modal=document.getElementById('repair-modal');if(modal){modal.hidden=false;modal.setAttribute('aria-hidden','false');}});slot.append(button);}}});</script>
+<?php else: ?><div class="services-toolbar"><a class="button service-new-button" href="<?=e(url('patient-followup.php?id='.$id.'&new=1'.$serviceNavigationContext))?>">+ Hizmet</a><label class="service-length">Göster <select id="service-page-size"><option>10</option><option>25</option><option selected>50</option><option>100</option></select> kayıt</label><span id="service-visible-count"><?=count($services)?> kayıt</span><label class="service-search">Ara: <input id="service-list-search" type="search" placeholder="Seçili sütunlarda ara" autocomplete="off"></label></div><div class="services-table-scroll"><table class="services-table"><thead><tr><th>SIRA</th><th>TARİH</th><th>DURUM</th><th>YAPILAN İŞLEM</th><th>AKSİYON</th><th>İLGİLENEN</th><th>ŞUBE</th><th>EYLEMLER</th></tr></thead><tbody><?php foreach($services as $index=>$service):?><tr data-edit-url="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id'].$serviceNavigationContext))?>"><td><?=$index+1?></td><td><?=e(format_date_tr($service['service_date']))?></td><td><?=e($service['service_status'])?></td><td><?=e($service['service_name'] ?? '')?:'—'?></td><td><?=e(format_date_tr($service['action_date']))?></td><td><?=e($service['contact_person'] ?? '')?></td><td><?=e($service['branch_name'])?></td><td><div class="service-row-actions"><a class="button patient-card-return-button" href="<?=e(url($fromPatientList?'patients.php':'patient-form.php?id='.$id.'&return=patients.php'))?>" title="<?=$fromPatientList?'Hasta kartları listesine dön':'Hasta kartına dön'?>" aria-label="<?=$fromPatientList?'Hasta kartları listesine dön':'Hasta kartına dön'?>" data-patient-back="1"<?=$fromPatientList?' data-patient-list-back="1"':''?>><i class="icon-base ti tabler-rotate-clockwise"></i></a><a class="button" href="<?=e(url('patient-followup.php?id='.$id.'&edit='.(int)$service['id'].$serviceNavigationContext))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu hizmet kartı silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><?php if($fromPatientCard):?><input type="hidden" name="from_patient_card" value="1"><?php endif?><?php if($fromPatientList):?><input type="hidden" name="from_patient_list" value="1"><?php endif?><input type="hidden" name="action" value="delete"><input type="hidden" name="edit_id" value="<?=(int)$service['id']?>"><button class="button" style="background:#e04f55" title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$services):?><tr><td colspan="8" class="service-empty">Henüz hizmet kartı bulunmuyor.</td></tr><?php endif?></tbody></table></div><script>document.querySelectorAll('.services-table tbody tr[data-edit-url]').forEach(row=>{row.style.cursor='pointer';row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});</script><?php endif; ?>
 </section></main>
 <?php if (!$showForm): ?>
+<script>
+(()=>{
+  const patientName=<?=json_encode((string)$patient['full_name'],JSON_UNESCAPED_UNICODE)?>;
+  const openServiceCard=link=>{
+    if(!link)return;
+    const isNew=new URL(link.href,window.location.href).searchParams.has('new');
+    const title=(isNew?'Yeni Hizmet Kartı':'Hizmet Kartı')+(patientName?' - '+patientName:'');
+    let windowManager=null;
+    try{
+      if(typeof window.voxOpenWindow==='function')windowManager=window.voxOpenWindow;
+      else if(window.parent!==window&&typeof window.parent.voxOpenWindow==='function')windowManager=window.parent.voxOpenWindow;
+    }catch(error){windowManager=null;}
+    if(window.parent!==window){
+      window.parent.postMessage({type:'vox-open-window',url:link.href,title},window.location.origin);
+      return;
+    }
+    if(windowManager)windowManager(link.href,title);
+    else window.location.href=link.href;
+  };
+  document.addEventListener('click',event=>{
+    const link=event.target.closest('.service-new-button,.service-row-actions a[href*="patient-followup.php"][href*="edit="]');
+    if(!link||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();
+    event.stopPropagation();
+    openServiceCard(link);
+  },true);
+  document.querySelectorAll('.services-table tbody tr[data-edit-url]').forEach(row=>{
+    row.addEventListener('dblclick',event=>{
+      if(event.target.closest('a,button,form,input'))return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const link=document.createElement('a');
+      link.href=row.dataset.editUrl;
+      openServiceCard(link);
+    },true);
+  });
+})();
+</script>
 <script>
 document.querySelectorAll('.services-table form').forEach(form => {
   if (form.querySelector('[name="action"]')?.value !== 'delete') return;
@@ -1079,15 +1364,26 @@ document.querySelectorAll('.services-table form').forEach(form => {
 </script>
 <script>
 (() => {
-  const newServiceButton = document.querySelector('.services-head > .button');
+  document.querySelectorAll('.services-toolbar .service-length,#service-visible-count,.services-toolbar .service-search').forEach(control => control.remove());
+  const servicesToolbar = document.querySelector('.services-toolbar');
+  if (servicesToolbar && !servicesToolbar.querySelector('.service-toolbar-patient-name')) {
+    servicesToolbar.style.position = 'relative';
+    const patientName = document.createElement('strong');
+    patientName.className = 'service-toolbar-patient-name';
+    patientName.textContent = <?=json_encode('Hasta: ' . (string)$patient['full_name'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+    patientName.title = patientName.textContent;
+    servicesToolbar.append(patientName);
+  }
+  const newServiceButton = document.querySelector('.service-new-button');
   if (newServiceButton) newServiceButton.textContent = '+ Hizmet';
-  document.querySelectorAll('.services-table tbody tr').forEach(row => {
+  document.querySelectorAll('.services-table tbody tr[data-edit-url]').forEach(row => {
     const actions = row.lastElementChild;
-    if (!actions || actions.querySelector('[data-patient-back]')) return;
+    if (!actions) return;
     actions.style.display = 'flex';
     actions.style.alignItems = 'center';
     actions.style.justifyContent = 'center';
     actions.style.gap = '8px';
+    if (actions.querySelector('[data-patient-back]')) return;
     const back = document.createElement('a');
     back.href = <?=json_encode(url('patient-form.php?id=' . $id . '&return=patients.php'))?>;
     back.title = 'Hasta kartına dön';
@@ -1097,8 +1393,17 @@ document.querySelectorAll('.services-table form').forEach(form => {
     back.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:40px;min-width:40px;height:40px;min-height:40px;margin:0;padding:0;border:1px solid #f3a64a;border-radius:6px;background:#f3a64a;color:#202020';
     const deleteForm = actions.querySelector('form');
     if (deleteForm) deleteForm.style.margin = '0';
-    back.innerHTML = '<i class="icon-base ti tabler-arrow-back-up" style="font-size:20px"></i>';
+    back.innerHTML = '<i class="icon-base ti tabler-rotate-clockwise" style="font-size:21px"></i>';
     actions.insertBefore(back, actions.firstChild);
+  });
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.services-table .service-row-actions>a,.services-table .service-row-actions>form>button').forEach(control=>{
+      ['width','height','min-width','min-height','max-width','max-height','flex-basis'].forEach(property=>control.style.setProperty(property,'32px','important'));
+      control.style.setProperty('padding','0','important');
+      control.style.setProperty('margin','0','important');
+      const icon=control.querySelector('.icon-base,.ti');
+      if(icon)['width','height','min-width','min-height','max-width','max-height','flex-basis','font-size','line-height'].forEach(property=>icon.style.setProperty(property,'17px','important'));
+    });
   });
 })();
 </script>
@@ -1159,37 +1464,124 @@ document.querySelectorAll('.services-table form').forEach(form => {
 <div id="repair-modal" class="repair-modal" hidden aria-hidden="true">
   <div class="repair-modal-backdrop" data-repair-close></div>
   <section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="repair-modal-title">
-    <header><h2 id="repair-modal-title"><i class="ti tabler-tools" aria-hidden="true"></i> Tamir Kabul - Yeni Kayıt</h2><button type="button" class="repair-close" data-repair-close aria-label="Kapat">×</button></header>
+    <header><h2 id="repair-modal-title"><i class="ti tabler-tools" aria-hidden="true"></i> Tamir Kabul - Yeni Kayıt</h2><span class="repair-window-controls"><button type="button" data-repair-window-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-repair-window-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" class="repair-close" data-repair-close aria-label="Kapat">×</button></span></header>
     <div class="repair-body"><div class="repair-tabs" id="repair-form-tabs"><div class="repair-tab-list" role="tablist"><button type="button" class="repair-tab is-active" role="tab" aria-selected="true" aria-controls="repair-tab-accessories" data-repair-tab="repair-tab-accessories">Aksesuarlar</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-issues" data-repair-tab="repair-tab-issues">&#350;ikayet / Ar&#305;za</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-delivery" data-repair-tab="repair-tab-delivery">Teslim ve Garanti</button><button type="button" class="repair-tab" role="tab" aria-selected="false" aria-controls="repair-tab-service-fee" data-repair-tab="repair-tab-service-fee">Hizmet bedeli</button></div>
       <section id="repair-tab-accessories" class="repair-tab-panel repair-accessories is-active" role="tabpanel"><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Pil"> Pil</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Garanti Kart&#305;"> Garanti Kart&#305;</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kutu"> Kutu</label><label><input form="service-card-form" type="checkbox" name="repair_accessories[]" value="Kulak Kal&#305;b&#305;"> Kulak Kal&#305;b&#305;</label></section>
       <section id="repair-tab-issues" class="repair-tab-panel" role="tabpanel"><fieldset class="repair-issues"><div class="repair-issue-head"><span></span><span>M&uuml;&#351;teri</span><span>Teknisyen</span></div><?php foreach($repairIssueDefinitions as $issue):?><label><span><?=e($issue['name'])?></span><input form="service-card-form" type="checkbox" name="repair_customer_issues[]" value="<?=e($issue['name'])?>"><input form="service-card-form" type="checkbox" name="repair_technician_issues[]" value="<?=e($issue['name'])?>"></label><?php endforeach?></fieldset></section>
       <section id="repair-tab-delivery" class="repair-tab-panel" role="tabpanel"><label class="repair-switch"><input form="service-card-form" type="checkbox" name="repair_warranty"><span></span> Garanti kapsam&#305;nda</label><label>&#350;ubeye Teslim tarihi<input form="service-card-form" type="date" name="repair_branch_delivery_date" value="<?=date('Y-m-d')?>"></label><label>Tamire teslim tarihi<input form="service-card-form" type="date" name="repair_delivery_date" value="<?=date('Y-m-d')?>"></label><div class="repair-grid"><label>Teknik servise g&ouml;nderilecekse (opsiyonel)<select form="service-card-form" name="repair_target"><option value="">Hedef</option><option>Teknik Servis</option></select></label><label>Teknik Servis<select form="service-card-form" name="repair_technician"><option value="">Teknik servis se&ccedil;in</option><?php foreach($technicalServiceAccounts as $technicalServiceAccount): $technicalServiceLabel=trim((string)($technicalServiceAccount['short_name'] ?: $technicalServiceAccount['title'])); $technicalServiceType=(string)$technicalServiceAccount['technical_service_type']; if($technicalServiceType !== '') $technicalServiceLabel.=' — '.str_replace(['inside','outside'], ['İç Servis','Dış Servis'], $technicalServiceType);?><option value="<?=e((string)$technicalServiceAccount['title'])?>"><?=e($technicalServiceLabel)?></option><?php endforeach?></select></label></div><label>Teslim eden (cihaz&#305; b&#305;rakan ki&#351;i)<input form="service-card-form" name="repair_delivered_by" placeholder="Ad Soyad (opsiyonel)"></label><label>Cihaz&#305; teslim alan ki&#351;i<select form="service-card-form" name="repair_received_by"><option value="">Se&ccedil;iniz</option><?php foreach($activeStaffNames as $staffName):?><option value="<?=e($staffName)?>"><?=e($staffName)?></option><?php endforeach?></select></label><label>A&ccedil;&#305;klama<textarea form="service-card-form" name="repair_note" placeholder="Ek a&ccedil;&#305;klama (opsiyonel)"></textarea></label></section>
       <section id="repair-tab-service-fee" class="repair-tab-panel" role="tabpanel"><div class="repair-grid"><label>Tarih<input form="service-card-form" type="date" name="repair_service_fee_date" value="<?=date('Y-m-d')?>"></label><label>&Uuml;cret<input form="service-card-form" type="text" name="repair_service_fee" inputmode="decimal" autocomplete="off" placeholder="0,00 &#8378;"></label></div><label>&Ouml;deme &#350;ekli<select form="service-card-form" name="repair_service_fee_payment_type"><option value="">Se&ccedil;iniz</option><option>Nakit</option><option>Kredi Kart&#305;</option><option>Mail Order</option><option>Vadeli</option></select></label></section>
     </div></div>
-    <footer><button type="button" class="repair-cancel" data-repair-close>İptal</button><button type="button" class="button" id="repair-save" title="Tamir Kaydı Oluştur" aria-label="Tamir Kaydı Oluştur"><i class="ti tabler-device-floppy" aria-hidden="true"></i></button></footer>
+    <footer><button type="button" class="repair-cancel" data-repair-close>İptal</button><button type="button" class="button" id="repair-save" title="Tamir Kaydı Oluştur" aria-label="Tamir Kaydı Oluştur"><i class="ti tabler-device-floppy" aria-hidden="true"></i> Kaydet (F2)</button></footer>
+    <span class="repair-window-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span>
   </section>
 </div>
+<style>
+/* Tamir Kabul: klasik VOX Windows pencere şablonu. */
+#repair-modal{box-sizing:border-box!important;padding:0!important;background:rgba(10,45,38,.34)!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+#repair-modal>.repair-modal-backdrop{background:rgba(12,43,38,.28)!important}
+#repair-modal>.repair-dialog{position:absolute!important;left:var(--repair-left,50%)!important;top:var(--repair-top,50%)!important;transform:var(--repair-transform,translate(-50%,-50%))!important;display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:var(--repair-width,min(920px,calc(100% - 24px)))!important;height:var(--repair-height,min(590px,calc(100% - 24px)))!important;min-width:min(620px,calc(100% - 12px))!important;min-height:330px!important;max-width:calc(100% - 8px)!important;max-height:calc(100% - 8px)!important;margin:0!important;padding:0!important;border:1px solid #d0ae52!important;border-radius:3px 3px 0 0!important;background:#dcebf8!important;box-shadow:5px 8px 19px rgba(0,0,0,.42)!important;overflow:hidden!important}
+#repair-modal>.repair-dialog>header{display:flex!important;flex:0 0 29px!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;height:29px!important;min-height:29px!important;margin:0!important;padding:3px 4px 3px 9px!important;border:0!important;border-bottom:1px solid #d0ae52!important;background:linear-gradient(#176c5b,#004b3b)!important;color:#fff!important;cursor:move!important;user-select:none!important}
+#repair-modal>.repair-dialog>header h2{flex:1 1 auto!important;min-width:0!important;margin:0!important;color:#fff!important;font:700 12px/21px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important}
+#repair-modal>.repair-dialog>header h2 .ti{margin-right:5px!important;color:#fff!important;font-size:14px!important;vertical-align:-2px!important}
+#repair-modal .repair-window-controls{display:flex!important;align-items:center!important;gap:3px!important;margin-left:auto!important}
+#repair-modal .repair-window-controls button{display:grid!important;place-items:center!important;box-sizing:border-box!important;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;border:1px solid rgba(255,255,255,.68)!important;border-radius:2px!important;background:linear-gradient(#4b8f7d,#155445)!important;color:#fff!important;font:700 12px/18px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important;cursor:pointer!important}
+#repair-modal .repair-window-controls button:hover{background:linear-gradient(#69aa96,#1a6653)!important}
+#repair-modal .repair-window-controls .repair-close:hover{background:linear-gradient(#ed8a76,#a82f21)!important}
+#repair-modal>.repair-dialog>.repair-body{display:block!important;flex:1 1 auto!important;box-sizing:border-box!important;min-height:0!important;margin:0!important;padding:4px!important;background:#dcebf8!important;overflow:auto!important}
+#repair-modal .repair-tabs{box-sizing:border-box!important;min-height:100%!important;border:1px solid #79a5d0!important;border-radius:0!important;background:#edf5fd!important;box-shadow:inset 0 1px #fff!important;overflow:auto!important}
+#repair-modal .repair-tab-list{display:flex!important;min-height:30px!important;border-bottom:1px solid #79a5d0!important;background:linear-gradient(#f8fcff,#cfe4f8)!important}
+#repair-modal .repair-tab{min-height:29px!important;margin:0!important;padding:4px 14px!important;border:0!important;border-right:1px solid #a8c5df!important;border-bottom:0!important;background:transparent!important;color:#124c82!important;font:700 11px/20px Tahoma,"Segoe UI",sans-serif!important}
+#repair-modal .repair-tab:hover{background:#e2f0fc!important;color:#064a80!important}
+#repair-modal .repair-tab.is-active{background:linear-gradient(#fff,#dcecf9)!important;color:#004b3b!important;box-shadow:inset 0 -2px #168c56!important}
+#repair-modal .repair-tab.is-active::after{display:none!important}
+#repair-modal .repair-tab-panel{box-sizing:border-box!important;padding:8px!important;background:#edf5fd!important}
+#repair-modal .repair-tab-panel.is-active{display:grid!important;gap:6px 8px!important}
+#repair-modal .repair-tab-panel label,#repair-modal .repair-tab-panel fieldset{color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+#repair-modal .repair-tab-panel input:not([type=checkbox]):not([type=radio]),#repair-modal .repair-tab-panel select,#repair-modal .repair-tab-panel textarea{box-sizing:border-box!important;width:100%!important;height:23px!important;min-height:23px!important;margin:0!important;padding:2px 5px!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important}
+#repair-modal .repair-tab-panel textarea{height:54px!important;min-height:54px!important;resize:vertical!important}
+#repair-modal .repair-accessories{grid-template-columns:repeat(4,minmax(0,1fr))!important;align-content:start!important;gap:7px 8px!important}
+#repair-modal .repair-accessory-options{gap:7px 24px!important}
+#repair-modal .repair-patient-device-serials{gap:7px 8px!important}
+#repair-modal .repair-issues{border:1px solid #8daece!important;border-radius:0!important;background:#fff!important}
+#repair-modal>.repair-dialog>footer{display:flex!important;flex:0 0 40px!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;box-sizing:border-box!important;width:100%!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;border:0!important;border-top:1px solid #79a5d0!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
+#repair-modal>.repair-dialog>footer .repair-cancel{display:none!important}
+#repair-modal #repair-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;box-sizing:border-box!important;width:auto!important;min-width:116px!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0 10px!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important}
+#repair-modal #repair-save .ti{font-size:14px!important;line-height:1!important}
+#repair-modal .repair-window-resizer{position:absolute!important;z-index:4!important;right:0!important;bottom:0!important;width:15px!important;height:15px!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 45%,#6d8fa9 46% 52%,transparent 53% 62%,#6d8fa9 63% 69%,transparent 70%)!important}
+#repair-modal>.repair-dialog.repair-window-minimized{left:8px!important;top:auto!important;bottom:8px!important;transform:none!important;width:330px!important;height:29px!important;min-height:29px!important}
+#repair-modal>.repair-dialog.repair-window-minimized>.repair-body,#repair-modal>.repair-dialog.repair-window-minimized>footer,#repair-modal>.repair-dialog.repair-window-minimized>.repair-window-resizer{display:none!important}
+#repair-modal>.repair-dialog.repair-window-maximized{inset:4px!important;transform:none!important;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important}
+#repair-modal>.repair-dialog.repair-window-maximized>.repair-window-resizer{display:none!important}
+@media(max-width:680px){#repair-modal>.repair-dialog{min-width:calc(100% - 8px)!important}.repair-modal #repair-tab-delivery{grid-template-columns:1fr!important}#repair-modal .repair-accessories{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+</style>
+<script>
+(()=>{
+  const setup=()=>{
+    const modal=document.getElementById('repair-modal'),dialog=modal?.querySelector(':scope > .repair-dialog'),header=dialog?.querySelector(':scope > header');
+    if(!modal||!dialog||!header||dialog.dataset.windowsReady==='1')return;
+    dialog.dataset.windowsReady='1';
+    let interaction=null;
+    const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+    const stop=()=>{interaction=null};
+    header.addEventListener('pointerdown',event=>{
+      if(event.target.closest('button')||dialog.classList.contains('repair-window-maximized'))return;
+      const rect=dialog.getBoundingClientRect();dialog.style.setProperty('--repair-left',rect.left+'px');dialog.style.setProperty('--repair-top',rect.top+'px');dialog.style.setProperty('--repair-transform','none');
+      interaction={mode:'move',x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};header.setPointerCapture(event.pointerId);
+    });
+    header.addEventListener('pointermove',event=>{if(interaction?.mode!=='move')return;dialog.style.setProperty('--repair-left',clamp(interaction.left+event.clientX-interaction.x,0,innerWidth-dialog.offsetWidth)+'px');dialog.style.setProperty('--repair-top',clamp(interaction.top+event.clientY-interaction.y,0,innerHeight-dialog.offsetHeight)+'px')});
+    header.addEventListener('pointerup',stop);header.addEventListener('pointercancel',stop);
+    const resizer=dialog.querySelector('.repair-window-resizer');
+    resizer?.addEventListener('pointerdown',event=>{if(dialog.classList.contains('repair-window-maximized'))return;const rect=dialog.getBoundingClientRect();interaction={mode:'resize',x:event.clientX,y:event.clientY,width:rect.width,height:rect.height};resizer.setPointerCapture(event.pointerId);event.preventDefault()});
+    resizer?.addEventListener('pointermove',event=>{if(interaction?.mode!=='resize')return;dialog.style.setProperty('--repair-width',clamp(interaction.width+event.clientX-interaction.x,620,innerWidth-dialog.offsetLeft)+'px');dialog.style.setProperty('--repair-height',clamp(interaction.height+event.clientY-interaction.y,330,innerHeight-dialog.offsetTop)+'px')});
+    resizer?.addEventListener('pointerup',stop);resizer?.addEventListener('pointercancel',stop);
+    const maximize=header.querySelector('[data-repair-window-action="maximize"]'),minimize=header.querySelector('[data-repair-window-action="minimize"]');
+    maximize?.addEventListener('click',()=>{const active=dialog.classList.toggle('repair-window-maximized');dialog.classList.remove('repair-window-minimized');maximize.textContent=active?'❐':'□';maximize.title=active?'Geri al':'Büyüt'});
+    minimize?.addEventListener('click',()=>{const active=dialog.classList.toggle('repair-window-minimized');dialog.classList.remove('repair-window-maximized');minimize.textContent=active?'▣':'_';minimize.title=active?'Geri yükle':'Simge durumuna küçült'});
+    header.addEventListener('dblclick',event=>{if(!event.target.closest('button'))maximize?.click()});
+    document.addEventListener('keydown',event=>{const save=dialog.querySelector('#repair-save');if(event.key==='F2'&&!modal.hidden&&save&&!save.disabled){event.preventDefault();save.click()}});
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
 <?php endif; ?>
+<script>
+document.addEventListener('click',event=>{
+  const back=event.target.closest('[data-patient-back="1"]');
+  if(!back)return;
+  const fromPatientList=back.matches('[data-patient-list-back="1"]');
+  const fromPatientCard=<?=json_encode($fromPatientCard)?>;
+  if(!fromPatientList&&!fromPatientCard)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if(window.parent!==window){
+    window.parent.postMessage({
+      type:'vox-return-window',
+      url:back.href,
+      title:fromPatientList?'Hasta Kartları':<?=json_encode('Hasta Kartı - ' . (string)$patient['full_name'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>
+    },location.origin);
+    return;
+  }
+  window.location.assign(back.href);
+},true);
+</script>
 <script>(()=>{document.querySelector('[name="repair_target"]')?.closest('label')?.remove();const technicianLabel=document.querySelector('[name="repair_technician"]')?.closest('label');if(!technicianLabel)return;technicianLabel.setAttribute('aria-label','Teknik Servis');[...technicianLabel.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).forEach(node=>node.remove());technicianLabel.prepend(document.createTextNode('Teknik Servis'));})();</script>
 <?php if($showForm): ?>
 <div id="sales-stock-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-close></div><section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-stock-title"><header><h2 id="sales-stock-title">Satış Stoğu Seç</h2><button type="button" class="repair-close" data-sales-close aria-label="Kapat">×</button></header><div class="repair-body"><input id="sales-stock-search" type="search" placeholder="Stok kodu, adı, marka veya model ara" autocomplete="off"><div id="sales-stock-list"><?php foreach($stockCards as $stock): $label=trim((string)$stock['stock_code'].' — '.(string)$stock['stock_name']); ?><button type="button" class="sales-stock-item" data-id="<?=(int)$stock['id']?>" data-label="<?=e($label)?>" data-search="<?=e(mb_strtolower($label.' '.(string)$stock['brand'].' '.(string)$stock['model'], 'UTF-8'))?>"><?=e($label)?></button><?php endforeach; if(!$stockCards): ?><p>Stok kartı bulunamadı.</p><?php endif; ?></div></div><footer><button type="button" class="repair-cancel" data-sales-close>İptal</button></footer></section></div>
-<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true" data-sales-locked="<?=$salesDetailsLocked?'1':'0'?>"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Bilgileri</h2><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Toplam Tutar<input inputmode="decimal" name="sales_payment_amount" autocomplete="off" readonly></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><?php if($serviceNameLocked): ?><button type="button" id="sales-lock-toggle" class="button" data-admin="<?=$canManageSalesLock?'1':'0'?>" title="<?=$salesDetailsLocked?'Satış kilidini aç':'Satış bilgilerini kilitle'?>" aria-label="Satış kilidi"><i class="ti <?=$salesDetailsLocked?'tabler-lock':'tabler-lock-open'?>"></i></button><?php endif; ?><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer></section></div>
+<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true" data-sales-locked="<?=$salesDetailsLocked?'1':'0'?>"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="false" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Kartı - <?=e($patient['full_name'])?></h2><span class="sales-window-controls"><button type="button" data-sales-window-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-sales-window-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></span></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Toplam Tutar<input inputmode="decimal" name="sales_payment_amount" autocomplete="off" readonly></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><?php if($serviceNameLocked): ?><button type="button" id="sales-lock-toggle" class="button" data-admin="<?=$canManageSalesLock?'1':'0'?>" title="<?=$salesDetailsLocked?'Satış kilidini aç':'Satış bilgilerini kilitle'?>" aria-label="Satış kilidi"><i class="ti <?=$salesDetailsLocked?'tabler-lock':'tabler-lock-open'?>"></i></button><?php endif; ?><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer><span class="sales-window-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span></section></div>
+<?php if ($salesWindow): ?>
+<style>
+main.services-page{display:none!important}
+#sales-details-modal{inset:0!important;padding:0!important;background:#dcebf8!important}
+#sales-details-modal .sales-details-dialog{inset:0!important;left:0!important;top:0!important;transform:none!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+#sales-details-modal .sales-window-controls,#sales-details-modal .sales-window-resizer{display:none!important}
+</style>
+<?php endif; ?>
 <?php endif; ?>
 <script>
 document.addEventListener('click',async event=>{
   const removeButton=event.target.closest('.sales-product-cancel');
-  if(removeButton){
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if(<?=json_encode($serviceNameLocked)?>){alert('Ödemesi tamamlanan satıştaki ürünler silinemez.');return;}
-    const modal=document.getElementById('sales-details-modal'),row=removeButton.closest('.sales-device-details, #charger-device-details, #consumable-details'),products=[...modal?.querySelectorAll('.sales-device-details:not([hidden]),#charger-device-details:not([hidden]),#consumable-details:not([hidden])')||[]];
-    if(!row)return;
-    if(products.length<=1){alert('Son ürün kalemi silinemez.');return;}
-    row.querySelectorAll('[name]').forEach(field=>field.value='');
-    row.remove();
-    setTimeout(()=>modal?.querySelector('[name="sales_device_sgk"]')?.dispatchEvent(new Event('input',{bubbles:true})),0);
-    return;
-  }
+  // Ürün silme işlemi, alanları ve kullanıcı uyarısını bilen kendi düğme işleyicisine bırakılır.
+  if(removeButton)return;
   const saveButton=event.target.closest('#sales-details-save');
   if(!saveButton)return;
   const form=document.getElementById('service-card-form'),modal=document.getElementById('sales-details-modal');
@@ -1428,6 +1820,7 @@ document.addEventListener('click',async event=>{
   const serviceFeeDate = modal.querySelector('[name="repair_service_fee_date"]');
   const serviceFeePayment = modal.querySelector('[name="repair_service_fee_payment_type"]');
   const openRepairFeeIncome = async () => {
+    if (!validateRepairSerialSelection()) return;
     let repairId = Number(form.querySelector('[name="edit_id"]')?.value || 0);
     formatServiceFee();
     const amount = Number(String(serviceFee?.value || '').replace(/[^0-9,.-]/g, '').replaceAll('.', '').replace(',', '.')) || 0;
@@ -1437,9 +1830,11 @@ document.addEventListener('click',async event=>{
       const requestData = new FormData(form);
       requestData.set('ajax', 'repair_fee_prepare');
       const response = await fetch(form.action || location.href, {method:'POST', body:requestData, credentials:'same-origin'});
-      if (!response.ok) throw new Error('Hizmet bedeli kaydedilemedi.');
-      const result = await response.json();
-      if (!result.success) throw new Error('Tamir kartı kaydedilemedi.');
+      const responseText = await response.text();
+      let result = null;
+      try { result = JSON.parse(responseText); }
+      catch (_) { throw new Error('Tamir kartı kaydedilemedi. Sunucudan geçersiz yanıt alındı.'); }
+      if (!response.ok || !result?.success) throw new Error(result?.message || 'Tamir kartı kaydedilemedi.');
       const savedEditId = Number(result.service_id || 0);
       if (savedEditId) {
         repairId = savedEditId;
@@ -1570,8 +1965,8 @@ const initializeSalesScreen=()=>{
   if(!form||!service||!modal||!value)return;
   const saleStockLocked=<?=json_encode($saleProductDeleteLocked)?>;
   const salePaymentCompleted=<?=json_encode($serviceNameLocked)?>;
-  const linkedSaleNeedsConfirmation=<?=json_encode((bool)($saleEditLinks['sale'] && ($saleEditLinks['cash'] || $saleEditLinks['stock'])))?>;
-  const confirmLinkedSaleChange=()=>{if(!linkedSaleNeedsConfirmation)return true;let confirmation=form.querySelector('[name="confirm_linked_sale_change"]');if(confirmation?.value==='1')return true;if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return false;confirmation=document.createElement('input');confirmation.type='hidden';confirmation.name='confirm_linked_sale_change';confirmation.value='1';form.append(confirmation);return true;};
+  const linkedSaleNeedsConfirmation=<?=json_encode((bool)($saleEditLinks['sale'] && ($saleEditLinks['cash'] || $saleEditLinks['stock'])))?>,initialSalesDetails=details?.value||'';
+  const confirmLinkedSaleChange=()=>{if(!linkedSaleNeedsConfirmation||(details?.value||'')===initialSalesDetails)return true;let confirmation=form.querySelector('[name="confirm_linked_sale_change"]');if(confirmation?.value==='1')return true;if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return false;confirmation=document.createElement('input');confirmation.type='hidden';confirmation.name='confirm_linked_sale_change';confirmation.value='1';form.append(confirmation);return true;};
   form.addEventListener('submit',event=>{if(!confirmLinkedSaleChange())event.preventDefault();},true);
   detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',event=>{if(confirmLinkedSaleChange())return;event.preventDefault();event.stopImmediatePropagation();},true);
   const salesLockButton=detailsModal?.querySelector('#sales-lock-toggle'),applySalesLock=locked=>{if(!detailsModal)return;detailsModal.dataset.salesLocked=locked?'1':'0';detailsModal.querySelectorAll('.repair-body [name]').forEach(field=>{field.disabled=locked;field.readOnly=locked;});detailsModal.querySelectorAll('.sales-product-cancel,#add-hearing-device').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('#add-hearing-device,.sales-product-actions .button,[data-sales-product-action]').forEach(button=>{button.disabled=locked;button.setAttribute('aria-disabled',locked?'true':'false');button.style.opacity=locked?'.48':'';button.style.cursor=locked?'not-allowed':'';});detailsModal.querySelectorAll('[aria-label="Kasa"]').forEach(link=>{link.style.pointerEvents=locked?'none':'';link.style.opacity=locked?'.38':'';});const saveButton=detailsModal.querySelector('#sales-details-save');if(saveButton)saveButton.disabled=locked;if(salesLockButton){salesLockButton.title=locked?'Satış kilidini aç':'Satış bilgilerini kilitle';salesLockButton.innerHTML=`<i class="ti ${locked?'tabler-lock':'tabler-lock-open'}"></i>`;salesLockButton.style.background=locked?'#e6525d':'#19a94b';}};
@@ -1614,7 +2009,7 @@ const initializeSalesScreen=()=>{
   detailsModal?.addEventListener('focusout',event=>{const field=event.target;if(!(field instanceof HTMLInputElement)||!field.name.endsWith('_sgk'))return;const amount=parseTurkishMoney(field.value);if(amount!==null&&amount>0)field.value=formatTurkishMoney(amount);});
   const hasSecondHearingDevice=()=>!!detailsModal?.querySelector('#hearing-device-details-2:not([hidden])');
   let totalDiscountModeActive=false;
-  const syncTotalDiscountMode=()=>{const enabled=hasSecondHearingDevice(),label=totalDiscountInput?.closest('label'),deviceDiscountFields=[...detailsModal?.querySelectorAll('[name="sales_device_discount_rate"],[name="sales_device_2_discount_rate"]')||[]];if(detailsModal)detailsModal.dataset.salesLayout=enabled?'dual-hearing':'single-hearing';if(enabled!==totalDiscountModeActive){if(enabled){const previousDiscount=deviceDiscountFields.map(field=>field.value.trim()).find(Boolean)||'';if(totalDiscountInput&&!totalDiscountInput.value.trim())totalDiscountInput.value=previousDiscount;deviceDiscountFields.forEach(field=>{field.value='';const netPriceField=detailsModal?.querySelector(`[name="${field.name.replace(/_discount_rate$/,'_net_price')}"]`),listPrice=parseTurkishMoney(netPriceField?.dataset.listPrice||netPriceField?.value),sgkField=detailsModal?.querySelector(`[name="${field.name.replace(/_discount_rate$/,'_sgk')}"]`),sgk=parseTurkishMoney(sgkField?.value)||0;if(netPriceField&&listPrice!==null)netPriceField.value=formatTurkishMoney(Math.max(0,listPrice-sgk));});}else if(totalDiscountInput)totalDiscountInput.value='';totalDiscountModeActive=enabled;}if(label){label.hidden=!enabled;label.style.cssText=enabled?'display:flex!important;flex-direction:column;gap:7px':'display:none!important';}deviceDiscountFields.forEach(field=>{const fieldLabel=field.closest('label');if(fieldLabel){field.disabled=enabled;fieldLabel.hidden=false;fieldLabel.style.cssText=enabled?'display:none!important':'display:flex!important;visibility:visible;pointer-events:auto;flex-direction:column;gap:7px';}});};
+  const syncTotalDiscountMode=()=>{const enabled=hasSecondHearingDevice(),activeProduct=detailsModal?.dataset.productType||'',showTotalDiscount=enabled&&!['Sarf Malzeme','Şarj Cihazı'].includes(activeProduct),label=totalDiscountInput?.closest('label'),deviceDiscountFields=[...detailsModal?.querySelectorAll('[name="sales_device_discount_rate"],[name="sales_device_2_discount_rate"]')||[]];if(detailsModal)detailsModal.dataset.salesLayout=enabled?'dual-hearing':'single-hearing';if(enabled!==totalDiscountModeActive){if(enabled){const previousDiscount=deviceDiscountFields.map(field=>field.value.trim()).find(Boolean)||'';if(totalDiscountInput&&!totalDiscountInput.value.trim())totalDiscountInput.value=previousDiscount;deviceDiscountFields.forEach(field=>{field.value='';const netPriceField=detailsModal?.querySelector(`[name="${field.name.replace(/_discount_rate$/,'_net_price')}"]`),listPrice=parseTurkishMoney(netPriceField?.dataset.listPrice||netPriceField?.value),sgkField=detailsModal?.querySelector(`[name="${field.name.replace(/_discount_rate$/,'_sgk')}"]`),sgk=parseTurkishMoney(sgkField?.value)||0;if(netPriceField&&listPrice!==null)netPriceField.value=formatTurkishMoney(Math.max(0,listPrice-sgk));});}else if(totalDiscountInput)totalDiscountInput.value='';totalDiscountModeActive=enabled;}if(label){label.hidden=!showTotalDiscount;label.style.cssText=showTotalDiscount?'display:flex!important;flex-direction:column;gap:7px':'display:none!important';}deviceDiscountFields.forEach(field=>{const fieldLabel=field.closest('label');if(fieldLabel){field.disabled=enabled;fieldLabel.hidden=false;fieldLabel.style.cssText=enabled?'display:none!important':'display:flex!important;visibility:visible;pointer-events:auto;flex-direction:column;gap:7px';}});};
   const updateTotalAmount=()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]');if(!totalField)return;syncTotalDiscountMode();const netFields=['sales_device_net_price','sales_device_2_net_price','sales_charger_net_price'],sgkFields=['sales_device_sgk','sales_device_2_sgk','sales_charger_sgk'];let total=netFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);const totalSgk=sgkFields.reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);if(totalSgkInput)totalSgkInput.value=totalSgk>0?formatTurkishMoney(totalSgk):'';const consumablePrice=parseTurkishMoney(detailsModal?.querySelector('[name="sales_consumable_price"]')?.value)||0,consumableQuantity=Number(detailsModal?.querySelector('[name="sales_consumable_quantity"]')?.value)||0;total+=consumablePrice*consumableQuantity;if(hasSecondHearingDevice()){const raw=totalDiscountInput?.value.trim()||'',discount=parseTurkishMoney(raw);if(discount!==null&&raw!=='')total=Math.max(0,raw.includes('%')?total*(1-discount/100):total-discount);}totalField.value=total>0?formatTurkishMoney(total):'';if(salesGrandTotal)salesGrandTotal.textContent='Toplam Satış: '+formatTurkishMoney(totalSgk+total);const paymentType=detailsModal?.querySelector('[name="sales_payment_type"]'),paymentLocked=<?=json_encode($savedCashRecord !== [])?>;if(paymentType){if(total<=0)paymentType.value='';paymentType.disabled=paymentLocked||total<=0;paymentType.title=paymentLocked?'Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.':(total<=0?'Ürün ve toplam tutar olmadan ödeme şekli seçilemez.':'');}};
   totalDiscountInput?.addEventListener('input',updateTotalAmount);
   totalDiscountInput?.addEventListener('focusout',()=>{const raw=totalDiscountInput.value.trim();if(raw===''||raw.includes('%'))return;const amount=parseTurkishMoney(raw);if(amount!==null)totalDiscountInput.value=formatTurkishMoney(amount);updateTotalAmount();});
@@ -1638,18 +2033,18 @@ const initializeSalesScreen=()=>{
   renameFieldLabel(chargerModelSelect,'Model');renameFieldLabel(chargerSerialInput,'Seri No');
   const consumableDetails=document.createElement('div');
   consumableDetails.id='consumable-details';consumableDetails.hidden=true;consumableDetails.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px';
-  consumableDetails.innerHTML='<input type="hidden" name="sales_consumable_promotion" value="Hayır"><input type="hidden" name="sales_consumable_unit" value="Adet"><input type="hidden" name="sales_consumable_unit_description" value=""><label>Sarf Malzeme / Pil<select name="sales_consumable_stock_id"><option value="">Sarf malzeme veya pil seçiniz</option></select></label><label>Adet<input type="number" min="1" step="1" name="sales_consumable_quantity" value="1"></label><label>Fiyat<input inputmode="decimal" name="sales_consumable_price" readonly></label>';
+  consumableDetails.innerHTML='<label>Sarf Malzeme<select name="sales_consumable_stock_id"><option value="">Sarf malzeme veya pil seçiniz</option></select></label><label>Promosyon<select name="sales_consumable_promotion"><option>Hayır</option><option>Evet</option></select></label><label>Adet<input type="number" min="1" step="1" name="sales_consumable_quantity" value="1"></label><label>Birim<input name="sales_consumable_unit" value="Adet" readonly></label><label>Satış Fiyatı<input inputmode="decimal" name="sales_consumable_price" readonly></label><input type="hidden" name="sales_consumable_unit_description"><input type="hidden" data-consumable-inline-total>';
   consumableDetails.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');
   detailsModal?.querySelector('.repair-body')?.prepend(consumableDetails);
-  const consumableSelect=consumableDetails.querySelector('[name="sales_consumable_stock_id"]'),consumableQuantityInput=consumableDetails.querySelector('[name="sales_consumable_quantity"]'),consumablePriceInput=consumableDetails.querySelector('[name="sales_consumable_price"]');
+  const consumableSelect=consumableDetails.querySelector('[name="sales_consumable_stock_id"]'),consumableQuantityInput=consumableDetails.querySelector('[name="sales_consumable_quantity"]'),consumablePriceInput=consumableDetails.querySelector('[name="sales_consumable_price"]'),consumablePromotionInput=consumableDetails.querySelector('[name="sales_consumable_promotion"]'),consumableUnitInput=consumableDetails.querySelector('[name="sales_consumable_unit"]'),consumableDescriptionInput=consumableDetails.querySelector('[name="sales_consumable_unit_description"]'),consumableInlineTotal=consumableDetails.querySelector('[data-consumable-inline-total]');
   consumableStocks.forEach(stock=>consumableSelect?.add(new Option(`[${stock.stock_type}] ${stock.stock_code} — ${stock.stock_name}`,stock.id)));
-  const syncConsumablePrice=()=>{const stock=consumableStocks.find(item=>String(item.id)===String(consumableSelect?.value||''));if(consumablePriceInput)consumablePriceInput.value=listPriceForStock(stock);updateTotalAmount();};
-  consumableSelect?.addEventListener('change',syncConsumablePrice);consumableQuantityInput?.addEventListener('input',updateTotalAmount);
+  const syncConsumablePrice=()=>{const stock=consumableStocks.find(item=>String(item.id)===String(consumableSelect?.value||'')),isPromotion=consumablePromotionInput?.value==='Evet',price=isPromotion?formatTurkishMoney(0):(listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0)),quantity=Math.max(1,Number(consumableQuantityInput?.value)||1),amount=parseTurkishMoney(price)||0;if(consumablePriceInput)consumablePriceInput.value=price;if(consumableUnitInput)consumableUnitInput.value=stock?.unit||'Adet';if(consumableDescriptionInput)consumableDescriptionInput.value=stock?`${stock.stock_code} — ${stock.stock_name}`:'';if(consumableInlineTotal)consumableInlineTotal.value=formatTurkishMoney(amount*quantity);updateTotalAmount();};
+  consumableSelect?.addEventListener('change',syncConsumablePrice);consumableQuantityInput?.addEventListener('input',syncConsumablePrice);consumablePromotionInput?.addEventListener('change',syncConsumablePrice);
   const toggleConsumableDetails=show=>{consumableDetails.hidden=!show;consumableDetails.style.display=show?'grid':'none';};
   const consumableModal=document.createElement('div');
-  consumableModal.className='repair-modal';consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');
+  consumableModal.className='repair-modal sales-consumable-window';consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');
   consumableModal.innerHTML='<div class="repair-modal-backdrop" data-consumable-close></div><section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="consumable-sale-title"><header><h2 id="consumable-sale-title">Sarf Malzeme Satışı</h2><button type="button" class="repair-close" data-consumable-close aria-label="Kapat">×</button></header><div class="repair-body" style="grid-template-columns:repeat(2,minmax(0,1fr))"><label style="grid-column:1/-1">Sarf Malzeme<select name="modal_consumable_stock"></select></label><label>Satış Fiyatı<input name="modal_consumable_price" inputmode="decimal" readonly></label><label>Promosyonlu mu?<select name="modal_consumable_promotion"><option>Hayır</option><option>Evet</option></select></label><label>Birim<input name="modal_consumable_unit" readonly></label><label>Birim Tanımı<input name="modal_consumable_description" readonly></label><label>Adet<input name="modal_consumable_quantity" type="number" min="1" step="1" value="1"></label><label>Toplam Satış Fiyatı<input name="modal_consumable_total" readonly></label></div><footer><button type="button" class="repair-cancel" data-consumable-close>İptal</button><button type="button" class="button" data-consumable-apply>Ürünü Ekle</button></footer></section>';
-  document.body.append(consumableModal);
+  detailsModal?.querySelector('.sales-details-dialog')?.append(consumableModal);
   const consumableForm=consumableModal.querySelector('.repair-body');
   consumableForm.classList.add('consumable-horizontal-form');
   consumableForm.style.cssText='display:block;padding:24px';
@@ -1659,7 +2054,7 @@ const initializeSalesScreen=()=>{
   modalConsumablePromotion.closest('.consumable-form-row')?.querySelector('label').replaceChildren('Promosyon');
   modalConsumableSelect.innerHTML=consumableSelect.innerHTML;
   const syncConsumableModal=()=>{const stock=consumableStocks.find(item=>String(item.id)===String(modalConsumableSelect.value)),isPromotion=modalConsumablePromotion.value==='Evet',price=isPromotion?formatTurkishMoney(0):(listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0));if(modalConsumablePrice)modalConsumablePrice.value=price;if(modalConsumableUnit)modalConsumableUnit.value=stock?.unit||'Adet';if(modalConsumableDescription)modalConsumableDescription.value=stock?`${stock.stock_code} — ${stock.stock_name}`:'';const amount=parseTurkishMoney(modalConsumablePrice?.value)||0,quantity=Math.max(1,Number(modalConsumableQuantity?.value)||1);if(modalConsumableTotal)modalConsumableTotal.value=formatTurkishMoney(amount*quantity);};
-  const openConsumableModal=()=>{modalConsumableSelect.value=consumableSelect.value||'';modalConsumableQuantity.value=consumableQuantityInput.value||1;modalConsumablePromotion.value=consumableDetails.querySelector('[name="sales_consumable_promotion"]')?.value||'Hayır';modalConsumablePrice.readOnly=true;syncConsumableModal();consumableModal.hidden=false;consumableModal.setAttribute('aria-hidden','false');modalConsumableSelect.focus();};
+  const openConsumableModal=()=>{setProductType('Sarf Malzeme');showConsumableDetails();syncConsumablePrice();setTimeout(()=>consumableSelect?.focus(),0);};
   modalConsumableSelect.addEventListener('change',syncConsumableModal);modalConsumableQuantity.addEventListener('input',syncConsumableModal);modalConsumablePromotion.addEventListener('change',syncConsumableModal);
   consumableModal.querySelectorAll('[data-consumable-close]').forEach(button=>button.addEventListener('click',()=>{consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');}));
   consumableModal.querySelector('[data-consumable-apply]').addEventListener('click',()=>{if(!modalConsumableSelect.value){alert('Sarf malzeme seçiniz.');modalConsumableSelect.focus();return;}consumableSelect.value=modalConsumableSelect.value;consumableQuantityInput.value=Math.max(1,Number(modalConsumableQuantity.value)||1);consumablePriceInput.value=modalConsumablePrice.value;consumableDetails.querySelector('[name="sales_consumable_promotion"]').value=modalConsumablePromotion.value;consumableDetails.querySelector('[name="sales_consumable_unit"]').value=modalConsumableUnit.value;consumableDetails.querySelector('[name="sales_consumable_unit_description"]').value=modalConsumableDescription.value;setProductType('Sarf Malzeme');showConsumableDetails();updateTotalAmount();consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');});
@@ -1692,7 +2087,7 @@ const initializeSalesScreen=()=>{
   const colorIncomeBalances=()=>cashSourceForm?.querySelectorAll('[data-income-header-total]').forEach(total=>{const text=total.textContent||'',parts=text.split(' · Bakiye: ');if(parts.length!==2||(total.dataset.balanceText===text&&total.dataset.balanceLayout==='vertical'&&total.children.length===3))return;total.dataset.balanceText=text;total.dataset.balanceLayout='vertical';total.style.whiteSpace='normal';total.style.lineHeight='1.4';total.innerHTML='<span style="display:block;color:#19a94b">'+parts[0]+'</span><span style="display:none"> · </span><span style="display:block;color:#e6525d">Bakiye: '+parts[1]+'</span>';});cashSourceForm?.addEventListener('input',()=>setTimeout(colorIncomeBalances,0));cashSourceForm?.addEventListener('change',()=>setTimeout(colorIncomeBalances,0));new MutationObserver(colorIncomeBalances).observe(cashSourceForm||document.body,{childList:true,subtree:true});colorIncomeBalances();
   const alignIncomeRecordTitles=()=>{const firstTitle=cashSourceForm?.querySelector('header h2'),secondTitle=cashSourceForm?.querySelector('[data-extra-income] strong');if(!firstTitle||!secondTitle)return;const firstStyle=getComputedStyle(firstTitle);secondTitle.style.marginLeft='4px';secondTitle.style.fontFamily=firstStyle.fontFamily;secondTitle.style.fontSize=firstStyle.fontSize;secondTitle.style.fontWeight=firstStyle.fontWeight;secondTitle.style.lineHeight=firstStyle.lineHeight;secondTitle.style.color=firstStyle.color;};new MutationObserver(alignIncomeRecordTitles).observe(cashSourceForm||document.body,{childList:true,subtree:true});alignIncomeRecordTitles();
   if(cashRecordForm){const footer=cashRecordForm.querySelector('footer');if(footer){footer.style.padding='16px 24px 20px';footer.style.minHeight='';footer.querySelectorAll('button').forEach(button=>button.style.cssText+=';width:36px;min-width:36px;max-width:36px;height:36px;min-height:36px;max-height:36px;padding:0;box-sizing:border-box');}}
-  const normalizeCashFooterButtons=()=>cashSourceForm?.querySelectorAll('footer button').forEach(button=>{['width','min-width','max-width','height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'44px','important'));button.style.setProperty('padding','0','important');button.style.setProperty('box-sizing','border-box','important');});new MutationObserver(normalizeCashFooterButtons).observe(cashRecordForm?.querySelector('footer')||document.body,{childList:true,subtree:true});normalizeCashFooterButtons();
+  const normalizeCashFooterButtons=()=>cashSourceForm?.querySelectorAll('footer button').forEach(button=>{const classic=!!button.closest('.classic-cash-window-dialog');if(classic&&button.matches('.repair-cancel,[data-cash-close]')){button.style.setProperty('display','none','important');return;}const isAdd=classic&&button.getAttribute('aria-label')==='Bir gelir kaydı daha ekle',isSave=classic&&button.type==='submit';if(isAdd||isSave){button.style.setProperty('display',isSave?'inline-flex':'inline-grid','important');button.style.setProperty('width',isSave?'auto':'29px','important');button.style.setProperty('min-width',isSave?'114px':'29px','important');button.style.setProperty('max-width',isSave?'none':'29px','important');['height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'29px','important'));button.style.setProperty('padding',isSave?'0 10px':'0','important');button.style.setProperty('box-sizing','border-box','important');return;}['width','min-width','max-width','height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'44px','important'));button.style.setProperty('padding','0','important');button.style.setProperty('box-sizing','border-box','important');});new MutationObserver(normalizeCashFooterButtons).observe(cashRecordForm?.querySelector('footer')||document.body,{childList:true,subtree:true});normalizeCashFooterButtons();
   const normalizeIncomeDescriptions=()=>cashSourceForm?.querySelectorAll('textarea[name="description"],textarea[name="extra_description"]').forEach(field=>{field.maxLength=256;field.rows=2;field.style.setProperty('height','48px','important');field.style.setProperty('min-height','48px','important');});new MutationObserver(normalizeIncomeDescriptions).observe(cashSourceForm||document.body,{childList:true,subtree:true});normalizeIncomeDescriptions();
   if(cashSourceForm){
     const sourceInput=document.createElement('input');sourceInput.type='hidden';sourceInput.name='source_url';sourceInput.value=<?=json_encode(url('patient-followup.php?id='.$id))?>;cashSourceForm.append(sourceInput);
@@ -1827,7 +2222,7 @@ const initializeSalesScreen=()=>{
     if(paymentSelect.value&&cashSourceForm?.dataset.saved!=='1'&&!<?=json_encode($serviceNameLocked)?>)cashIconLink?.click();
   });syncCashIcon();if(<?=json_encode($openIncomeRecord)?>)setTimeout(()=>{cashIconLink?.click();const pageUrl=new URL(location.href);pageUrl.searchParams.delete('open_income_record');history.replaceState(null,'',pageUrl.pathname+(pageUrl.search||''));},0);
   const detailFields=detailsModal?[...detailsModal.querySelectorAll('[name]')]:[], deviceDetails=document.getElementById('hearing-device-details'), addDeviceButton=document.getElementById('add-hearing-device');
-  const setProductType=type=>{const body=detailsModal?.querySelector('.repair-body');if(!detailsModal||!body)return;detailsModal.dataset.productType=type;body.classList.remove('sales-product-device','sales-product-consumable','sales-product-charger');const productClass={'İşitme Cihazı':'sales-product-device','Sarf Malzeme':'sales-product-consumable','Şarj Cihazı':'sales-product-charger'}[type];if(productClass)body.classList.add(productClass);};
+  const setProductType=type=>{const body=detailsModal?.querySelector('.repair-body');if(!detailsModal||!body)return;detailsModal.dataset.productType=type;body.classList.remove('sales-product-device','sales-product-consumable','sales-product-charger');const productClass={'İşitme Cihazı':'sales-product-device','Sarf Malzeme':'sales-product-consumable','Şarj Cihazı':'sales-product-charger'}[type];if(productClass)body.classList.add(productClass);syncTotalDiscountMode();};
   const restoreDetails=()=>{try{const saved=JSON.parse(details?.value||'{}');detailFields.forEach(field=>{if(Object.prototype.hasOwnProperty.call(saved,field.name))field.value=saved[field.name]??'';});if(deviceSerialInput)deviceSerialInput.dataset.value=saved.sales_device_serial||'';if(brandSelect){brandSelect.value=saved.sales_brand||'';if(modelSelect)modelSelect.dataset.value=saved.sales_model||'';}if(chargerBrandSelect){chargerBrandSelect.value=saved.sales_charger_brand||'';if(chargerModelSelect)chargerModelSelect.dataset.value=saved.sales_charger_model||'';}formatSgkMoneyFields();if(paymentSelect&&!paymentSelect.value)paymentSelect.value=<?=json_encode($savedCashPaymentType)?>;setProductType(saved.sales_product_type||'');syncCashIcon();}catch(_){if(paymentSelect&&!paymentSelect.value)paymentSelect.value=<?=json_encode($savedCashPaymentType)?>;}};
   const persistDetails=()=>{if(!details)return;const saved={};detailsModal?.querySelectorAll('[name]').forEach(field=>saved[field.name]=field.value);if(detailsModal?.dataset.productType)saved.sales_product_type=detailsModal.dataset.productType;details.value=JSON.stringify(saved);};const invoiceStore=document.createElement('input');invoiceStore.type='hidden';invoiceStore.name='sales_invoice_no';form.append(invoiceStore);const syncInvoice=()=>{invoiceStore.value=detailsModal?.querySelector('[name="sales_invoice_no"]')?.value||'';persistDetails();};detailsModal?.querySelector('[name="sales_invoice_no"]')?.addEventListener('input',syncInvoice);detailsModal?.querySelector('[name="sales_invoice_no"]')?.addEventListener('change',syncInvoice);form.addEventListener('submit',syncInvoice);
   const openDetails=()=>{if(detailsModal){detailsModal.hidden=false;detailsModal.setAttribute('aria-hidden','false');}};
@@ -1879,14 +2274,16 @@ const initializeSalesScreen=()=>{
   let productWasRemoved=false;
   const clearFields=names=>names.forEach(name=>{const field=detailsModal?.querySelector(`[name="${name}"]`);if(field)field.value='';});
   const activeProductLineCount=()=>{const groups=[['sales_brand','sales_model','sales_device_serial'],['sales_device_2_brand','sales_device_2_model','sales_device_2_serial'],['sales_charger_brand','sales_charger_model','sales_charger_serial'],['sales_consumable_stock_id']];return groups.filter(names=>names.some(name=>String(detailsModal?.querySelector(`[name="${name}"]`)?.value||'').trim()!=='' )).length;};
-  const refreshProductDeleteButtons=()=>{const showButtons=!salePaymentCompleted&&(!saleStockLocked||activeProductLineCount()>1);detailsModal?.querySelectorAll('.sales-product-cancel').forEach(button=>button.hidden=!showButtons);};
-  const addProductCancel=(container,names,onClear)=>{const button=document.createElement('button');button.type='button';button.className='repair-cancel sales-product-cancel';button.textContent='×';button.title='Ürünü kaldır';button.setAttribute('aria-label','Ürünü kaldır');const removeProduct=()=>{if(salePaymentCompleted){alert('Ödemesi tamamlanan satıştaki ürünler silinemez.');return;}if(saleStockLocked&&activeProductLineCount()<=1){alert('Hasta ödeme yapmış. Son ürün kalemini silemezsiniz.');return;}productWasRemoved=true;clearFields(names);onClear();updateTotalAmount();refreshProductDeleteButtons();};button.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();removeProduct();},true);container.append(button);refreshProductDeleteButtons();return button;};
+  const placeDeviceDeleteButtons=()=>{detailsModal?.querySelectorAll('.sales-device-details').forEach(container=>{const button=container.querySelector('.sales-product-cancel'),serial=container.querySelector('select[name="sales_device_serial"],select[name$="_serial"]');if(!button||!serial)return;let row=serial.closest('.sales-serial-delete-row');if(!row){row=document.createElement('span');row.className='sales-serial-delete-row';serial.before(row);row.append(serial);}if(button.parentElement!==row)row.append(button);});};
+  const refreshProductDeleteButtons=()=>{const showButtons=!salePaymentCompleted&&(!saleStockLocked||activeProductLineCount()>1);detailsModal?.querySelectorAll('.sales-product-cancel').forEach(button=>button.hidden=!showButtons);placeDeviceDeleteButtons();};
+  const addProductCancel=container=>{const isDevice=container.classList.contains('sales-device-details');container.classList.remove('has-product-delete');container.querySelectorAll('.sales-product-cancel').forEach(button=>button.remove());container.querySelectorAll('.sales-serial-delete-row').forEach(row=>row.replaceWith(...row.childNodes));if(isDevice&&!container.querySelector('.sales-product-section-heading')){const heading=document.createElement('strong');heading.className='sales-product-section-heading';heading.textContent=container.id==='hearing-device-details-2'?'İşitme Cihazı 2':'İşitme Cihazı 1';container.prepend(heading);}return container;};
   detailsModal?.addEventListener('change',event=>{if(event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)refreshProductDeleteButtons();});
   let consumableCancel=null;
   const showConsumableDetails=()=>{chargerDetails?.after(consumableDetails);toggleConsumableDetails(true);consumableCancel??=addProductCancel(consumableDetails,['sales_consumable_stock_id','sales_consumable_quantity','sales_consumable_price'],()=>{toggleConsumableDetails(false);if(detailsModal?.dataset.productType==='Sarf Malzeme')setProductType('');});};
   let firstDeviceCancel=null;
-  const showFirstDevice=()=>{if(!deviceDetails)return;toggleDeviceDetails(true);firstDeviceCancel??=addProductCancel(deviceDetails,['sales_brand','sales_model','sales_device_serial','sales_device_sgk','sales_device_discount_rate','sales_device_net_price'],()=>{toggleDeviceDetails(false);if(detailsModal?.dataset.productType==='İşitme Cihazı')setProductType('');});};
-  const updateDeviceAddButton=()=>{if(addDeviceButton)addDeviceButton.hidden=!!detailsModal?.querySelector('#hearing-device-details-2');};
+  const showFirstDevice=()=>{if(!deviceDetails)return;toggleDeviceDetails(true);firstDeviceCancel??=addProductCancel(deviceDetails,['sales_brand','sales_model','sales_device_serial','sales_device_sgk','sales_device_discount_rate','sales_device_net_price'],()=>{toggleDeviceDetails(false);if(detailsModal?.dataset.productType==='İşitme Cihazı')setProductType('');});updateDeviceAddButton();};
+  const addSecondDeviceButton=(()=>{if(!salesFooter)return null;const button=document.createElement('button');button.type='button';button.id='sales-add-second-hearing';button.dataset.salesProductAction='add-second-hearing';button.title='İkinci işitme cihazı ekle';button.setAttribute('aria-label','İkinci işitme cihazı ekle');button.textContent='+';salesFooter.insertBefore(button,salesFooter.querySelector('#sales-details-save'));return button;})();
+  const updateDeviceAddButton=()=>{const hasFirst=!!deviceDetails&&!deviceDetails.hidden,hasSecond=!!detailsModal?.querySelector('#hearing-device-details-2');if(addDeviceButton)addDeviceButton.hidden=false;if(addSecondDeviceButton){addSecondDeviceButton.disabled=!hasFirst||hasSecond;addSecondDeviceButton.setAttribute('aria-disabled',addSecondDeviceButton.disabled?'true':'false');addSecondDeviceButton.title=hasSecond?'İkinci işitme cihazı eklenmiş':(hasFirst?'İkinci işitme cihazı ekle':'Önce birinci işitme cihazını ekleyin');}};
   const addExtraDevice=number=>{
     if(number!==2||detailsModal?.querySelector(`#hearing-device-details-${number}`))return;
     const previous=number===2?deviceDetails:detailsModal?.querySelector(`#hearing-device-details-${number-1}`);if(!previous)return;
@@ -1900,20 +2297,22 @@ const initializeSalesScreen=()=>{
     brand.addEventListener('change',()=>{fillSerialOptions(serial,[]);netPrice.value='';delete netPrice.dataset.listPrice;setListPriceHint([brand,model,serial],null);sync();});model.addEventListener('change',()=>{const stocks=hearingDeviceStocks.filter(item=>item.brand===brand.value&&item.model===model.value),stock=stocks[0],historical=invoiceMatchedSerials(brand.value,model.value),listPrice=listPriceForStock(stock);fillSerialOptions(serial,[...stocks,...historical]);netPrice.dataset.listPrice=listPrice;netPrice.value=listPrice;applyDiscount(netPrice,discount,netPrice);setListPriceHint([brand,model,serial],stock);});discount.addEventListener('input',()=>applyDiscount(netPrice,discount,netPrice));
     addProductCancel(device,[`sales_device_${number}_brand`,`sales_device_${number}_model`,`sales_device_${number}_serial`,`sales_device_${number}_sgk`,`sales_device_${number}_discount_rate`,`sales_device_${number}_net_price`],()=>{device.remove();updateDeviceAddButton();updateTotalAmount();});updateDeviceAddButton();updateTotalAmount();
   };
-  const addNextDevice=()=>{setProductType('İşitme Cihazı');if(deviceDetails?.hidden)showFirstDevice();else addExtraDevice(2);arrangeProductSections();};
+  const addNextDevice=()=>{setProductType('İşitme Cihazı');if(deviceDetails?.hidden)showFirstDevice();arrangeProductSections();updateDeviceAddButton();};
   detailsModal?.addEventListener('click',event=>{if(!event.target.closest('#add-hearing-device'))return;event.preventDefault();event.stopImmediatePropagation();addNextDevice();},true);
+  addSecondDeviceButton?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();if(addSecondDeviceButton.disabled)return;addExtraDevice(2);arrangeProductSections();updateDeviceAddButton();});
   salesInvoiceInput?.addEventListener('input',()=>{const brand=detailsModal?.querySelector('[name="sales_device_2_brand"]'),model=detailsModal?.querySelector('[name="sales_device_2_model"]'),serial=detailsModal?.querySelector('[name="sales_device_2_serial"]');if(!brand||!model||!serial||!brand.value||!model.value)return;const stocks=hearingDeviceStocks.filter(item=>item.brand===brand.value&&item.model===model.value);fillSerialOptions(serial,[...stocks,...invoiceMatchedSerials(brand.value,model.value)]);});
   salesDateInput?.addEventListener('change',()=>{fillDeviceSerial();fillChargerSerial();syncConsumablePrice();const brand=detailsModal?.querySelector('[name="sales_device_2_brand"]'),model=detailsModal?.querySelector('[name="sales_device_2_model"]'),netPrice=detailsModal?.querySelector('[name="sales_device_2_net_price"]'),discount=detailsModal?.querySelector('[name="sales_device_2_discount_rate"]');if(!brand||!model||!netPrice)return;const stock=hearingDeviceStocks.find(item=>item.brand===brand.value&&item.model===model.value),listPrice=listPriceForStock(stock);netPrice.dataset.listPrice=listPrice;applyDiscount(netPrice,discount,netPrice);});
   try{const saved=JSON.parse(details?.value||'{}');if(saved.sales_device_2_brand||saved.sales_device_2_model||saved.sales_device_2_serial){addExtraDevice(2);const device=detailsModal?.querySelector('#hearing-device-details-2'),brand=device?.querySelector('[name="sales_device_2_brand"]'),model=device?.querySelector('[name="sales_device_2_model"]'),serial=device?.querySelector('[name="sales_device_2_serial"]');if(brand){brand.value=saved.sales_device_2_brand||'';brand.dispatchEvent(new Event('change'));}if(model){model.value=saved.sales_device_2_model||'';model.dispatchEvent(new Event('change'));}if(serial)serial.value=saved.sales_device_2_serial||'';}}catch(_){}
   setTimeout(()=>{try{const saved=JSON.parse(details?.value||'{}');for(let number=1;number<=2;number++){const isFirst=number===1,device=isFirst?deviceDetails:detailsModal?.querySelector('#hearing-device-details-2'),brand=isFirst?brandSelect:device?.querySelector('[name="sales_device_2_brand"]'),model=isFirst?modelSelect:device?.querySelector('[name="sales_device_2_model"]'),serial=isFirst?deviceSerialInput:device?.querySelector('[name="sales_device_2_serial"]'),sgk=isFirst?detailsModal?.querySelector('[name="sales_device_sgk"]'):device?.querySelector('[name="sales_device_2_sgk"]'),savedBrand=saved[isFirst?'sales_brand':'sales_device_2_brand']||'',savedModel=saved[isFirst?'sales_model':'sales_device_2_model']||'',savedSerial=saved[isFirst?'sales_device_serial':'sales_device_2_serial']||'';if(!device||!brand||!model||!serial||!savedBrand||!savedModel)continue;brand.value=savedBrand;if(![...model.options].some(option=>option.value===savedModel))model.add(new Option(savedModel,savedModel));model.disabled=false;model.value=savedModel;const stocks=hearingDeviceStocks.filter(item=>item.brand===savedBrand&&item.model===savedModel);fillSerialOptions(serial,[...stocks,...invoiceMatchedSerials(savedBrand,savedModel)]);if(savedSerial&&![...serial.options].some(option=>option.value===savedSerial))serial.add(new Option(savedSerial,savedSerial));serial.value=savedSerial;if(sgk)sgk.value=saved[isFirst?'sales_device_sgk':'sales_device_2_sgk']||sgk.value;}}catch(_){}},0);
   [80,250,600].forEach(delay=>setTimeout(()=>{try{const saved=JSON.parse(details?.value||'{}');[[deviceSerialInput,saved.sales_device_serial],[detailsModal?.querySelector('[name="sales_device_2_serial"]'),saved.sales_device_2_serial]].forEach(([serial,savedSerial])=>{if(!serial||!savedSerial)return;if(![...serial.options].some(option=>option.value===savedSerial))serial.add(new Option(savedSerial,savedSerial));serial.value=savedSerial;});}catch(_){}updateTotalAmount();},delay));
   if(!deviceDetails?.hidden)showFirstDevice();
-  addDeviceButton?.addEventListener('click',()=>{setProductType('İşitme Cihazı');if(deviceDetails?.hidden)showFirstDevice();else addExtraDevice(2);arrangeProductSections();});
+  addDeviceButton?.addEventListener('click',()=>{setProductType('İşitme Cihazı');if(deviceDetails?.hidden)showFirstDevice();arrangeProductSections();updateDeviceAddButton();});
   if(!consumableDetails.hidden)showConsumableDetails();
   addConsumableButton.addEventListener('click',openConsumableModal);
   let chargerCancel=null;
   if(!chargerDetails.hidden)chargerCancel=addProductCancel(chargerDetails,['sales_charger_brand','sales_charger_model','sales_charger_price','sales_charger_serial','sales_charger_sgk','sales_charger_discount_rate','sales_charger_net_price'],()=>{toggleChargerDetails(false);detailsModal.dataset.chargerAdded='';if(detailsModal?.dataset.productType==='Şarj Cihazı')setProductType('');});
   addChargerButton.addEventListener('click',()=>{setProductType('Şarj Cihazı');toggleChargerDetails(true);detailsModal.dataset.chargerAdded='1';chargerCancel??=addProductCancel(chargerDetails,['sales_charger_brand','sales_charger_model','sales_charger_price','sales_charger_serial','sales_charger_sgk','sales_charger_discount_rate','sales_charger_net_price'],()=>{toggleChargerDetails(false);detailsModal.dataset.chargerAdded='';if(detailsModal?.dataset.productType==='Şarj Cihazı')setProductType('');});arrangeProductSections();});
+  updateDeviceAddButton();
   arrangeProductSections();
   refreshProductDeleteButtons();
   updateTotalAmount();
@@ -1927,13 +2326,22 @@ if('requestIdleCallback' in window)window.requestIdleCallback(initializeSalesScr
 <script>
 document.addEventListener('DOMContentLoaded',()=>{const salesSave=document.getElementById('sales-details-save');if(!salesSave)return;salesSave.addEventListener('click',()=>{const nativeAlert=window.alert;let restored=false;window.alert=message=>{if(message==='Kayıt tamamlandı'){if(!restored){window.alert=nativeAlert;restored=true;}return;}return nativeAlert(message);};setTimeout(()=>{if(!restored){window.alert=nativeAlert;restored=true;}},15000);},true);});
 </script>
-<style>#sales-details-link[hidden]{display:none!important}#sales-lock-toggle{width:44px!important;min-width:44px!important;height:44px!important;min-height:44px!important;font-size:20px!important}</style>
+<style>
+#sales-details-modal .has-product-delete{box-sizing:border-box!important;padding-top:0!important}
+#sales-details-modal .sales-product-section-heading{position:static!important;z-index:1;display:flex!important;grid-column:1/-1!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;min-height:32px!important;margin:0!important;padding:4px!important;color:#16404b;font-size:13px;font-weight:700;line-height:24px}
+#sales-details-modal .sales-product-cancel{position:absolute!important;z-index:4!important;top:4px!important;right:4px!important;display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:32px!important;min-width:32px!important;max-width:32px!important;height:32px!important;min-height:32px!important;max-height:32px!important;margin:0!important;padding:0!important;border:1px solid #c8353d!important;border-radius:5px!important;background:linear-gradient(#ef6269,#dc454d)!important;color:#fff!important;cursor:pointer!important;box-shadow:0 1px 2px rgba(0,0,0,.12)!important}
+#sales-details-modal .sales-product-cancel:hover{background:linear-gradient(#e95058,#c9343d)!important}
+#sales-details-modal .sales-product-cancel .ti{display:block!important;font-size:17px!important;line-height:1!important;color:#fff!important}
+#sales-details-modal .sales-product-cancel::after{position:absolute;right:0;bottom:calc(100% + 7px);z-index:20;padding:6px 9px;border-radius:5px;background:#24364c;color:#fff;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;content:attr(data-tooltip);opacity:0;visibility:hidden;transform:translateY(3px);transition:opacity .15s ease,transform .15s ease;pointer-events:none;box-shadow:0 3px 9px rgba(0,0,0,.22)}
+#sales-details-modal .sales-product-cancel:hover::after,#sales-details-modal .sales-product-cancel:focus-visible::after{opacity:1;visibility:visible;transform:translateY(0)}
+#sales-details-link[hidden]{display:none!important}#sales-lock-toggle{width:44px!important;min-width:44px!important;height:44px!important;min-height:44px!important;font-size:20px!important}
+</style>
 <style>#sales-details-modal #sales_total_sgk,#sales-details-modal [name="sales_payment_amount"]{color:#e0444c!important;font-weight:700!important}</style>
 <script>
 (()=>{const setup=()=>{const modal=document.getElementById('sales-details-modal');if(!modal)return;const sync=()=>{if(modal.dataset.salesLocked!=='1')return;modal.querySelectorAll('.repair-body select,.repair-body input,.repair-body textarea').forEach(field=>{field.disabled=true;field.readOnly=true;field.setAttribute('aria-disabled','true');});};new MutationObserver(sync).observe(modal,{childList:true,subtree:true,attributes:true,attributeFilter:['data-sales-locked']});[0,80,250,600,1100].forEach(delay=>setTimeout(sync,delay));modal.addEventListener('pointerdown',event=>{if(modal.dataset.salesLocked==='1'&&event.target.closest('.repair-body select,input,textarea'))event.preventDefault();},true);};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup);else setup();})();
 </script>
 <script>
-document.addEventListener('DOMContentLoaded',()=>{const service=document.querySelector('#service-card-form [name="service_name"]'),removeSaleActions=()=>{if(service?.value.trim()==='Satış')return;document.getElementById('sales-details-link')?.remove();document.querySelector('.sales-income-link')?.remove();};removeSaleActions();service?.addEventListener('change',removeSaleActions);const pageUrl=new URL(location.href);if(pageUrl.searchParams.has('open_sales_details')){setTimeout(()=>{removeSaleActions();document.getElementById('sales-details-modal')?.setAttribute('hidden','');pageUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',pageUrl.pathname+(pageUrl.search||''));},0);}});
+document.addEventListener('DOMContentLoaded',()=>{const service=document.querySelector('#service-card-form [name="service_name"]'),removeSaleActions=()=>{if(service?.value.trim()==='Satış')return;document.getElementById('sales-details-link')?.remove();document.querySelector('.sales-income-link')?.remove();};removeSaleActions();service?.addEventListener('change',removeSaleActions);const pageUrl=new URL(location.href);if(pageUrl.searchParams.has('open_sales_details')&&!pageUrl.searchParams.has('sales_window')){setTimeout(()=>{removeSaleActions();document.getElementById('sales-details-modal')?.setAttribute('hidden','');pageUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',pageUrl.pathname+(pageUrl.search||''));},0);}});
 </script>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{const renderIncomeSummary=()=>{const form=document.querySelector('form[action*="cash.php"]'),header=form?.querySelector('header');if(!form||!header)return;const amounts=[...form.querySelectorAll('[data-primary-term-amount]')],paid=[...form.querySelectorAll('[name="term_paid[]"]')],scheduled=amounts.reduce((sum,input)=>sum+(Number(String(input.value||'').replace(/[^0-9,.-]/g,'').replaceAll('.','').replace(',','.'))||0),0),total=scheduled||(Number(String(form.querySelector('[name="amount"]')?.value||'').replace(/[^0-9,.-]/g,'').replaceAll('.','').replace(',','.'))||0),paidTotal=amounts.reduce((sum,input,index)=>sum+(paid[index]?.checked?(Number(String(input.value||'').replace(/[^0-9,.-]/g,'').replaceAll('.','').replace(',','.'))||0):0),0),balance=Math.max(0,total-paidTotal),money=value=>value.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';let summary=header.querySelector('[data-income-header-total]');if(!summary){summary=document.createElement('span');summary.dataset.incomeHeaderTotal='1';summary.style.cssText='margin-left:auto;font-size:13px;font-weight:700;white-space:normal;line-height:1.4;text-align:right';header.append(summary);}summary.innerHTML='<span style="display:block;color:#19a94b">Ödenen: '+money(paidTotal)+'</span>'+(balance>0?'<span style="display:block;color:#e6525d">Bakiye: '+money(balance)+'</span>':'');};[100,350,800].forEach(delay=>setTimeout(renderIncomeSummary,delay));});
@@ -1957,17 +2365,18 @@ window.addEventListener('click',event=>{const button=event.target.closest('form[
 </script>
 <style>
 form[action*="cash.php"]>footer{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important}
-form[action*="cash.php"].repair-dialog>footer{padding:16px 24px 20px!important;min-height:0!important}
-form[action*="cash.php"].repair-dialog>footer button{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;flex:0 0 44px!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important}
-form[action*="cash.php"].repair-dialog>footer button .ti{font-size:21px!important;line-height:1!important;font-weight:700!important}
-form[action*="cash.php"].repair-dialog>footer [aria-label="Bir gelir kaydı daha ekle"]{font-size:26px!important;font-weight:600!important;line-height:1!important}
-form[action*="cash.php"]>footer [data-cash-close]{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#e6525d!important;color:#fff!important}
+form[action*="cash.php"].repair-dialog:not(.classic-cash-window-dialog)>footer{padding:16px 24px 20px!important;min-height:0!important}
+form[action*="cash.php"].repair-dialog:not(.classic-cash-window-dialog)>footer button{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;flex:0 0 44px!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important}
+form[action*="cash.php"].repair-dialog:not(.classic-cash-window-dialog)>footer button .ti{font-size:21px!important;line-height:1!important;font-weight:700!important}
+form[action*="cash.php"].repair-dialog:not(.classic-cash-window-dialog)>footer [aria-label="Bir gelir kaydı daha ekle"]{font-size:26px!important;font-weight:600!important;line-height:1!important}
+form[action*="cash.php"]:not(.classic-cash-window-dialog)>footer [data-cash-close]{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;min-height:44px!important;max-height:44px!important;padding:0!important;border:0!important;border-radius:6px!important;background:#e6525d!important;color:#fff!important}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   const normalizeIncomeFooter=()=>{
     const form=document.querySelector('form[action*="cash.php"]'),footer=form?.querySelector(':scope > footer');
     if(!footer)return;
+    if(form.classList.contains('classic-cash-window-dialog'))return;
     const footerButtons=[...footer.querySelectorAll('button')],addButton=footer.querySelector('[aria-label="Bir gelir kaydı daha ekle"]'),actionButtons=footerButtons.filter(button=>button!==addButton);
     const cancel=footer.querySelector('[data-cash-close]')||actionButtons.find(button=>button!==actionButtons.at(-1));
     if(cancel){
@@ -1997,7 +2406,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
   normalizeIncomeFooter();
   new MutationObserver(normalizeIncomeFooter).observe(document.body,{childList:true,subtree:true});
-  const lockIncomeFooterSize=()=>document.querySelectorAll('form[action*="cash.php"].repair-dialog>footer button').forEach(button=>{
+  const lockIncomeFooterSize=()=>document.querySelectorAll('form[action*="cash.php"].repair-dialog:not(.classic-cash-window-dialog)>footer button').forEach(button=>{
     if(button.style.getPropertyValue('width')==='44px'&&button.style.getPropertyValue('height')==='44px')return;
     ['width','min-width','max-width','height','min-height','max-height'].forEach(property=>button.style.setProperty(property,'44px','important'));
     button.style.setProperty('padding','0','important');
@@ -2156,7 +2565,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     value=document.createElement('button');value.type='button';value.id='sales-details-link';value.className='sales-details-link';value.title='Satış Kartını Aç';value.setAttribute('aria-label','Satış Kartını Aç');value.innerHTML='<i class="ti tabler-file-search"></i>';slot.append(value);return value;
   };
   const sync=()=>{const value=button();if(value)value.hidden=service.value.trim()!=='Satış';};
-  document.addEventListener('click',event=>{const value=event.target.closest('#sales-details-link');if(!value||service.value.trim()!=='Satış')return;event.preventDefault();const modal=document.getElementById('sales-details-modal');if(modal){modal.hidden=false;modal.setAttribute('aria-hidden','false');}},true);
+  document.addEventListener('click',event=>{const value=event.target.closest('#sales-details-link,#service-detail-button');if(!value||service.value.trim()!=='Satış'||new URL(location.href).searchParams.has('sales_window'))return;event.preventDefault();event.stopImmediatePropagation();const targetUrl=new URL(location.href);targetUrl.searchParams.delete('open_income_record');targetUrl.searchParams.set('open_sales_details','1');targetUrl.searchParams.set('sales_window','1');const title=<?=json_encode('Satış Kartı - '.(string)$patient['full_name'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;if(window.parent!==window){window.parent.postMessage({type:'vox-open-window',url:targetUrl.href,title},location.origin);return;}if(typeof window.voxOpenWindow==='function'){window.voxOpenWindow(targetUrl.href,title);return;}window.open(targetUrl.href,'_blank','noopener');},true);
   document.addEventListener('click',event=>{if(!event.target.closest('[data-sales-details-close]'))return;event.preventDefault();const modal=document.getElementById('sales-details-modal');if(modal){modal.hidden=true;modal.setAttribute('aria-hidden','true');}},true);
   service.addEventListener('change',sync,true);
   sync();
@@ -2228,10 +2637,10 @@ document.addEventListener('DOMContentLoaded', () => {
         option.text = option.text.replace(/^\s*[^—]+—\s*/, '');
       });
       accountLabel.style.setProperty('width', '100%', 'important');
-      accountLabel.style.setProperty('min-width', '220px', 'important');
+      accountLabel.style.setProperty('min-width', '0', 'important');
       accountField.style.setProperty('display', 'block', 'important');
       accountField.style.setProperty('width', '100%', 'important');
-      accountField.style.setProperty('min-width', '220px', 'important');
+      accountField.style.setProperty('min-width', '0', 'important');
     }
     setLabel('installment_count', type === 'credit_card' || type === 'term', type === 'term' ? '1 / 2' : '2 / 3', '2');
     setLabel('commission_rate', type === 'credit_card' || type === 'term', '2 / 3', '3');
@@ -2254,7 +2663,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <style>
 form[action*="cash.php"] section label:has([name="current_account_id"]){grid-column:2/3!important;grid-row:2!important;width:100%!important;min-width:0!important}
-form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;height:40px!important;min-height:40px!important;padding:8px 10px!important;box-sizing:border-box!important;visibility:visible!important;opacity:1!important}
+form[action*="cash.php"] [name="current_account_id"]{display:block!important;width:100%!important;min-width:0!important;height:23px!important;min-height:23px!important;padding:2px 5px!important;box-sizing:border-box!important;visibility:visible!important;opacity:1!important}
 form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minmax(0,1fr) minmax(280px,1fr)!important}
 </style>
 <?php if ($showForm): ?>
@@ -2263,10 +2672,21 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   const serviceForm = document.getElementById('service-card-form');
   const complaint = serviceForm?.querySelector('[name="complaint"]');
   const anamnesisIcon = complaint?.closest('.service-input-with-icon')?.querySelector('.service-input-icon');
-  if (!serviceForm || !complaint || !anamnesisIcon) return;
+  if (!serviceForm || !complaint) return;
+
+  const anamnesisShell = complaint.closest('.service-input-with-icon');
+  const surveyButton = document.createElement('button');
+  surveyButton.type = 'button';
+  surveyButton.className = 'anamnesis-survey-button';
+  surveyButton.title = 'Anamnez anketini aç';
+  surveyButton.setAttribute('aria-label', 'Anamnez anketini aç');
+  surveyButton.innerHTML = '<i class="ti tabler-clipboard-check" aria-hidden="true"></i>';
+  anamnesisShell?.classList.add('has-anamnesis-survey');
+  anamnesisShell?.append(surveyButton);
 
   let saved = {};
   try { saved = JSON.parse(<?=json_encode((string)$form['anamnesis_form'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?> || '{}') || {}; } catch (_) {}
+  // Anket şikâyeti ile hizmet kartındaki Anamnez alanı iki bağımsız kayıttır.
   let fields = [
     ['complaint','Şikayetiniz nedir?','text'], ['duration','Kaç yıldır şikayetiniz var?','text'],
     ['profession','Mesleğinizi öğrenebilir miyiz?','text'], ['noise','Gürültülü ortamlarda çalıştınız mı?','yesno'],
@@ -2293,14 +2713,17 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   ];
   const modal = document.createElement('div');
   modal.id = 'anamnesis-card-modal'; modal.hidden = true;
-  modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA KARTI</h2><button type="button" aria-label="Kapat">×</button></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><div class="anamnesis-company-logo" hidden><img alt="Şirket logosu"></div><footer><button type="button" class="anamnesis-cancel">İptal</button><button type="button" class="anamnesis-print" title="Yazdır" aria-label="Yazdır"><i class="ti tabler-printer"></i></button><button type="button" class="button anamnesis-apply" title="Anketi kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy"></i></button></footer></section>`;
+  modal.innerHTML = `<div class="anamnesis-backdrop"></div><section class="anamnesis-dialog" role="dialog" aria-modal="true" aria-labelledby="anamnesis-card-title"><header><h2 id="anamnesis-card-title">VOX İ.M. - HASTA ANAMNEZ</h2></header><div class="anamnesis-meta"><strong>${<?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE)?>}</strong><span>Tarih: ${new Date().toLocaleDateString('tr-TR')}</span></div><div class="anamnesis-grid"></div><div class="anamnesis-company-logo" hidden><img alt="Şirket logosu"></div><footer><button type="button" class="anamnesis-cancel" title="Hasta kartına geri dön" aria-label="Geri Dön"><i class="ti tabler-arrow-back-up"></i><span>Geri Dön</span></button><button type="button" class="anamnesis-print" title="Yazdır" aria-label="Yazdır"><i class="ti tabler-printer"></i></button><button type="button" class="button anamnesis-apply" title="Anketi kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy"></i></button></footer></section>`;
+  const anamnesisBackButton = modal.querySelector('.anamnesis-cancel');
+  anamnesisBackButton?.classList.add('patient-card-return-button');
+  if (anamnesisBackButton) anamnesisBackButton.querySelector('i').className = 'ti tabler-rotate-clockwise';
   document.body.append(modal);
   modal.querySelectorAll('.anamnesis-meta > strong, .anamnesis-meta > span').forEach(item => {
     item.style.setProperty('font-size', 'calc(1em + 2px)', 'important');
   });
   const printSettings = <?=json_encode($anamnesisPrintSettings, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
   const visualPrintProject = String(printSettings.grapesjs_project || '');
-  modal.querySelector('#anamnesis-card-title').textContent = printSettings.title || 'VOX İ.M. - HASTA KARTI';
+  modal.querySelector('#anamnesis-card-title').textContent = 'VOX İ.M. - HASTA ANAMNEZ';
   modal.style.setProperty('--anamnesis-header-color', printSettings.header_color || '#14843c');
   modal.style.setProperty('--anamnesis-font-size', String(printSettings.font_size || 11) + 'px');
   modal.style.setProperty('--anamnesis-question-font-size', String(printSettings.question_font_size || 11) + 'px');
@@ -2314,8 +2737,9 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   modal.style.setProperty('--anamnesis-company-logo-width', String(printSettings.company_logo_width || 28) + 'mm');
   const companyLogo = modal.querySelector('.anamnesis-company-logo');
   const companyLogoImage = companyLogo.querySelector('img');
-  if (String(printSettings.company_logo_enabled) === '1' && String(printSettings.company_logo_path || '').trim() !== '') {
-    companyLogoImage.src = <?=json_encode(rtrim(url(''), '/'), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?> + '/' + String(printSettings.company_logo_path).replace(/^\/+/, '');
+  const companyLogoUrl = <?=json_encode(rtrim(url(''), '/') . '/' . $anamnesisCompanyLogoPath, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  if (String(printSettings.company_logo_enabled) === '1') {
+    companyLogoImage.src = companyLogoUrl;
     companyLogo.hidden = false;
   }
   let printLayout = {};
@@ -2335,6 +2759,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
   editableTextFields.forEach(field => {
     designerSourceMap['field-' + field.id] = {key: field.field_key, label: field.name, type: field.field_type || 'text'};
   });
+  const inlineDesignerFieldKeys = new Set(['complaint', 'duration', 'profession']);
   const normalizeDesignerText = value => String(value || '').toLocaleUpperCase('tr-TR').replace(/[^\p{L}\p{N}]+/gu, '');
   const isVarYok = answerOptions => String(answerOptions || '').trim().toLowerCase() === 'var_yok';
   const legacyDesignerSource = block => {
@@ -2427,10 +2852,23 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
             block.textContent = descriptor.label;
             pendingEntry = descriptor;
           } else {
-            // Kaynak alan önce başlıktır; onu takip eden "Metin Alanı" veri girişidir.
-            block.classList.add('designer-field-label');
-            block.textContent = descriptor.label;
-            pendingEntry = descriptor;
+            if (inlineDesignerFieldKeys.has(descriptor.key)) {
+              // Şikâyet, süre ve meslek satırlarının şablonda ayrı giriş bloğu yoktur.
+              // Başlık ile yazılabilir alanı aynı tasarım bloğunda birlikte göster.
+              block.classList.add('designer-inline-field');
+              const title = document.createElement('span');
+              title.className = 'designer-field-label';
+              title.textContent = descriptor.label;
+              const field = buildField(descriptor);
+              field.setAttribute('aria-label', descriptor.label);
+              block.append(title, field);
+              pendingEntry = null;
+            } else {
+              // Kaynak alan önce başlıktır; onu takip eden "Metin Alanı" veri girişidir.
+              block.classList.add('designer-field-label');
+              block.textContent = descriptor.label;
+              pendingEntry = descriptor;
+            }
           }
           return;
         }
@@ -2542,7 +2980,29 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
     const available = dialog.clientHeight - header.offsetHeight - meta.offsetHeight - footer.offsetHeight;
     if (grid.scrollHeight > available && available > 0) grid.style.zoom = String(Math.max(.68, available / grid.scrollHeight));
   };
-  const close = () => { modal.hidden = true; };
+  const close = () => {
+    if (<?=json_encode($anamnesisWindow)?> && window.parent !== window) {
+      window.parent.postMessage({type:'vox-close-window'}, location.origin);
+      return;
+    }
+    modal.hidden = true;
+  };
+  const open = () => { modal.hidden = false; requestAnimationFrame(fitToA4); };
+  const openIndependent = () => {
+    if (<?=json_encode($anamnesisWindow)?>) { open(); return; }
+    const targetUrl = new URL(location.href);
+    targetUrl.searchParams.delete('open_income_record');
+    targetUrl.searchParams.delete('open_sales_details');
+    targetUrl.searchParams.delete('sales_window');
+    targetUrl.searchParams.set('anamnesis_window','1');
+    const title = <?=json_encode('Anamnez - '.(string)$patient['full_name'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+    if (window.parent !== window) {
+      window.parent.postMessage({type:'vox-open-window',url:targetUrl.href,title},location.origin);
+      return;
+    }
+    if (typeof window.voxOpenWindow === 'function') { window.voxOpenWindow(targetUrl.href,title); return; }
+    window.open(targetUrl.href,'_blank','noopener');
+  };
   const collect = () => Object.fromEntries(fields.map(([key, , type, , answerOptions = 'yes_no']) => {
     const field = modal.querySelector(`[name="${key}"]`);
     if (field?.type === 'checkbox') {
@@ -2571,30 +3031,37 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       patientName: <?=json_encode($patient['full_name'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>,
       date: new Date().toLocaleDateString('tr-TR'),
       questionsHtml: '<table class="question-table">'+questionRows+'</table>',
-      companyLogo: String(printSettings.company_logo_enabled) === '1' && String(printSettings.company_logo_path || '').trim() !== '' ? <?=json_encode(rtrim(url(''), '/'), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?> + '/' + String(printSettings.company_logo_path).replace(/^\/+/, '') : ''
+      companyLogo: String(printSettings.company_logo_enabled) === '1' ? companyLogoUrl : ''
     };
     const popup = window.open('', '_blank'); if (!popup) { alert('Yazdırma penceresi açılamadı. Tarayıcı açılır pencere izni verin.'); return true; }
     const encoded = JSON.stringify(payload).replace(/</g, '\\u003c');
     popup.document.write('<!doctype html><html><head><meta charset="utf-8"><script src="<?=url('assets/vendor/grapesjs/grapes.min.js')?>"><\\/script><script src="<?=url('assets/vendor/pagedjs/paged.polyfill.js')?>"><\\/script><style>@page{size:A4 portrait;margin:10mm}body{font-family:Arial,sans-serif;color:#182438}.question-table{width:100%;border-collapse:collapse}.question-table td{border:1px solid #222;padding:6px;font-size:11px}.a4-sheet{box-sizing:border-box;width:100%}</style></head><body><div id="render"></div><script>window.addEventListener("load",function(){const data='+encoded+';const editor=grapesjs.init({container:"#render",height:"auto",storageManager:false,fromElement:false,panels:{defaults:[]}});editor.loadProjectData(data.project);setTimeout(function(){let html=editor.getHtml(),css=editor.getCss();html=html.replaceAll("{{patient_name}}",data.patientName).replaceAll("{{date}}",data.date).replaceAll("{{anamnesis_questions}}",data.questionsHtml).replaceAll("{{company_logo}}",data.companyLogo);document.head.insertAdjacentHTML("beforeend","<style>"+css+"<\\/style>");document.getElementById("render").innerHTML=html;const print=function(){window.print()};window.PagedPolyfill?window.PagedPolyfill.preview().then(print).catch(print):print()},350)})<\\/script></body></html>');
     popup.document.close(); return true;
   };
-  anamnesisIcon.title = 'Anamnez hasta kartını açmak için çift tıklayın';
-  anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); modal.hidden = false; requestAnimationFrame(fitToA4); });
+  if (anamnesisIcon) {
+    anamnesisIcon.title = 'Anamnez anketini aç';
+    anamnesisIcon.addEventListener('dblclick', event => { event.preventDefault(); openIndependent(); });
+  }
+  surveyButton.addEventListener('click', openIndependent);
+  complaint.addEventListener('dblclick', event => { event.preventDefault(); openIndependent(); });
   modal.querySelectorAll('header button,.anamnesis-cancel,.anamnesis-backdrop').forEach(button => button.addEventListener('click', close));
   modal.querySelector('.anamnesis-apply').addEventListener('click', async event => {
     const button = event.currentTarget;
-    hidden.value = JSON.stringify(collectWithDetails());
+    const values = collectWithDetails();
+    hidden.value = JSON.stringify(values);
+    const currentEditId = serviceForm.querySelector('[name="edit_id"]')?.value || '';
+    if (!currentEditId || currentEditId === '0') { modal.hidden = true; return; }
     const data = new FormData();
     data.set('csrf', serviceForm.querySelector('[name="csrf"]').value);
     data.set('action', 'save_anamnesis');
-    data.set('edit_id', serviceForm.querySelector('[name="edit_id"]').value);
+    data.set('edit_id', currentEditId);
     data.set('anamnesis_form', hidden.value);
     button.disabled = true;
     try {
       const response = await fetch(location.href, {method:'POST', body:data, headers:{Accept:'application/json'}});
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || 'Kayıt tamamlanamadı.');
-      modal.hidden = true;
+      if (!<?=json_encode($anamnesisWindow)?>) modal.hidden = true;
     } catch (error) { alert(error.message || 'Anamnez kaydedilemedi.'); }
     finally { button.disabled = false; }
   });
@@ -2623,6 +3090,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       else target.textContent = content;
     }), 500);
   });
+  if (<?=json_encode($anamnesisWindow)?>) setTimeout(open, 0);
 })();
 </script>
 <style>
@@ -2691,6 +3159,10 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #anamnesis-card-modal .anamnesis-designer-sheet .design-block.logo img{width:52%;max-width:100%;max-height:100%;object-fit:contain}
 #anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field{padding:0}
 #anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field{display:block;position:absolute}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-inline-field{display:grid!important;grid-template-columns:minmax(185px,40%) minmax(0,1fr)!important;align-items:stretch!important;padding:0!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-inline-field>.designer-field-label{display:flex!important;align-items:center!important;min-width:0!important;padding:4px 6px!important;border-right:1px solid #182438!important;float:none!important;line-height:1.15!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-inline-field>input{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;margin:0!important;padding:4px 6px!important;border:0!important;border-radius:0!important;outline:0!important;background:#fff!important;font:inherit!important;color:#182438!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .designer-inline-field>input:focus{box-shadow:inset 0 0 0 2px #1a9b4b!important;background:#fffef2!important}
 #anamnesis-card-modal .anamnesis-designer-sheet .designer-field-label,#anamnesis-card-modal .anamnesis-designer-sheet .designer-detail-label{font-weight:400!important}
 #anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field input,#anamnesis-card-modal .anamnesis-designer-sheet .designer-entry-field textarea{display:block;width:100%;height:100%;min-height:0;border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;box-sizing:border-box;padding:5px 6px;font:inherit;resize:none;background:transparent!important}
 #anamnesis-card-modal .anamnesis-designer-sheet .designer-answer-field{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;flex-wrap:nowrap;font-size:11px!important;font-weight:400!important}
@@ -2704,5 +3176,584 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 /* A4 baskıda kullanılmayan yüksekliği form satırlarına dağıt. */
 @media print{#anamnesis-card-modal .anamnesis-dialog{height:auto!important;min-height:0!important;display:block!important;box-sizing:border-box!important;break-inside:auto!important;page-break-inside:auto!important}#anamnesis-card-modal .anamnesis-grid{display:block!important;height:auto!important;min-height:0!important;overflow:visible!important;break-inside:auto!important;page-break-inside:auto!important}#anamnesis-card-modal .anamnesis-row{display:grid!important;flex:none!important;border-bottom:var(--anamnesis-line-width,1px) solid #222!important;box-shadow:inset 0 calc(-1 * var(--anamnesis-line-width,1px)) 0 #222!important;break-inside:avoid!important;page-break-inside:avoid!important}#anamnesis-card-modal .anamnesis-row.anamnesis-free-text{min-height:24px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field{min-height:78px!important}#anamnesis-card-modal .anamnesis-row.anamnesis-note-field>span{padding-top:8px!important}#anamnesis-card-modal .anamnesis-company-logo{position:fixed!important;right:0!important;bottom:4mm!important;left:0!important;display:flex!important;justify-content:center!important;align-items:center!important}#anamnesis-card-modal .anamnesis-company-logo[hidden]{display:none!important}#anamnesis-card-modal .anamnesis-company-logo img{display:block!important;width:var(--anamnesis-company-logo-width,28mm)!important;height:auto!important;max-height:18mm!important;object-fit:contain!important}}
 @media print{#anamnesis-card-modal.designer-layout-active{padding:0!important}#anamnesis-card-modal.designer-layout-active .anamnesis-dialog{width:210mm!important;height:297mm!important;min-height:297mm!important;border:0!important;overflow:hidden!important}#anamnesis-card-modal.designer-layout-active .anamnesis-grid.designer-active{display:block!important;overflow:hidden!important;background:#fff!important}#anamnesis-card-modal .anamnesis-designer-sheet{width:210mm!important;height:297mm!important;aspect-ratio:auto!important}.anamnesis-designer-sheet .design-block{font-size:10pt!important}.anamnesis-designer-sheet .design-block.title{font-size:20pt!important}}
+/* Anamnez kartı alt alanı: şirket logosu ve işlem düğmeleri birbirinden bağımsızdır. */
+#anamnesis-card-modal .anamnesis-company-logo{box-sizing:border-box;flex:0 0 auto;min-height:44px;padding:4px 10px!important;border-top:1px solid #d7e2ed;background:#fff}
+#anamnesis-card-modal .anamnesis-company-logo img{width:auto!important;max-width:128px!important;max-height:38px!important;object-fit:contain!important}
+#anamnesis-card-modal .anamnesis-designer-sheet .design-block.logo img{display:block;width:auto!important;max-width:88%!important;max-height:100%!important;object-fit:contain!important}
+#anamnesis-card-modal .anamnesis-dialog>footer{position:relative!important;box-sizing:border-box;display:flex!important;flex:0 0 48px;align-items:center!important;justify-content:flex-end!important;flex-wrap:nowrap!important;gap:7px!important;min-height:48px;padding:5px 9px!important;border-top:1px solid #a9bfd3!important;background:#e8f2fb!important;overflow:visible!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-cancel{position:absolute!important;left:9px!important;top:50%!important;display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:38px!important;min-width:38px!important;max-width:38px!important;height:36px!important;min-height:36px!important;max-height:36px!important;margin:0!important;padding:0!important;transform:translateY(-50%)!important;border:1px solid #e39122!important;border-radius:5px!important;background:linear-gradient(#ffb95a,#f3a13b)!important;color:#fff!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-cancel:hover{background:linear-gradient(#f5a542,#df8f2b)!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-cancel span{display:none!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-cancel i{display:block!important;font-size:19px!important;line-height:1!important;color:#fff!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-print{position:absolute!important;left:50%!important;top:50%!important;display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;flex:0 0 38px!important;width:38px!important;min-width:38px!important;max-width:38px!important;height:36px!important;min-height:36px!important;max-height:36px!important;margin:0!important;padding:0!important;transform:translate(-50%,-50%)!important;border:1px solid #26384e!important;border-radius:5px!important;background:linear-gradient(#3d526d,#26384e)!important;color:#fff!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-apply,#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-apply.vox-classic-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;flex:0 0 auto!important;width:auto!important;min-width:116px!important;height:36px!important;min-height:36px!important;padding:0 13px!important;border:1px solid #087b30!important;border-radius:5px!important;background:linear-gradient(#37c85f,#0b9737)!important;color:#fff!important;font-weight:700!important;white-space:nowrap!important}
+#anamnesis-card-modal .anamnesis-dialog>footer .anamnesis-apply i{flex:0 0 auto!important}
+/* Baskıda şirket logosunu A4 sayfasının merkezinde ve okunaklı boyutta göster. */
+@media print{
+  #anamnesis-card-modal .anamnesis-designer-sheet .design-block.logo{box-sizing:border-box!important;left:50%!important;right:auto!important;width:42mm!important;height:20mm!important;padding:0!important;transform:translateX(-50%)!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:visible!important}
+  #anamnesis-card-modal .anamnesis-designer-sheet .design-block.logo img{display:block!important;width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;margin:0 auto!important;object-fit:contain!important;object-position:center center!important}
+  /* Alt işlem çubuğu ekranda kalır, fakat yazıcı çıktısına dahil edilmez. */
+  #anamnesis-card-modal .anamnesis-dialog>footer{display:none!important}
+}
 </style>
+<?php if($showForm): ?>
+<style>
+.classic-service-form .service-input-with-icon.has-anamnesis-survey{position:relative!important;display:flex!important;align-items:stretch!important;height:39px!important;min-height:39px!important;padding-right:39px!important;overflow:hidden!important}
+.classic-service-form .service-input-with-icon.has-anamnesis-survey textarea[name="complaint"]{flex:1 1 auto!important;width:100%!important;height:37px!important;min-height:37px!important;padding-right:5px!important;cursor:text!important}
+.classic-service-form .field-observation .service-input-with-icon{display:flex!important;align-items:stretch!important;height:39px!important;min-height:39px!important;overflow:hidden!important}
+.classic-service-form .field-observation .service-input-with-icon textarea[name="observation"]{flex:1 1 auto!important;width:100%!important;height:37px!important;min-height:37px!important;padding-top:4px!important}
+.classic-service-form .anamnesis-survey-button{position:absolute!important;z-index:3!important;right:2px!important;top:2px!important;display:grid!important;place-items:center!important;box-sizing:border-box!important;width:33px!important;min-width:33px!important;max-width:33px!important;height:33px!important;min-height:33px!important;max-height:33px!important;margin:0!important;padding:0!important;border:1px solid #0f7b4d!important;border-radius:3px!important;background:linear-gradient(#31b978,#138655)!important;color:#fff!important;box-shadow:inset 1px 1px rgba(255,255,255,.42)!important;cursor:pointer!important}
+.classic-service-form .anamnesis-survey-button:hover{background:linear-gradient(#44c789,#15945e)!important}
+.classic-service-form .anamnesis-survey-button i{font-size:19px!important;line-height:1!important;color:#fff!important}
+</style>
+<style>
+/* Satış Kartı: Hizmet/Hasta kartlarıyla aynı klasik Windows şablonu. */
+#sales-details-modal{z-index:2300!important;padding:0!important;pointer-events:none!important}
+#sales-details-modal .repair-modal-backdrop{display:none!important}
+#sales-details-modal .sales-details-dialog{position:absolute!important;left:50%;top:50%;transform:translate(-50%,-50%);display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:min(1120px,calc(100vw - 16px))!important;height:min(720px,calc(100vh - 16px))!important;max-height:calc(100vh - 16px)!important;border:1px solid #d0ae52!important;border-radius:2px!important;background:#dcebf8!important;box-shadow:0 8px 24px rgba(0,0,0,.38)!important;overflow:hidden!important;pointer-events:auto!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .sales-details-dialog>header{display:flex!important;flex:0 0 29px!important;align-items:center!important;box-sizing:border-box!important;height:29px!important;min-height:29px!important;margin:0!important;padding:3px 4px 3px 9px!important;border:0!important;border-bottom:1px solid #d0ae52!important;background:linear-gradient(#176c5b,#004b3b)!important;color:#fff!important;cursor:move!important;user-select:none!important}
+#sales-details-modal .sales-details-dialog>header h2{flex:1 1 auto!important;min-width:0!important;margin:0!important;color:#fff!important;font:700 12px/21px Tahoma,"Segoe UI",sans-serif!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+#sales-details-modal .sales-window-controls{display:flex!important;align-items:center!important;gap:3px!important;margin-left:auto!important}
+#sales-details-modal .sales-window-controls button{display:grid!important;place-items:center!important;box-sizing:border-box!important;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;border:1px solid rgba(255,255,255,.65)!important;border-radius:2px!important;background:linear-gradient(rgba(255,255,255,.25),rgba(255,255,255,.08))!important;color:#fff!important;font:700 14px/18px Tahoma,"Segoe UI",sans-serif!important;cursor:pointer!important}
+#sales-details-modal .sales-window-controls button:hover{background:rgba(255,255,255,.3)!important}
+#sales-details-modal .sales-window-controls .repair-close{font-size:18px!important;line-height:16px!important}
+#sales-details-modal .sales-details-dialog>.repair-body{display:grid!important;flex:1 1 auto!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-content:start!important;gap:5px 8px!important;box-sizing:border-box!important;min-height:0!important;margin:0!important;padding:4px!important;background:#dcebf8!important;overflow:auto!important}
+#sales-details-modal .classic-sales-section-title{grid-column:1/-1!important;height:23px!important;margin:0!important;padding:3px 9px!important;border:1px solid #79a5d0!important;background:linear-gradient(#f8fcff,#cfe4f8)!important;color:#124c82!important;font:700 13px/17px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .classic-sales-section-title i{display:inline-block;width:17px;margin-right:4px;color:#1769a8!important;text-align:center;font-style:normal!important}
+#sales-details-modal .sales-product-actions{grid-column:1/-1!important;display:flex!important;align-items:center!important;gap:7px!important;margin:0!important;padding:3px 7px!important;border-right:1px solid #79a5d0!important;border-left:1px solid #79a5d0!important;background:#edf5fd!important}
+#sales-details-modal .sales-product-actions .button{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:110px!important;height:27px!important;min-height:27px!important;margin:0!important;padding:0 10px!important;border:1px solid #0f7b4d!important;border-radius:3px!important;background:linear-gradient(#2bb474,#138655)!important;color:#fff!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px rgba(255,255,255,.4)!important}
+#sales-details-modal .sales-device-details,
+#sales-details-modal #charger-device-details,
+#sales-details-modal #consumable-details{display:grid!important;grid-column:1/-1!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px 8px!important;margin:0!important;padding:6px 7px!important;border:1px solid #79a5d0!important;background:#edf5fd!important}
+#sales-details-modal .sales-device-details[hidden],#sales-details-modal #charger-device-details[hidden],#sales-details-modal #consumable-details[hidden]{display:none!important}
+#sales-details-modal .repair-body>label,
+#sales-details-modal .sales-device-details>label,
+#sales-details-modal #charger-device-details>label,
+#sales-details-modal #consumable-details>label{display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .repair-body input:not([type=checkbox]),
+#sales-details-modal .repair-body select,
+#sales-details-modal .repair-body textarea{box-sizing:border-box!important;width:100%!important;height:23px!important;min-height:23px!important;margin:0!important;padding:2px 5px!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important}
+#sales-details-modal .repair-body input:focus,#sales-details-modal .repair-body select:focus,#sales-details-modal .repair-body textarea:focus{outline:0!important;border-color:#2c72b5!important;box-shadow:0 0 0 1px #85b8e8!important}
+#sales-details-modal .sales-list-price,#sales-details-modal #sales_total_sgk,#sales-details-modal [name="sales_payment_amount"]{color:#d93d46!important;font-weight:700!important}
+#sales-details-modal .sales-product-cancel{position:absolute!important;z-index:4!important;top:9px!important;right:7px!important;display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:26px!important;min-width:26px!important;max-width:26px!important;height:26px!important;min-height:26px!important;max-height:26px!important;margin:0!important;padding:0!important;border:1px solid #bd3039!important;border-radius:3px!important;background:linear-gradient(#ef6269,#d94149)!important;color:#fff!important;font-size:16px!important;line-height:1!important;box-shadow:inset 1px 1px rgba(255,255,255,.35),1px 1px 2px rgba(0,0,0,.15)!important}
+#sales-details-modal .sales-serial-delete-row{display:flex!important;align-items:center!important;gap:4px!important;width:100%!important;min-width:0!important;height:23px!important}
+#sales-details-modal .sales-serial-delete-row>select{flex:1 1 auto!important;width:auto!important;min-width:0!important}
+#sales-details-modal .sales-serial-delete-row>.sales-product-cancel{position:static!important;z-index:4!important;display:inline-grid!important;place-items:center!important;flex:0 0 22px!important;width:22px!important;min-width:22px!important;max-width:22px!important;height:22px!important;min-height:22px!important;max-height:22px!important;margin:0!important;padding:0!important;border-radius:3px!important;font-size:14px!important}
+#sales-details-modal .sales-details-dialog>footer{display:flex!important;flex:0 0 40px!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;box-sizing:border-box!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;border:0!important;border-top:1px solid #79a5d0!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
+#sales-details-modal .sales-details-dialog>footer .repair-cancel{display:none!important}
+#sales-details-modal #sales-grand-total{margin-right:auto!important;color:#d93d46!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal #sales-lock-toggle{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:29px!important;min-width:29px!important;max-width:29px!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0!important;border-radius:3px!important}
+#sales-details-modal #sales-details-save,#sales-details-modal #sales-details-save.vox-classic-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:114px!important;max-width:none!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0 10px!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;box-shadow:inset 1px 1px rgba(255,255,255,.55),1px 1px 2px rgba(0,0,0,.18)!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important}
+#sales-details-modal .sales-window-resizer{position:absolute!important;z-index:5!important;right:0!important;bottom:0!important;width:15px!important;height:15px!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 45%,#6d8fa9 46% 52%,transparent 53% 62%,#6d8fa9 63% 69%,transparent 70%)!important}
+#sales-details-modal .sales-details-dialog.sales-window-maximized{left:0!important;top:0!important;transform:none!important;width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}
+#sales-details-modal .sales-details-dialog.sales-window-minimized{left:8px!important;top:auto!important;bottom:8px!important;transform:none!important;width:320px!important;height:29px!important;max-height:29px!important}
+#sales-details-modal .sales-details-dialog.sales-window-minimized>.repair-body,#sales-details-modal .sales-details-dialog.sales-window-minimized>footer,#sales-details-modal .sales-details-dialog.sales-window-minimized>.sales-window-resizer{display:none!important}
+@media(max-width:720px){#sales-details-modal .sales-details-dialog>.repair-body,#sales-details-modal .sales-device-details,#sales-details-modal #charger-device-details,#sales-details-modal #consumable-details{grid-template-columns:1fr!important}#sales-details-modal .sales-product-actions{flex-wrap:wrap!important}}
+</style>
+<script>
+(()=>{
+  const setup=()=>{
+    const modal=document.getElementById('sales-details-modal');
+    const dialog=modal?.querySelector('.sales-details-dialog');
+    const header=dialog?.querySelector(':scope > header');
+    const body=dialog?.querySelector(':scope > .repair-body');
+    if(!modal||!dialog||!header||!body||dialog.dataset.windowsReady==='1')return;
+    dialog.dataset.windowsReady='1';
+    const save=dialog.querySelector('#sales-details-save');
+    if(save){save.textContent='▣ Kaydet (F2)';save.setAttribute('aria-label','Kaydet');save.title='Kaydet — F2';}
+    const normalizeFooter=()=>{
+      if(save){save.textContent='▣ Kaydet (F2)';['width','min-width','max-width','height','min-height','max-height','padding','box-sizing'].forEach(property=>save.style.removeProperty(property));}
+      const lock=dialog.querySelector('#sales-lock-toggle');
+      if(lock)['width','min-width','max-width','height','min-height','max-height','padding','box-sizing'].forEach(property=>lock.style.removeProperty(property));
+    };
+    const decorateSections=()=>{
+      normalizeFooter();
+      let productTitle=body.querySelector('[data-sales-section="products"]');
+      const actions=body.querySelector('.sales-product-actions');
+      if(actions&&!productTitle){productTitle=document.createElement('div');productTitle.className='classic-sales-section-title';productTitle.dataset.salesSection='products';productTitle.innerHTML='<i aria-hidden="true">▪</i>Ürün Bilgileri';}
+      if(actions&&productTitle&&actions.nextElementSibling!==productTitle)actions.after(productTitle);
+      let transactionTitle=body.querySelector('[data-sales-section="transaction"]');
+      const saleDate=body.querySelector('[name="sales_sale_date"]')?.closest('label');
+      if(saleDate&&!transactionTitle){transactionTitle=document.createElement('div');transactionTitle.className='classic-sales-section-title';transactionTitle.dataset.salesSection='transaction';transactionTitle.innerHTML='<i aria-hidden="true">▦</i>Satış ve Garanti Bilgileri';saleDate.before(transactionTitle);}
+    };
+    [0,100,350,800,1400].forEach(delay=>setTimeout(decorateSections,delay));
+    new MutationObserver(decorateSections).observe(body,{childList:true,subtree:false});
+    let interaction=null;
+    const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+    const stop=()=>{interaction=null;document.body.classList.remove('sales-window-moving','sales-window-resizing');};
+    header.addEventListener('pointerdown',event=>{
+      if(event.target.closest('button')||dialog.classList.contains('sales-window-maximized'))return;
+      const rect=dialog.getBoundingClientRect();
+      dialog.style.left=rect.left+'px';dialog.style.top=rect.top+'px';dialog.style.bottom='auto';dialog.style.transform='none';
+      interaction={mode:'move',x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
+      header.setPointerCapture(event.pointerId);document.body.classList.add('sales-window-moving');
+    });
+    header.addEventListener('pointermove',event=>{if(interaction?.mode!=='move')return;dialog.style.left=clamp(interaction.left+event.clientX-interaction.x,0,innerWidth-dialog.offsetWidth)+'px';dialog.style.top=clamp(interaction.top+event.clientY-interaction.y,0,innerHeight-dialog.offsetHeight)+'px';});
+    header.addEventListener('pointerup',stop);header.addEventListener('pointercancel',stop);
+    const resizer=dialog.querySelector('.sales-window-resizer');
+    resizer?.addEventListener('pointerdown',event=>{if(dialog.classList.contains('sales-window-maximized'))return;const rect=dialog.getBoundingClientRect();interaction={mode:'resize',x:event.clientX,y:event.clientY,width:rect.width,height:rect.height};resizer.setPointerCapture(event.pointerId);document.body.classList.add('sales-window-resizing');event.preventDefault();});
+    resizer?.addEventListener('pointermove',event=>{if(interaction?.mode!=='resize')return;dialog.style.width=clamp(interaction.width+event.clientX-interaction.x,620,innerWidth-dialog.offsetLeft)+'px';dialog.style.height=clamp(interaction.height+event.clientY-interaction.y,350,innerHeight-dialog.offsetTop)+'px';});
+    resizer?.addEventListener('pointerup',stop);resizer?.addEventListener('pointercancel',stop);
+    const maximize=header.querySelector('[data-sales-window-action="maximize"]');
+    const minimize=header.querySelector('[data-sales-window-action="minimize"]');
+    maximize?.addEventListener('click',()=>{const active=dialog.classList.toggle('sales-window-maximized');dialog.classList.remove('sales-window-minimized');maximize.textContent=active?'❐':'□';maximize.title=active?'Geri al':'Büyüt';});
+    minimize?.addEventListener('click',()=>{const active=dialog.classList.toggle('sales-window-minimized');dialog.classList.remove('sales-window-maximized');minimize.textContent=active?'▣':'_';minimize.title=active?'Geri yükle':'Simge durumuna küçült';});
+    header.addEventListener('dblclick',event=>{if(!event.target.closest('button'))maximize?.click();});
+    document.addEventListener('keydown',event=>{if(event.key==='F2'&&!modal.hidden&&save&&!save.disabled){event.preventDefault();save.click();}});
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
+<style>
+/* Sarf Malzeme seçimi: Satış Kartının içinde açılan klasik Windows penceresi. */
+#sales-details-modal .sales-consumable-window{position:absolute!important;z-index:180!important;inset:29px 0 40px!important;display:block!important;box-sizing:border-box!important;padding:0!important;background:rgba(16,46,42,.28)!important;pointer-events:auto!important}
+#sales-details-modal .sales-consumable-window[hidden]{display:none!important}
+#sales-details-modal .sales-consumable-window>.repair-modal-backdrop{position:absolute!important;inset:0!important;display:block!important;background:rgba(14,42,38,.2)!important}
+#sales-details-modal .sales-consumable-window>.repair-dialog{position:absolute!important;z-index:2!important;left:var(--consumable-left,50%)!important;top:var(--consumable-top,50%)!important;transform:var(--consumable-transform,translate(-50%,-50%))!important;display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:var(--consumable-width,min(760px,calc(100% - 16px)))!important;height:var(--consumable-height,min(430px,calc(100% - 16px)))!important;min-width:min(430px,calc(100% - 16px))!important;min-height:250px!important;max-width:calc(100% - 8px)!important;max-height:calc(100% - 8px)!important;margin:0!important;padding:0!important;border:1px solid #d0ae52!important;border-radius:3px 3px 0 0!important;background:#dcebf8!important;box-shadow:5px 8px 19px rgba(0,0,0,.42)!important;overflow:hidden!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .sales-consumable-window>.repair-dialog>header{display:flex!important;flex:0 0 29px!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;height:29px!important;min-height:29px!important;margin:0!important;padding:3px 4px 3px 9px!important;border:0!important;border-bottom:1px solid #d0ae52!important;background:linear-gradient(#176c5b,#004b3b)!important;color:#fff!important;cursor:move!important;user-select:none!important}
+#sales-details-modal .sales-consumable-window>.repair-dialog>header h2{flex:1 1 auto!important;min-width:0!important;margin:0!important;color:#fff!important;font:700 12px/21px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important}
+#sales-details-modal .sales-consumable-controls{display:flex!important;align-items:center!important;gap:3px!important;margin-left:auto!important}
+#sales-details-modal .sales-consumable-controls button{display:grid!important;place-items:center!important;box-sizing:border-box!important;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;border:1px solid rgba(255,255,255,.68)!important;border-radius:2px!important;background:linear-gradient(#4b8f7d,#155445)!important;color:#fff!important;font:700 12px/18px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important;cursor:pointer!important}
+#sales-details-modal .sales-consumable-controls button:hover{background:linear-gradient(#69aa96,#1a6653)!important}
+#sales-details-modal .sales-consumable-controls [data-consumable-close]:hover{background:linear-gradient(#ed8a76,#a82f21)!important}
+#sales-details-modal .sales-consumable-window .consumable-horizontal-form{display:grid!important;flex:1 1 auto!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-content:start!important;gap:5px 8px!important;box-sizing:border-box!important;min-height:0!important;margin:0!important;padding:7px!important;background:#edf5fd!important;overflow:auto!important}
+#sales-details-modal .sales-consumable-window .consumable-form-row{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:2px!important;min-width:0!important;margin:0!important}
+#sales-details-modal .sales-consumable-window .consumable-form-row:first-child{grid-column:1/-1!important}
+#sales-details-modal .sales-consumable-window .consumable-form-row>label{margin:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .sales-consumable-window .consumable-form-row>div{min-width:0!important}
+#sales-details-modal .sales-consumable-window .consumable-form-row input,
+#sales-details-modal .sales-consumable-window .consumable-form-row select{box-sizing:border-box!important;width:100%!important;height:23px!important;min-height:23px!important;margin:0!important;padding:2px 5px!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important}
+#sales-details-modal .sales-consumable-window>.repair-dialog>footer{display:flex!important;flex:0 0 40px!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;box-sizing:border-box!important;width:100%!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;border:0!important;border-top:1px solid #79a5d0!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
+#sales-details-modal .sales-consumable-window>.repair-dialog>footer button{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:92px!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0 10px!important;border-radius:3px!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .sales-consumable-window [data-consumable-apply]{border:1px solid #19782b!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;text-shadow:1px 1px #176726!important}
+#sales-details-modal .sales-consumable-window>.repair-dialog>footer [data-consumable-close]{border:1px solid #b63840!important;background:linear-gradient(#f06d73,#d94750)!important;color:#fff!important}
+#sales-details-modal .sales-consumable-resizer{position:absolute!important;z-index:4!important;right:0!important;bottom:0!important;width:15px!important;height:15px!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 45%,#6d8fa9 46% 52%,transparent 53% 62%,#6d8fa9 63% 69%,transparent 70%)!important}
+#sales-details-modal .sales-consumable-window.is-minimized{background:transparent!important;pointer-events:none!important}
+#sales-details-modal .sales-consumable-window.is-minimized>.repair-modal-backdrop{display:none!important}
+#sales-details-modal .sales-consumable-window.is-minimized>.repair-dialog{left:8px!important;top:auto!important;bottom:8px!important;transform:none!important;width:310px!important;height:29px!important;min-height:29px!important;pointer-events:auto!important}
+#sales-details-modal .sales-consumable-window.is-minimized>.repair-dialog>.consumable-horizontal-form,
+#sales-details-modal .sales-consumable-window.is-minimized>.repair-dialog>footer,
+#sales-details-modal .sales-consumable-window.is-minimized .sales-consumable-resizer{display:none!important}
+#sales-details-modal .sales-consumable-window.is-maximized>.repair-dialog{inset:4px!important;transform:none!important;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important}
+#sales-details-modal .sales-consumable-window.is-maximized .sales-consumable-resizer{display:none!important}
+@media(max-width:720px){#sales-details-modal .sales-consumable-window .consumable-horizontal-form{grid-template-columns:1fr!important}#sales-details-modal .sales-consumable-window .consumable-form-row:first-child{grid-column:auto!important}}
+</style>
+<script>
+(()=>{
+  const setup=()=>{
+    const modal=document.querySelector('#sales-details-modal .sales-consumable-window');
+    const dialog=modal?.querySelector(':scope > .repair-dialog');
+    const header=dialog?.querySelector(':scope > header');
+    if(!modal||!dialog||!header||dialog.dataset.classicWindowReady==='1')return;
+    dialog.dataset.classicWindowReady='1';
+    const oldClose=header.querySelector('[data-consumable-close]');
+    const controls=document.createElement('span');
+    controls.className='sales-consumable-controls';
+    const minimize=document.createElement('button');minimize.type='button';minimize.dataset.consumableWindowAction='minimize';minimize.title='Simge durumuna küçült';minimize.setAttribute('aria-label','Simge durumuna küçült');minimize.textContent='_';
+    const maximize=document.createElement('button');maximize.type='button';maximize.dataset.consumableWindowAction='maximize';maximize.title='Büyüt';maximize.setAttribute('aria-label','Büyüt');maximize.textContent='□';
+    controls.append(minimize,maximize);
+    if(oldClose)controls.append(oldClose);
+    header.append(controls);
+    const resizer=document.createElement('span');resizer.className='sales-consumable-resizer';resizer.title='Pencere boyutunu değiştir';dialog.append(resizer);
+    let interaction=null;
+    const stop=()=>{interaction=null;};
+    header.addEventListener('pointerdown',event=>{
+      if(event.target.closest('button')||modal.classList.contains('is-maximized'))return;
+      const rect=dialog.getBoundingClientRect(),modalRect=modal.getBoundingClientRect();
+      const left=rect.left-modalRect.left,top=rect.top-modalRect.top;
+      dialog.style.setProperty('--consumable-left',left+'px');
+      dialog.style.setProperty('--consumable-top',top+'px');
+      dialog.style.setProperty('--consumable-transform','none');
+      interaction={mode:'move',x:event.clientX,y:event.clientY,left,top};
+      header.setPointerCapture(event.pointerId);
+    });
+    header.addEventListener('pointermove',event=>{
+      if(interaction?.mode!=='move')return;
+      dialog.style.setProperty('--consumable-left',Math.max(0,Math.min(modal.clientWidth-dialog.offsetWidth,interaction.left+event.clientX-interaction.x))+'px');
+      dialog.style.setProperty('--consumable-top',Math.max(0,Math.min(modal.clientHeight-dialog.offsetHeight,interaction.top+event.clientY-interaction.y))+'px');
+    });
+    header.addEventListener('pointerup',stop);header.addEventListener('pointercancel',stop);
+    resizer.addEventListener('pointerdown',event=>{if(modal.classList.contains('is-maximized'))return;const rect=dialog.getBoundingClientRect();interaction={mode:'resize',x:event.clientX,y:event.clientY,width:rect.width,height:rect.height};resizer.setPointerCapture(event.pointerId);event.preventDefault();});
+    resizer.addEventListener('pointermove',event=>{if(interaction?.mode!=='resize')return;dialog.style.setProperty('--consumable-width',Math.max(430,Math.min(modal.clientWidth-dialog.offsetLeft,interaction.width+event.clientX-interaction.x))+'px');dialog.style.setProperty('--consumable-height',Math.max(250,Math.min(modal.clientHeight-dialog.offsetTop,interaction.height+event.clientY-interaction.y))+'px');});
+    resizer.addEventListener('pointerup',stop);resizer.addEventListener('pointercancel',stop);
+    minimize.addEventListener('click',()=>{const active=modal.classList.toggle('is-minimized');modal.classList.remove('is-maximized');minimize.textContent=active?'▣':'_';minimize.title=active?'Geri yükle':'Simge durumuna küçült';});
+    maximize.addEventListener('click',()=>{const active=modal.classList.toggle('is-maximized');modal.classList.remove('is-minimized');maximize.textContent=active?'❐':'□';maximize.title=active?'Geri al':'Büyüt';});
+    modal.querySelectorAll('[data-consumable-close]').forEach(button=>button.addEventListener('click',()=>modal.classList.remove('is-minimized','is-maximized')));
+    modal.querySelector('[data-consumable-apply]')?.addEventListener('click',()=>setTimeout(()=>modal.classList.remove('is-minimized','is-maximized'),0));
+    header.addEventListener('dblclick',event=>{if(!event.target.closest('button'))maximize.click();});
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
+<style>
+/* Satış Kartı ürün sekmeleri aynı konumda tek bir klasik Windows alt penceresi gibi çalışır. */
+#sales-details-modal .sales-details-dialog>.repair-body{position:relative!important}
+#sales-details-modal .sales-product-child-window{position:absolute!important;z-index:30;left:var(--sales-child-left,10px);top:var(--sales-child-top,38px);display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:var(--sales-child-width,min(900px,calc(100% - 20px)))!important;height:var(--sales-child-height,min(350px,calc(100% - 52px)))!important;min-width:min(430px,calc(100% - 20px))!important;min-height:150px!important;margin:0!important;padding:0!important;border:1px solid #d0ae52!important;border-radius:3px 3px 0 0!important;background:#dcebf8!important;box-shadow:4px 6px 15px rgba(0,0,0,.34)!important;overflow:hidden!important}
+#sales-details-modal .sales-product-child-window[hidden]{display:none!important}
+#sales-details-modal .sales-product-child-window[data-sales-product-window="consumable"],
+#sales-details-modal .sales-product-child-window[data-sales-product-window="charger"]{--sales-child-left:10px;--sales-child-top:38px}
+#sales-details-modal .sales-product-child-window.is-active{box-shadow:5px 8px 18px rgba(0,0,0,.46)!important}
+#sales-details-modal .sales-product-child-titlebar{display:flex!important;flex:0 0 29px!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;height:29px!important;min-height:29px!important;margin:0!important;padding:3px 4px 3px 9px!important;border:0!important;border-bottom:1px solid #d0ae52!important;background:linear-gradient(#176c5b,#004b3b)!important;color:#fff!important;cursor:move!important;user-select:none!important}
+#sales-details-modal .sales-product-child-titlebar strong{flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;color:#fff!important;text-overflow:ellipsis!important;white-space:nowrap!important;font:700 12px/21px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important}
+#sales-details-modal .sales-product-child-controls{display:flex!important;align-items:center!important;gap:3px!important;margin-left:auto!important}
+#sales-details-modal .sales-product-child-controls button{display:grid!important;place-items:center!important;box-sizing:border-box!important;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;border:1px solid rgba(255,255,255,.68)!important;border-radius:2px!important;background:linear-gradient(#4b8f7d,#155445)!important;color:#fff!important;font:700 12px/18px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important;cursor:pointer!important}
+#sales-details-modal .sales-product-child-controls button:hover{background:linear-gradient(#69aa96,#1a6653)!important}
+#sales-details-modal .sales-product-child-controls [data-sales-child-action="close"]:hover{background:linear-gradient(#ed8a76,#a82f21)!important}
+#sales-details-modal .sales-product-child-content{display:block!important;flex:1 1 auto!important;box-sizing:border-box!important;min-height:0!important;margin:0!important;padding:4px!important;background:#dcebf8!important;overflow:auto!important}
+#sales-details-modal .sales-product-child-content>.sales-device-details,
+#sales-details-modal .sales-product-child-content>#charger-device-details,
+#sales-details-modal .sales-product-child-content>#consumable-details{position:relative!important;display:grid!important;width:100%!important;margin:0 0 4px!important;border:1px solid #79a5d0!important}
+#sales-details-modal .sales-product-child-resizer{position:absolute!important;z-index:4!important;right:0!important;bottom:0!important;width:15px!important;height:15px!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 45%,#6d8fa9 46% 52%,transparent 53% 62%,#6d8fa9 63% 69%,transparent 70%)!important}
+#sales-details-modal .sales-product-child-window.is-minimized{height:29px!important;min-height:29px!important;max-height:29px!important}
+#sales-details-modal .sales-product-child-window.is-minimized .sales-product-child-content,
+#sales-details-modal .sales-product-child-window.is-minimized .sales-product-child-resizer{display:none!important}
+#sales-details-modal .sales-product-child-window.is-maximized{inset:4px!important;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important}
+#sales-details-modal .sales-product-child-window.is-maximized .sales-product-child-resizer{display:none!important}
+@media(max-width:720px){#sales-details-modal .sales-product-child-window{left:4px!important;top:38px!important;width:calc(100% - 8px)!important;min-width:0!important;height:calc(100% - 44px)!important}}
+</style>
+<script>
+(()=>{
+  const setup=()=>{
+    const modal=document.getElementById('sales-details-modal');
+    const dialog=modal?.querySelector('.sales-details-dialog');
+    const body=dialog?.querySelector(':scope > .repair-body');
+    if(!modal||!dialog||!body||body.dataset.productWindowsReady==='1')return;
+    /* Ürünler artık ayrı alt pencerelerde değil, satış kartının içinde sekme olarak gösteriliyor. */
+    body.dataset.productWindowsReady='inline';
+    return;
+    const definitions=[
+      {key:'hearing',title:'İşitme Cihazı',selector:'#hearing-device-details,#hearing-device-details-2'},
+      {key:'consumable',title:'Sarf Malzeme',selector:'#consumable-details'},
+      {key:'charger',title:'Şarj Cihazı',selector:'#charger-device-details'}
+    ];
+    let topZ=30;
+    let activeKey='';
+    const records=new Map();
+    const activate=record=>{
+      records.forEach(item=>item.window.classList.toggle('is-active',item===record));
+      record.window.style.zIndex=String(++topZ);
+    };
+    definitions.forEach(definition=>{
+      const windowElement=document.createElement('section');
+      windowElement.className='sales-product-child-window';
+      windowElement.dataset.salesProductWindow=definition.key;
+      windowElement.hidden=true;
+      windowElement.innerHTML='<header class="sales-product-child-titlebar"><strong></strong><span class="sales-product-child-controls"><button type="button" data-sales-child-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-sales-child-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" data-sales-child-action="close" title="Kapat" aria-label="Kapat">×</button></span></header><div class="sales-product-child-content"></div><span class="sales-product-child-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span>';
+      windowElement.querySelector('strong').textContent=definition.title;
+      body.append(windowElement);
+      const record={definition,window:windowElement,content:windowElement.querySelector('.sales-product-child-content')};
+      records.set(definition.key,record);
+      windowElement.addEventListener('pointerdown',()=>activate(record));
+    });
+    const matchingRecord=section=>{
+      for(const record of records.values())if(section.matches(record.definition.selector))return record;
+      return null;
+    };
+    let organizing=false;
+    const organize=()=>{
+      if(organizing)return;
+      organizing=true;
+      const visibleKeys=[];
+      definitions.forEach(definition=>{
+        const record=records.get(definition.key);
+        [...body.querySelectorAll(definition.selector)].forEach(section=>{if(section.parentElement!==record.content)record.content.append(section);});
+        const sections=[...record.content.querySelectorAll(definition.selector)];
+        const hasVisible=sections.some(section=>!section.hidden);
+        if(hasVisible)visibleKeys.push(definition.key);
+      });
+      if(!activeKey||!visibleKeys.includes(activeKey)){
+        const savedType=modal.dataset.productType||'';
+        const preferred=savedType==='İşitme Cihazı'?'hearing':savedType==='Sarf Malzeme'?'consumable':savedType==='Şarj Cihazı'?'charger':'';
+        activeKey=visibleKeys.includes(preferred)?preferred:(visibleKeys[0]||activeKey);
+      }
+      definitions.forEach(definition=>{
+        const record=records.get(definition.key);
+        const sections=[...record.content.querySelectorAll(definition.selector)];
+        const hasVisible=sections.some(section=>!section.hidden);
+        if(record.window.dataset.manuallyClosed!=='1'){
+          const shouldHide=!hasVisible||definition.key!==activeKey,opening=record.window.hidden&&!shouldHide;
+          if(record.window.hidden!==shouldHide)record.window.hidden=shouldHide;
+          if(opening)activate(record);
+        }
+      });
+      organizing=false;
+    };
+    const openForButton=button=>{
+      const label=button.textContent.trim();
+      const key=label.includes('İşitme')?'hearing':label.includes('Sarf')?'consumable':label.includes('Şarj')?'charger':'';
+      const record=records.get(key);
+      if(!record)return;
+      activeKey=key;
+      records.forEach(item=>{
+        if(item===record)return;
+        item.window.hidden=true;
+        item.window.classList.remove('is-active','is-minimized','is-maximized');
+      });
+      delete record.window.dataset.manuallyClosed;
+      setTimeout(()=>{organize();if(!record.window.hidden)activate(record);},0);
+    };
+    body.addEventListener('click',event=>{const button=event.target.closest('.sales-product-actions button');if(button)openForButton(button);},true);
+    const observer=new MutationObserver(()=>queueMicrotask(organize));
+    observer.observe(body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+    records.forEach(record=>{
+      const windowElement=record.window;
+      const titlebar=windowElement.querySelector('.sales-product-child-titlebar');
+      const minimize=windowElement.querySelector('[data-sales-child-action="minimize"]');
+      const maximize=windowElement.querySelector('[data-sales-child-action="maximize"]');
+      const close=windowElement.querySelector('[data-sales-child-action="close"]');
+      minimize.addEventListener('click',event=>{event.stopPropagation();const active=windowElement.classList.toggle('is-minimized');windowElement.classList.remove('is-maximized');minimize.textContent=active?'▣':'_';minimize.title=active?'Geri yükle':'Simge durumuna küçült';activate(record);});
+      maximize.addEventListener('click',event=>{event.stopPropagation();const active=windowElement.classList.toggle('is-maximized');windowElement.classList.remove('is-minimized');maximize.textContent=active?'❐':'□';maximize.title=active?'Geri al':'Büyüt';activate(record);});
+      close.addEventListener('click',event=>{event.stopPropagation();windowElement.dataset.manuallyClosed='1';windowElement.hidden=true;});
+      titlebar.addEventListener('dblclick',event=>{if(!event.target.closest('button'))maximize.click();});
+      let interaction=null;
+      const stop=()=>{interaction=null;};
+      titlebar.addEventListener('pointerdown',event=>{
+        if(event.target.closest('button')||windowElement.classList.contains('is-maximized'))return;
+        const rect=windowElement.getBoundingClientRect(),bodyRect=body.getBoundingClientRect();
+        const startLeft=rect.left-bodyRect.left+body.scrollLeft,startTop=rect.top-bodyRect.top+body.scrollTop;
+        windowElement.style.setProperty('--sales-child-left',startLeft+'px');
+        windowElement.style.setProperty('--sales-child-top',startTop+'px');
+        interaction={mode:'move',x:event.clientX,y:event.clientY,left:startLeft,top:startTop};
+        titlebar.setPointerCapture(event.pointerId);activate(record);
+      });
+      titlebar.addEventListener('pointermove',event=>{
+        if(interaction?.mode!=='move')return;
+        const maxLeft=Math.max(0,body.clientWidth-windowElement.offsetWidth),maxTop=Math.max(0,body.scrollHeight-windowElement.offsetHeight);
+        windowElement.style.setProperty('--sales-child-left',Math.max(0,Math.min(maxLeft,interaction.left+event.clientX-interaction.x))+'px');
+        windowElement.style.setProperty('--sales-child-top',Math.max(0,Math.min(maxTop,interaction.top+event.clientY-interaction.y))+'px');
+      });
+      titlebar.addEventListener('pointerup',stop);titlebar.addEventListener('pointercancel',stop);
+      const resizer=windowElement.querySelector('.sales-product-child-resizer');
+      resizer.addEventListener('pointerdown',event=>{
+        if(windowElement.classList.contains('is-maximized'))return;
+        const rect=windowElement.getBoundingClientRect();
+        interaction={mode:'resize',x:event.clientX,y:event.clientY,width:rect.width,height:rect.height};
+        resizer.setPointerCapture(event.pointerId);activate(record);event.preventDefault();
+      });
+      resizer.addEventListener('pointermove',event=>{
+        if(interaction?.mode!=='resize')return;
+        windowElement.style.setProperty('--sales-child-width',Math.max(430,Math.min(body.clientWidth-windowElement.offsetLeft,interaction.width+event.clientX-interaction.x))+'px');
+        windowElement.style.setProperty('--sales-child-height',Math.max(150,Math.min(body.clientHeight-windowElement.offsetTop,interaction.height+event.clientY-interaction.y))+'px');
+      });
+      resizer.addEventListener('pointerup',stop);resizer.addEventListener('pointercancel',stop);
+    });
+    [0,80,250,600,1200].forEach(delay=>setTimeout(organize,delay));
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
+<style>
+#sales-details-modal .sales-device-details.sales-product-inline-inactive,
+#sales-details-modal #consumable-details.sales-product-inline-inactive,
+#sales-details-modal #charger-device-details.sales-product-inline-inactive{display:none!important}
+#sales-details-modal .repair-body>.sales-transaction-tab-hidden,
+#sales-details-modal .classic-sales-section-title.sales-transaction-tab-hidden{display:none!important}
+#sales-details-modal .sales-details-dialog>footer{position:relative!important}
+#sales-details-modal #sales-add-second-hearing{position:absolute!important;left:50%!important;top:5px!important;transform:translateX(-50%)!important;display:grid!important;place-items:center!important;box-sizing:border-box!important;width:29px!important;min-width:29px!important;max-width:29px!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;font:700 20px/27px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important;cursor:pointer!important}
+#sales-details-modal #sales-add-second-hearing:disabled{border-color:#84958d!important;background:linear-gradient(#cad2ce,#9facA6)!important;color:#eef1ef!important;text-shadow:none!important;cursor:not-allowed!important;opacity:.8!important}
+#sales-details-modal #sales-add-second-hearing.sales-product-inline-inactive{display:none!important}
+#sales-details-modal .sales-product-actions .button.is-active-product-tab{border-color:#075f3a!important;background:linear-gradient(#167c54,#07583b)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)!important}
+</style>
+<script>
+(()=>{
+  const setup=()=>{
+    const modal=document.getElementById('sales-details-modal');
+    const body=modal?.querySelector('.sales-details-dialog>.repair-body');
+    if(!modal||!body||body.dataset.inlineProductTabsReady==='1')return;
+    body.dataset.inlineProductTabsReady='1';
+    const definitions=[
+      {key:'hearing',label:'İşitme Cihazı',selector:'#hearing-device-details,#hearing-device-details-2'},
+      {key:'consumable',label:'Sarf Malzeme',selector:'#consumable-details'},
+      {key:'charger',label:'Şarj Cihazı',selector:'#charger-device-details'}
+    ];
+    const keyForLabel=label=>label.includes('İşitme')?'hearing':label.includes('Sarf')?'consumable':label.includes('Şarj')?'charger':'';
+    const keyForSavedType=()=>keyForLabel(modal.dataset.productType||'');
+    let activeKey=keyForSavedType()||'hearing';
+    let arranging=false;
+    const arrange=()=>{
+      if(arranging)return;
+      arranging=true;
+      const actions=body.querySelector('.sales-product-actions');
+      const productTitle=body.querySelector('[data-sales-section="products"]');
+      const transactionTitle=body.querySelector('[data-sales-section="transaction"]');
+      if(!actions||!productTitle){arranging=false;return;}
+      if(actions.nextElementSibling!==productTitle)actions.after(productTitle);
+      const groups=definitions.map(definition=>({definition,sections:[...body.querySelectorAll(definition.selector)]}));
+      const available=groups.filter(group=>group.sections.some(section=>!section.hidden)).map(group=>group.definition.key);
+      const savedKey=keyForSavedType();
+      if(!activeKey)activeKey=savedKey||available[0]||'hearing';
+      let anchor=productTitle;
+      groups.forEach(group=>group.sections.forEach(section=>{if(anchor.nextElementSibling!==section)anchor.after(section);anchor=section;}));
+      if(transactionTitle&&anchor.nextElementSibling!==transactionTitle)anchor.after(transactionTitle);
+      groups.forEach(group=>group.sections.forEach(section=>section.classList.toggle('sales-product-inline-inactive',group.definition.key!==activeKey)));
+      const transactionNames=['sales_sale_date','sales_warranty_start','sales_warranty_end','sales_invoice_no','sales_payment_type','sales_payment_amount','sales_total_discount_rate'];
+      const transactionFields=transactionNames.map(name=>body.querySelector(`[name="${name}"]`)?.closest('label'));
+      transactionFields.push(body.querySelector('#sales_total_sgk')?.closest('label'),body.querySelector('[aria-label="Kasa"]'));
+      [transactionTitle,...transactionFields].filter(Boolean).forEach(element=>element.classList.toggle('sales-transaction-tab-hidden',activeKey!=='hearing'));
+      modal.querySelector('#sales-add-second-hearing')?.classList.toggle('sales-product-inline-inactive',activeKey!=='hearing');
+      actions.querySelectorAll('button').forEach(button=>{
+        const selected=keyForLabel(button.textContent.trim())===activeKey;
+        button.classList.toggle('is-active-product-tab',selected);
+        button.setAttribute('aria-selected',selected?'true':'false');
+      });
+      arranging=false;
+    };
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('.sales-product-actions button');
+      if(!button||!body.contains(button))return;
+      const key=keyForLabel(button.textContent.trim());
+      if(!key)return;
+      activeKey=key;
+      setTimeout(arrange,0);
+    },true);
+    new MutationObserver(()=>queueMicrotask(arrange)).observe(body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+    [0,80,250,600,1200].forEach(delay=>setTimeout(arrange,delay));
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
+<style>
+/* Gelir Kayıt: Satış kartının üzerinde açılan klasik Windows penceresi. */
+#sales-details-modal [aria-label="Kasa"]{top:3px!important;box-sizing:border-box!important;width:30px!important;min-width:30px!important;max-width:30px!important;height:30px!important;min-height:30px!important;max-height:30px!important;margin-top:3px!important;border-radius:4px!important}
+#sales-details-modal [aria-label="Kasa"] .ti{font-size:18px!important;line-height:1!important}
+.classic-cash-window-modal{position:fixed!important;z-index:4200!important;inset:0!important;display:grid;place-items:center!important;box-sizing:border-box!important;padding:0!important;background:rgba(0,43,36,.42)!important;pointer-events:auto!important}
+.classic-cash-window-modal[hidden]{display:none!important}
+.classic-cash-window-modal>.classic-cash-window-dialog{position:absolute!important;left:50%;top:50%;transform:translate(-50%,-50%);display:flex!important;flex-direction:column!important;box-sizing:border-box!important;width:min(760px,calc(100vw - 20px))!important;height:min(620px,calc(100vh - 20px))!important;min-width:min(430px,calc(100vw - 20px))!important;min-height:280px!important;max-width:calc(100vw - 12px)!important;max-height:calc(100vh - 12px)!important;margin:0!important;padding:0!important;border:1px solid #d0ae52!important;border-radius:3px!important;background:#dcebf8!important;box-shadow:0 12px 32px rgba(0,0,0,.42)!important;overflow:hidden!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+.classic-cash-window-dialog>header{display:flex!important;flex:0 0 29px!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;height:29px!important;min-height:29px!important;margin:0!important;padding:3px 4px 3px 9px!important;border:0!important;border-bottom:1px solid #d0ae52!important;background:linear-gradient(#176c5b,#004b3b)!important;color:#fff!important;cursor:move!important;user-select:none!important}
+.classic-cash-window-dialog>header h2{display:flex!important;flex:0 1 auto!important;align-items:center!important;min-width:0!important;margin:0!important;color:#fff!important;font:700 12px/21px Tahoma,"Segoe UI",sans-serif!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.classic-cash-window-dialog>header h2 .ti{margin-right:5px!important;color:#f4c84c!important;font-size:14px!important}
+.classic-cash-window-controls{display:flex!important;align-items:center!important;gap:3px!important;margin-left:auto!important}
+.classic-cash-window-controls button{display:grid!important;place-items:center!important;box-sizing:border-box!important;width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;margin:0!important;padding:0!important;border:1px solid rgba(255,255,255,.65)!important;border-radius:2px!important;background:linear-gradient(rgba(255,255,255,.25),rgba(255,255,255,.08))!important;color:#fff!important;font:700 14px/18px Tahoma,"Segoe UI",sans-serif!important;cursor:pointer!important}
+.classic-cash-window-controls button:hover{background:rgba(255,255,255,.3)!important}
+.classic-cash-window-controls .classic-cash-close{font-size:18px!important;line-height:16px!important}
+.classic-cash-window-dialog>section{display:grid!important;flex:1 1 auto!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-content:start!important;gap:5px 8px!important;box-sizing:border-box!important;min-height:0!important;margin:0!important;padding:7px!important;border:0!important;background:#dcebf8!important;color:#26384a!important;overflow:auto!important}
+.classic-cash-window-dialog>section+section{flex:0 1 auto!important;max-height:45%!important;border-top:1px solid #79a5d0!important}
+.classic-cash-window-dialog>section>label{display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;padding:0!important;border:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+.classic-cash-window-dialog>section>strong{grid-column:1/-1!important;box-sizing:border-box!important;min-height:23px!important;margin:0!important;padding:3px 8px!important;border:1px solid #79a5d0!important;background:linear-gradient(#f8fcff,#cfe4f8)!important;color:#124c82!important;font:700 12px/16px Tahoma,"Segoe UI",sans-serif!important}
+.classic-cash-window-dialog>section input:not([type=checkbox]),.classic-cash-window-dialog>section select,.classic-cash-window-dialog>section textarea{box-sizing:border-box!important;width:100%!important;min-width:0!important;height:23px!important;min-height:23px!important;margin:0!important;padding:2px 5px!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important}
+.classic-cash-window-dialog>section textarea{height:48px!important;min-height:48px!important;resize:vertical!important}
+.classic-cash-window-dialog>section input:focus,.classic-cash-window-dialog>section select:focus,.classic-cash-window-dialog>section textarea:focus{outline:0!important;border-color:#2c72b5!important;box-shadow:0 0 0 1px #85b8e8!important}
+.classic-cash-window-dialog>footer{display:flex!important;flex:0 0 40px!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;box-sizing:border-box!important;width:100%!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;border:0!important;border-top:1px solid #79a5d0!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
+.classic-cash-window-dialog>footer .repair-cancel{display:none!important}
+.classic-cash-window-dialog>footer .classic-cash-add{display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:29px!important;min-width:29px!important;max-width:29px!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0!important;border:1px solid #0f7b4d!important;border-radius:3px!important;background:linear-gradient(#31b978,#138655)!important;color:#fff!important;font:700 18px/27px Tahoma,"Segoe UI",sans-serif!important}
+.classic-cash-window-dialog>footer .classic-cash-save{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;box-sizing:border-box!important;width:auto!important;min-width:114px!important;max-width:none!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0 10px!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;box-shadow:inset 1px 1px rgba(255,255,255,.55),1px 1px 2px rgba(0,0,0,.18)!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important}
+.classic-cash-window-resizer{position:absolute!important;z-index:5!important;right:0!important;bottom:0!important;width:15px!important;height:15px!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 45%,#6d8fa9 46% 52%,transparent 53% 62%,#6d8fa9 63% 69%,transparent 70%)!important}
+.classic-cash-window-dialog.classic-cash-window-maximized{left:0!important;top:0!important;transform:none!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;border-radius:0!important}
+.classic-cash-window-dialog.classic-cash-window-minimized{left:8px!important;top:auto!important;bottom:8px!important;transform:none!important;width:320px!important;height:29px!important;min-height:29px!important;max-height:29px!important}
+.classic-cash-window-dialog.classic-cash-window-minimized>section,.classic-cash-window-dialog.classic-cash-window-minimized>footer,.classic-cash-window-dialog.classic-cash-window-minimized>.classic-cash-window-resizer{display:none!important}
+@media(max-width:560px){.classic-cash-window-dialog>section{grid-template-columns:1fr!important}.classic-cash-window-modal>.classic-cash-window-dialog{min-width:calc(100vw - 12px)!important}}
+</style>
+<script>
+(()=>{
+  const setup=()=>{
+    const form=document.querySelector('form[action*="cash.php"]');
+    const modal=form?.parentElement;
+    const header=form?.querySelector(':scope > header');
+    if(!form||!modal||!header)return false;
+    modal.classList.add('classic-cash-window-modal');
+    modal.style.setProperty('z-index','4200','important');
+    form.classList.add('classic-cash-window-dialog');
+    form.setAttribute('role','dialog');
+    form.setAttribute('aria-modal','false');
+    if(form.dataset.classicCashReady==='1')return true;
+    form.dataset.classicCashReady='1';
+    let title=header.querySelector('h2');
+    if(!title){title=document.createElement('h2');title.innerHTML='<i class="ti tabler-cash-register" aria-hidden="true"></i> Gelir Kayıt';header.prepend(title);}
+    if(!title.id)title.id='classic-cash-window-title';
+    form.setAttribute('aria-labelledby',title.id);
+    const close=header.querySelector('[data-cash-close]');
+    const controls=document.createElement('span');
+    controls.className='classic-cash-window-controls';
+    controls.innerHTML='<button type="button" data-classic-cash-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-classic-cash-action="maximize" title="Büyüt" aria-label="Büyüt">□</button>';
+    if(close){close.classList.add('classic-cash-close');close.textContent='×';controls.append(close);}
+    header.append(controls);
+    const resizer=document.createElement('span');
+    resizer.className='classic-cash-window-resizer';
+    resizer.title='Pencere boyutunu değiştir';
+    resizer.setAttribute('aria-hidden','true');
+    form.append(resizer);
+    const normalizeFooter=()=>{
+      const footer=form.querySelector(':scope > footer');
+      if(!footer)return;
+      const add=[...footer.querySelectorAll('button')].find(button=>button.getAttribute('aria-label')==='Bir gelir kaydı daha ekle');
+      if(add){add.classList.add('classic-cash-add');['width','min-width','max-width','height','min-height','max-height'].forEach(property=>add.style.setProperty(property,'29px','important'));add.style.setProperty('padding','0','important');}
+      footer.querySelectorAll('.repair-cancel,[data-cash-close]').forEach(button=>button.style.setProperty('display','none','important'));
+      const save=[...footer.querySelectorAll('button')].find(button=>button.type==='submit');
+      if(save){save.classList.add('classic-cash-save');if(save.textContent.trim()!=='Kaydet (F2)'||!save.querySelector('.tabler-device-floppy'))save.innerHTML='<i class="ti tabler-device-floppy" aria-hidden="true"></i> Kaydet (F2)';save.title='Kaydet — F2';save.setAttribute('aria-label','Kaydet');save.style.setProperty('display','inline-flex','important');save.style.setProperty('width','auto','important');save.style.setProperty('min-width','114px','important');save.style.setProperty('max-width','none','important');['height','min-height','max-height'].forEach(property=>save.style.setProperty(property,'29px','important'));save.style.setProperty('padding','0 10px','important');}
+    };
+    normalizeFooter();
+    new MutationObserver(()=>queueMicrotask(normalizeFooter)).observe(form,{childList:true,subtree:true});
+    const bringToFront=()=>modal.style.setProperty('z-index','4200','important');
+    modal.addEventListener('pointerdown',bringToFront,true);
+    document.addEventListener('click',event=>{if(!event.target.closest('[aria-label="Kasa"]'))return;bringToFront();setTimeout(()=>{bringToFront();form.querySelector('input:not([type=hidden]),select,textarea')?.focus();},0);},true);
+    let interaction=null;
+    const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+    const stop=()=>{interaction=null;};
+    header.addEventListener('pointerdown',event=>{
+      bringToFront();
+      if(event.target.closest('button')||form.classList.contains('classic-cash-window-maximized'))return;
+      const rect=form.getBoundingClientRect();
+      form.style.left=rect.left+'px';form.style.top=rect.top+'px';form.style.bottom='auto';form.style.transform='none';
+      interaction={mode:'move',x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
+      header.setPointerCapture(event.pointerId);
+    });
+    header.addEventListener('pointermove',event=>{if(interaction?.mode!=='move')return;form.style.left=clamp(interaction.left+event.clientX-interaction.x,0,innerWidth-form.offsetWidth)+'px';form.style.top=clamp(interaction.top+event.clientY-interaction.y,0,innerHeight-form.offsetHeight)+'px';});
+    header.addEventListener('pointerup',stop);header.addEventListener('pointercancel',stop);
+    resizer.addEventListener('pointerdown',event=>{if(form.classList.contains('classic-cash-window-maximized'))return;const rect=form.getBoundingClientRect();interaction={mode:'resize',x:event.clientX,y:event.clientY,width:rect.width,height:rect.height};resizer.setPointerCapture(event.pointerId);event.preventDefault();});
+    resizer.addEventListener('pointermove',event=>{if(interaction?.mode!=='resize')return;form.style.width=clamp(interaction.width+event.clientX-interaction.x,430,innerWidth-form.offsetLeft)+'px';form.style.height=clamp(interaction.height+event.clientY-interaction.y,280,innerHeight-form.offsetTop)+'px';});
+    resizer.addEventListener('pointerup',stop);resizer.addEventListener('pointercancel',stop);
+    const maximize=controls.querySelector('[data-classic-cash-action="maximize"]');
+    const minimize=controls.querySelector('[data-classic-cash-action="minimize"]');
+    maximize?.addEventListener('click',()=>{const active=form.classList.toggle('classic-cash-window-maximized');form.classList.remove('classic-cash-window-minimized');maximize.textContent=active?'❐':'□';maximize.title=active?'Geri al':'Büyüt';minimize.textContent='_';minimize.title='Simge durumuna küçült';});
+    minimize?.addEventListener('click',()=>{const active=form.classList.toggle('classic-cash-window-minimized');form.classList.remove('classic-cash-window-maximized');minimize.textContent=active?'▣':'_';minimize.title=active?'Geri yükle':'Simge durumuna küçült';maximize.textContent='□';maximize.title='Büyüt';});
+    header.addEventListener('dblclick',event=>{if(!event.target.closest('button'))maximize?.click();});
+    close?.addEventListener('click',()=>{form.classList.remove('classic-cash-window-minimized','classic-cash-window-maximized');minimize.textContent='_';maximize.textContent='□';});
+    document.addEventListener('keydown',event=>{if(event.key==='F2'&&!modal.hidden&&getComputedStyle(modal).display!=='none'){const save=form.querySelector('.classic-cash-save');if(save&&!save.disabled){event.preventDefault();save.click();}}});
+    return true;
+  };
+  const start=()=>{if(setup())return;const observer=new MutationObserver(()=>{if(setup())observer.disconnect();});observer.observe(document.body,{childList:true,subtree:true});[50,150,350,800,1500].forEach(delay=>setTimeout(setup,delay));};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
+</script>
+<?php endif; ?>
+<?php if ($salesWindow): ?>
+<style>
+/* Bağımsız Satış Kartında yalnız dış MDI pencere çerçevesi kullanılır. */
+#sales-details-modal{inset:0!important;padding:0!important;background:#dcebf8!important;pointer-events:auto!important}
+#sales-details-modal .sales-details-dialog,
+#sales-details-modal .sales-details-dialog.sales-window-maximized,
+#sales-details-modal .sales-details-dialog.sales-window-minimized{position:absolute!important;inset:0!important;left:0!important;top:0!important;bottom:0!important;transform:none!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;background:#dcebf8!important;box-shadow:none!important}
+#sales-details-modal .sales-details-dialog>header,
+#sales-details-modal .sales-window-resizer{display:none!important}
+#sales-details-modal .sales-details-dialog>.repair-body{display:grid!important;flex:1 1 auto!important;min-height:0!important;overflow:auto!important}
+#sales-details-modal .sales-details-dialog>footer{display:flex!important;flex:0 0 40px!important}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const dialog=document.querySelector('#sales-details-modal .sales-details-dialog');
+  dialog?.classList.remove('sales-window-minimized','sales-window-maximized');
+});
+</script>
+<?php endif; ?>
+<?php if ($anamnesisWindow): ?>
+<style>
+/* Bağımsız Anamnez ekranında hizmet kartı ve eski modal kabuğu gösterilmez. */
+main.services-page{display:none!important}
+#anamnesis-card-modal{inset:0!important;padding:0!important;background:#dcebf8!important}
+#anamnesis-card-modal .anamnesis-backdrop{display:none!important}
+#anamnesis-card-modal .anamnesis-dialog{position:absolute!important;inset:0!important;display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;margin:0!important;border:0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;overflow:hidden!important}
+#anamnesis-card-modal .anamnesis-grid{flex:1 1 auto!important;min-height:0!important;overflow:auto!important}
+#anamnesis-card-modal .anamnesis-dialog>header,
+#anamnesis-card-modal .anamnesis-meta,
+#anamnesis-card-modal .anamnesis-dialog>footer{flex:0 0 auto!important}
+@media screen{
+  #anamnesis-card-modal .anamnesis-grid{zoom:1!important}
+  #anamnesis-card-modal .anamnesis-grid .design-block,
+  #anamnesis-card-modal .anamnesis-grid input,
+  #anamnesis-card-modal .anamnesis-grid textarea,
+  #anamnesis-card-modal .anamnesis-grid select,
+  #anamnesis-card-modal .anamnesis-grid span{font-size:12px!important;line-height:1.25!important}
+}
+</style>
+<?php endif; ?>
 <?php patient_footer(); ?>

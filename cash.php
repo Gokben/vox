@@ -402,6 +402,7 @@ $closings = $pdo->query('SELECT * FROM cash_closings ORDER BY closing_date DESC,
 
 patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
 ?>
+<?php if ($isPreCash): ?><link rel="stylesheet" href="<?=url('assets/classic-pre-cash.css?v=20260824-4')?>"><?php endif; ?>
 <main class="patient-container cash-page">
   <div class="cash-page-head"><div><h1><?=$isPreCash ? 'Ön Kasa' : 'Kasa'?></h1><p>Gelir, gider, bakiye ve günlük kapanış işlemlerini yönetin.</p></div></div>
   <?php if ($message): ?><div class="cash-notice success"><?=e($message)?></div><?php endif ?>

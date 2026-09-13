@@ -203,6 +203,7 @@ foreach ($groupedRows as $groupedRow) $accountBalance += ($groupedRow['movement_
 foreach ($mailOrderRows as $mailOrder) $accountBalance -= (float)$mailOrder['amount'];
 foreach ($sgkRows as $sgkRow) $accountBalance += $sgkRow['movement_kind'] === 'debit' ? (float)$sgkRow['amount'] : -(float)$sgkRow['amount'];
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-current-accounts.css?v=20260824-3')?>">
 <main class="patient-container cam-page<?= $isSgkAccount ? ' sgk-account' : '' ?>">
 <style>.sgk-account .cam-card th:nth-child(6),.sgk-account .cam-card td:nth-child(6),.sgk-account .cam-card th:nth-child(7),.sgk-account .cam-card td:nth-child(7),.sgk-account .cam-card th:nth-child(8),.sgk-account .cam-card td:nth-child(8),.sgk-account .cam-card th:nth-child(9),.sgk-account .cam-card td:nth-child(9),.sgk-account .cam-card th:nth-child(11),.sgk-account .cam-card td:nth-child(11){display:none}.sgk-account .cam-card table{min-width:680px}.sgk-account .sgk-debit-row td:nth-child(5){color:#e04f55;font-weight:700}</style>
 <?php if ($isSgkAccount): ?><script>document.addEventListener('DOMContentLoaded',()=>{const header=document.querySelector('.sgk-account .cam-card th:nth-child(5)');if(header)header.textContent='TOPLAM';});</script><?php endif; ?>

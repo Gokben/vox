@@ -78,6 +78,7 @@ function stock_exit_serials($value): string {
 
 patient_header('Stok Çıkış', 'stock');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-stock-menu.css?v=20260823-3')?>">
 <main class="patient-container stock-exit-page">
   <section class="stock-exit-card">
     <header>

@@ -67,7 +67,7 @@ foreach (db()->query('SELECT source_id, COUNT(*) AS total FROM patients WHERE so
     $usageById[(int)$usageRow['source_id']] = (int)$usageRow['total'];
 }
 
-patient_header('Ayarlar - Başvuru Kaynağı', 'settings');
+patient_header('Kurulum - Başvuru Kaynağı', 'settings');
 ?>
 <main class="patient-container personnel-page">
   <nav class="settings-tabs"></nav>
@@ -85,8 +85,8 @@ patient_header('Ayarlar - Başvuru Kaynağı', 'settings');
   </details>
   <section class="vuexy-form-card">
     <header class="form-card-title"><h2>Başvuru Kaynağı Listesi</h2><p><?= count($rows) ?> kayıt</p></header>
-    <div class="table-responsive"><table class="personnel-table"><thead><tr><th>Kaynak</th><th>Sıra</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>
-      <?php foreach ($rows as $row): $usageCount = $usageById[(int)$row['id']] ?? 0; ?><tr><td><?= e($row['name']) ?></td><td><?= (int)$row['sort_order'] ?></td><td><span class="status-pill <?= $row['active'] ? 'active' : 'passive' ?>"><?= $row['active'] ? 'Aktif' : 'Pasif' ?></span></td><td><a class="edit-definition" href="<?= url('sources.php?edit=' . (int)$row['id']) ?>">Düzenle</a><?php if ($usageCount): ?><button class="delete-definition disabled" type="button" disabled title="<?= $usageCount ?> hasta kaydında kullanılıyor">Sil</button><?php else: ?><form method="post" class="inline" onsubmit="return confirm('Bu başvuru kaynağı silinsin mi?')"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="delete-definition">Sil</button></form><?php endif ?></td></tr><?php endforeach ?>
+    <div class="table-responsive"><table class="personnel-table"><thead><tr><th>Sıra</th><th>Kaynak</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>
+      <?php foreach ($rows as $row): $usageCount = $usageById[(int)$row['id']] ?? 0; ?><tr><td><?= (int)$row['sort_order'] ?></td><td><?= e($row['name']) ?></td><td><span class="status-pill <?= $row['active'] ? 'active' : 'passive' ?>"><?= $row['active'] ? 'Aktif' : 'Pasif' ?></span></td><td><a class="edit-definition" href="<?= url('sources.php?edit=' . (int)$row['id']) ?>">Düzenle</a><?php if ($usageCount): ?><button class="delete-definition disabled" type="button" disabled title="<?= $usageCount ?> hasta kaydında kullanılıyor">Sil</button><?php else: ?><form method="post" class="inline" onsubmit="return confirm('Bu başvuru kaynağı silinsin mi?')"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="delete-definition">Sil</button></form><?php endif ?></td></tr><?php endforeach ?>
     </tbody></table></div>
   </section>
 </main>

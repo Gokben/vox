@@ -51,3 +51,10 @@ next-env.d.ts
 /.openai/
 /config.local.php
 /vox-cpanel-full-import.sql
+
+# Local exports and hosting runtime files
+/*.zip
+/.ftpquota
+/error_log
+/tools/composer.phar
+/assets/uploads/

@@ -57,12 +57,13 @@ $leadingDays = (int)$firstDay->format('N') - 1;
 $daysInMonth = (int)$firstDay->format('t');
 patient_header('Takvim', 'calendar');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-calendar.css?v=20260823-4')?>">
 <main class="calendar-page">
   <section class="calendar-shell">
     <aside class="calendar-sidebar">
-      <a class="calendar-add" href="<?= url('patient-form.php?date='.date('Y-m-d')) ?>" title="Randevu Ekle" aria-label="Randevu Ekle"><i class="ti tabler-calendar-plus" aria-hidden="true"></i></a>
-      <a class="calendar-add calendar-add-daily" href="<?= url('appointment-form.php?type=daily_event&date='.date('Y-m-d')) ?>" title="Günlük Olay Ekle" aria-label="Günlük Olay Ekle"><i class="ti tabler-tools" aria-hidden="true"></i></a>
-      <button class="calendar-add calendar-add-patient" type="button" id="patient-appointment-open" title="Hasta Randevu" aria-label="Hasta Randevu"><i class="ti tabler-stethoscope" aria-hidden="true"></i></button>
+      <a class="calendar-add" href="<?= url('appointment-form.php?date='.date('Y-m-d')) ?>" title="Randevu Ekle" aria-label="Randevu Ekle"><i class="ti tabler-calendar-plus" aria-hidden="true"></i><span>Randevu Ekle</span></a>
+      <a class="calendar-add calendar-add-daily" href="<?= url('appointment-form.php?type=daily_event&date='.date('Y-m-d')) ?>" title="Günlük Olay Ekle" aria-label="Günlük Olay Ekle"><i class="ti tabler-tools" aria-hidden="true"></i><span>Günlük Olay</span></a>
+      <button class="calendar-add calendar-add-patient" type="button" id="patient-appointment-open" title="Hasta Randevu" aria-label="Hasta Randevu"><i class="ti tabler-stethoscope" aria-hidden="true"></i><span>Hasta Randevu</span></button>
       <div class="mini-calendar">
         <div class="mini-calendar-head"><a href="<?=url('calendar.php?month='.$previousMonth->format('Y-m'))?>" aria-label="Önceki ay">‹</a><b><?=$monthTitle?></b><a href="<?=url('calendar.php?month='.$nextMonth->format('Y-m'))?>" aria-label="Sonraki ay">›</a></div>
         <div class="mini-week">P P S Ç P C C</div>
@@ -284,7 +285,6 @@ Object.entries(calendarAppointments).forEach(([date, appointments]) => {
 <script>
 const calendarAddButtons=[...document.querySelectorAll('.calendar-sidebar>.calendar-add')];
 if(calendarAddButtons.length){const wrapper=document.createElement('div');wrapper.className='calendar-add-actions';calendarAddButtons[0].before(wrapper);calendarAddButtons.forEach(button=>wrapper.append(button));}
-document.querySelectorAll('a.calendar-add:not(.calendar-add-daily)').forEach(link=>{link.href=link.href.replace('patient-form.php','appointment-form.php');});
 (()=>{const modal=document.getElementById('patient-appointment-modal'),open=document.getElementById('patient-appointment-open'),search=document.getElementById('patient-appointment-search'),select=document.getElementById('patient-appointment-select'),results=document.getElementById('patient-appointment-results');if(!modal||!open||!search||!select||!results)return;const options=[...select.options].slice(1);const close=()=>{modal.hidden=true;results.hidden=true;open.focus();};const showResults=()=>{const query=search.value.trim().toLocaleLowerCase('tr-TR');results.replaceChildren();if(query.length<3){results.hidden=true;return;}const matches=options.filter(option=>option.textContent.toLocaleLowerCase('tr-TR').includes(query)).slice(0,4);if(!matches.length){const empty=document.createElement('div');empty.className='patient-appointment-no-result';empty.textContent='Hasta bulunamadı.';results.append(empty);}matches.forEach(option=>{const item=document.createElement('button');item.type='button';item.className='patient-appointment-result';item.textContent=option.textContent;item.addEventListener('click',()=>{select.value=option.value;search.value=option.textContent;results.hidden=true;});results.append(item);});results.hidden=false;};open.addEventListener('click',()=>{modal.hidden=false;search.value='';select.value='';results.hidden=true;search.focus();});modal.querySelectorAll('[data-patient-appointment-close]').forEach(button=>button.addEventListener('click',close));search.addEventListener('input',()=>{select.value='';showResults();});select.addEventListener('change',()=>{if(select.value)search.value=select.selectedOptions[0].textContent;results.hidden=true;});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!modal.hidden)close();});})();
 </script>
 <style>.calendar-day.drag-target{background:#fff5e8!important;box-shadow:inset 0 0 0 2px #ff7800}.calendar-event[draggable="true"]{cursor:grab}.calendar-event[draggable="true"]:active{cursor:grabbing}.calendar-event.is-dragging{opacity:.45}</style>

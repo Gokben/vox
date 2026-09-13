@@ -101,6 +101,7 @@ $accountName = trim((string)($account['short_name'] ?? '')) ?: (string)$account[
 
 patient_header('Cari Evrakları', 'cash');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-current-accounts.css?v=20260824-3')?>">
 <main class="patient-container account-documents-page">
   <section class="account-documents-card">
     <header>

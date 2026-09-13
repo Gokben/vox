@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/config.php';
-require_login();
+require_admin();
 
 header('Content-Type: application/json; charset=utf-8');
 

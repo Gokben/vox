@@ -1,0 +1,48 @@
+/* Tüm VOX açılır bölüm göstergeleri: kapalı +, açık − */
+body#vox-app :is(.definition-chevron,.new-user-chevron,.admin-card-chevron,.employee-chevron,.social-security-chevron){
+  position:absolute!important;
+  right:7px!important;
+  top:50%!important;
+  display:grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:24px!important;
+  height:24px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:#d71920!important;
+  font:700 20px/1 Tahoma,Arial,sans-serif!important;
+  text-align:center!important;
+  transform:translateY(-50%)!important;
+  transition:none!important;
+}
+body#vox-app :is(.definition-chevron,.new-user-chevron,.admin-card-chevron,.employee-chevron,.social-security-chevron)::before{
+  content:"+"!important;
+  color:#d71920!important;
+}
+body#vox-app details[open] :is(.definition-chevron,.new-user-chevron,.admin-card-chevron,.employee-chevron,.social-security-chevron)::before{
+  content:"−"!important;
+}
+
+body#vox-app details.cash-accordion>summary>i{
+  position:absolute!important;
+  right:7px!important;
+  top:50%!important;
+  display:grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:24px!important;
+  height:24px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:#d71920!important;
+  font:700 20px/1 Tahoma,Arial,sans-serif!important;
+  transform:translateY(-50%)!important;
+  transition:none!important;
+}
+body#vox-app details.cash-accordion>summary>i::before{content:"+"!important;color:#d71920!important}
+body#vox-app details.cash-accordion[open]>summary>i::before{content:"−"!important}

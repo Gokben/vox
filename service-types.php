@@ -82,9 +82,9 @@ $usageById = [];
 foreach (db()->query('SELECT service_type_id, COUNT(*) AS total FROM patients WHERE service_type_id IS NOT NULL GROUP BY service_type_id')->fetchAll() as $usageRow) {
     $usageById[(int)$usageRow['service_type_id']] = (int)$usageRow['total'];
 }
-patient_header('Ayarlar - Hizmet Yerleri', 'settings');
+patient_header('Kurulum - Hizmet Yerleri', 'settings');
 ?>
-<main class="patient-container personnel-page">
+<main class="patient-container personnel-page setup-page">
   <nav class="settings-tabs"></nav>
   <details class="vuexy-form-card definition-accordion"<?=((int)$edit['id'] || $error !== '') ? ' open' : ''?>>
     <summary class="form-card-title"><span><h1><?= (int)$edit['id'] ? 'Hizmet Yerini Düzenle' : 'Yeni Hizmet Yeri' ?></h1><p><?= (int)$edit['id'] ? 'Mevcut hizmet yeri kaydını güncelliyorsunuz.' : 'Hasta kayıtlarında kullanılacak hizmet yerini tanımlayın.' ?></p></span><i class="definition-chevron" aria-hidden="true"></i></summary>
@@ -100,8 +100,8 @@ patient_header('Ayarlar - Hizmet Yerleri', 'settings');
   </details>
   <section class="vuexy-form-card">
     <header class="form-card-title"><h2>Hizmet Yeri Listesi</h2><p><?= count($rows) ?> kayıt</p></header>
-    <div class="table-responsive"><table class="personnel-table"><thead><tr><th>Hizmet Yeri</th><th>Sıra</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>
-      <?php foreach ($rows as $row): $usageCount = $usageById[(int)$row['id']] ?? 0; ?><tr><td><?= e($row['name']) ?></td><td><?= (int)$row['sort_order'] ?></td><td><span class="status-pill <?= $row['active'] ? 'active' : 'passive' ?>"><?= $row['active'] ? 'Aktif' : 'Pasif' ?></span></td><td><a class="edit-definition" href="<?= url('service-types.php?edit=' . (int)$row['id']) ?>">Düzenle</a><?php if ($usageCount): ?><button class="delete-definition disabled" type="button" disabled title="<?= $usageCount ?> hasta kaydında kullanılıyor">Sil</button><?php else: ?><form method="post" class="inline" onsubmit="return confirm('Bu hizmet yeri silinsin mi?')"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="delete-definition">Sil</button></form><?php endif ?></td></tr><?php endforeach ?>
+    <div class="table-responsive"><table class="personnel-table"><thead><tr><th>Sıra</th><th>Hizmet Yeri</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>
+      <?php foreach ($rows as $row): $usageCount = $usageById[(int)$row['id']] ?? 0; ?><tr><td><?= (int)$row['sort_order'] ?></td><td><?= e($row['name']) ?></td><td><span class="status-pill <?= $row['active'] ? 'active' : 'passive' ?>"><?= $row['active'] ? 'Aktif' : 'Pasif' ?></span></td><td><a class="edit-definition" href="<?= url('service-types.php?edit=' . (int)$row['id']) ?>">Düzenle</a><?php if ($usageCount): ?><button class="delete-definition disabled" type="button" disabled title="<?= $usageCount ?> hasta kaydında kullanılıyor">Sil</button><?php else: ?><form method="post" class="inline" onsubmit="return confirm('Bu hizmet yeri silinsin mi?')"><input type="hidden" name="csrf" value="<?= csrf() ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$row['id'] ?>"><button class="delete-definition">Sil</button></form><?php endif ?></td></tr><?php endforeach ?>
     </tbody></table></div>
   </section>
 </main>

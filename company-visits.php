@@ -76,4 +76,6 @@ patient_header('Ziyaret', 'cash');
 })();
 </script>
 <style>.company-visits-home{display:grid!important;place-items:center!important;width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important;padding:0!important;color:#fff!important}.company-visits-home .icon-base{font-size:19px!important;color:#fff!important}</style>
+<?php if ($showForm): ?><script>document.querySelector('main.company-visits-page')?.classList.add('vox-form-page');</script><?php endif; ?>
+<link rel="stylesheet" href="<?=url('assets/classic-field-actions.css?v=20260824-2')?>">
 <?php patient_footer(); ?>

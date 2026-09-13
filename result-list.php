@@ -49,6 +49,7 @@ function result_list_class(string $result): string { return match ($result) { 'O
 $returnTo = 'result-list.php?' . http_build_query($_GET);
 patient_header('Sonuç Listesi', 'results');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-menu-lists.css?v=20260823-2')?>">
 <script>document.documentElement.classList.add('result-list-js');window.addEventListener('load',()=>document.querySelector('.result-list-page')?.classList.add('result-list-ready'));</script>
 <style>
 .result-list-js .result-list-page{visibility:hidden}.result-list-js .result-list-page.result-list-ready{visibility:visible}.result-list-page{max-width:1500px;margin:0 auto;padding:96px 20px 48px}.result-list-card{overflow:hidden;border:1px solid var(--line);border-radius:9px;background:var(--card);box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1)}.result-list-head{padding:22px 24px;border-bottom:1px solid var(--line)}.result-list-head h1{margin:0 0 5px;font-size:21px}.result-list-head p{margin:0;color:var(--muted)}.result-list-filter{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:16px;padding:20px 24px;border-bottom:1px solid var(--line)}.result-list-filter label{display:grid;gap:7px;font-size:13px;font-weight:700}.result-list-filter input,.result-list-filter select{height:39px;padding:0 11px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);color:var(--text);font:inherit}.result-choice{grid-column:span 2;display:flex!important;flex-wrap:wrap;align-content:start;gap:8px}.result-choice>span{width:100%}.result-choice label{display:flex;align-items:center;gap:6px;font-weight:400}.result-list-actions{display:flex;align-items:end;gap:8px}.result-list-actions button,.result-list-actions a{display:grid;place-items:center;height:39px;padding:0 16px;border:0;border-radius:6px;background:#20a447;color:#fff;text-decoration:none;font:inherit;font-weight:700}.result-list-actions a{background:#f0f0f3;color:#5d596c}.result-list-scroll{overflow:auto}.result-list-table{width:100%;min-width:1040px;border-collapse:collapse}.result-list-table th,.result-list-table td{padding:14px 18px;border-bottom:1px solid var(--line);text-align:left}.result-list-table th{font-size:12px;text-transform:uppercase}.result-list-table td{font-size:13px;color:var(--muted)}.result-badge{display:inline-flex;padding:5px 9px;border-radius:12px;font-weight:700}.result-badge.approved{background:#d8f3e1;color:#126d31}.result-badge.considering{background:#fff0cf;color:#986800}.result-badge.rejected{background:#ffe0e0;color:#a32626}.result-badge.none{background:#ececf1;color:#686576}.result-list-empty{text-align:center!important;padding:38px!important}.result-list-foot{padding:15px 24px;color:var(--muted)}@media(max-width:900px){.result-list-filter{grid-template-columns:repeat(2,minmax(150px,1fr))}.result-choice{grid-column:span 2}}@media(max-width:560px){.result-list-page{padding:92px 14px 30px}.result-list-filter{grid-template-columns:1fr}.result-choice{grid-column:span 1}.result-list-actions{align-items:stretch}}
@@ -159,59 +160,21 @@ if (resultListYear?.form) {
   }));
 }
 if (resultListTable && resultListYear?.parentElement) {
-  const tableHeaders = [...resultListTable.tHead.rows[0].cells].map(cell => cell.textContent.trim());
-  const columnVisibilityKey = 'vox-result-list-columns';
-  let visibleColumns;
-  try { visibleColumns = JSON.parse(localStorage.getItem(columnVisibilityKey) || 'null'); } catch (_) { visibleColumns = null; }
-  if (!Array.isArray(visibleColumns) || visibleColumns.length !== tableHeaders.length) visibleColumns = tableHeaders.map(() => true);
   const tools = document.createElement('div');
   tools.className = 'result-list-tools';
-  const picker = document.createElement('div');
-  picker.className = 'result-list-column-picker';
-  picker.innerHTML = '<button type="button" class="result-list-column-button">☷ Sütunlar</button><div class="result-list-column-menu"><div class="result-list-column-actions"><button type="button" data-toggle-all>Tümünü Seç</button></div><div class="result-list-column-options"></div></div>';
   const excel = document.createElement('button');
   excel.type = 'button';
   excel.className = 'result-list-excel';
   excel.title = 'Excel’e aktar';
   excel.setAttribute('aria-label', excel.title);
   excel.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 12l4 6m0-6-4 6m7-6h2m-2 3h2m-2 3h2"/></svg>';
-  tools.append(picker, excel);
+  tools.append(excel);
   resultListYear.parentElement.after(tools);
-  const menu = picker.querySelector('.result-list-column-menu');
-  const options = picker.querySelector('.result-list-column-options');
-  const applyColumns = () => {
-    resultListTable.querySelectorAll('thead tr,tbody tr').forEach(row => {
-      [...row.cells].forEach((cell, index) => {
-        if (row.cells.length === 1 && cell.colSpan > 1) return;
-        cell.style.display = visibleColumns[index] ? '' : 'none';
-      });
-    });
-    options.querySelectorAll('input').forEach((input, index) => input.checked = visibleColumns[index]);
-    picker.querySelector('[data-toggle-all]').textContent = visibleColumns.every(Boolean) ? 'Tümünü Kaldır' : 'Tümünü Seç';
-    localStorage.setItem(columnVisibilityKey, JSON.stringify(visibleColumns));
-  };
-  tableHeaders.forEach((name, index) => {
-    const label = document.createElement('label');
-    label.innerHTML = '<input type="checkbox"><span></span>';
-    label.querySelector('span').textContent = name;
-    label.querySelector('input').addEventListener('change', event => { visibleColumns[index] = event.target.checked; applyColumns(); });
-    options.append(label);
-  });
-  const resultListCard = resultListTable.closest('.result-list-card');
-  picker.querySelector('.result-list-column-button').addEventListener('click', event => {
-    event.stopPropagation();
-    menu.classList.toggle('open');
-    resultListCard?.classList.toggle('column-menu-open', menu.classList.contains('open'));
-  });
-  picker.querySelector('[data-toggle-all]').addEventListener('click', () => { visibleColumns = tableHeaders.map(() => !visibleColumns.every(Boolean)); applyColumns(); });
-  menu.addEventListener('click', event => event.stopPropagation());
-  document.addEventListener('click', () => { menu.classList.remove('open'); resultListCard?.classList.remove('column-menu-open'); });
   excel.addEventListener('click', () => {
     const exportUrl = new URL(window.location.href);
     exportUrl.pathname = exportUrl.pathname.replace(/[^/]+$/, 'result-list-export.php');
     window.location.assign(exportUrl.toString());
   });
-  applyColumns();
 }
 document.querySelectorAll('.result-list-table tbody tr').forEach(row => {
   const patientUrl = row.dataset.patientUrl || row.querySelector('a[href*="patient-form.php"]')?.href;

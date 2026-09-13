@@ -76,12 +76,11 @@ $listedCategories = $selectedParent
 
 patient_header('Kurulum - Kasa Kategorileri', 'settings');
 ?>
-<main class="patient-container category-page">
-  <div class="category-page-head"><h1><?=$selectedParent ? e($selectedParent['name']) . ' Alt Kategorileri' : 'Kasa Kategorileri'?></h1><p><?=$selectedParent ? 'Bu ana kategoriye bağlı alt kategorileri yönetin.' : 'Gelir ve gider kayıtları için ana kategori ve alt kategori tanımlayın.'?></p><?php if ($selectedParent): ?><a class="back-link" href="<?=url('cash-categories.php')?>">← Ana kategorilere dön</a><?php endif ?></div>
+<main class="patient-container category-page setup-page">
   <?php if ($message): ?><div class="category-notice success"><?=e($message)?></div><?php endif ?>
   <?php if ($error): ?><div class="category-notice error"><?=e($error)?></div><?php endif ?>
   <section class="category-card">
-    <header><div><h2><?=$editingCategory ? 'Kategoriyi Düzenle' : ($selectedParent ? 'Yeni Alt Kategori' : 'Yeni Kategori')?></h2><p><?=$editingCategory ? 'Bu değişiklik mevcut kasa kayıtlarını etkilemez.' : ($selectedParent ? e($selectedParent['name']) . ' altında yeni bir alt kategori oluşturun.' : 'Alt kategori eklemek için önce ana kategoriyi seçin.')?></p></div></header>
+    <header><div><h2><?=$editingCategory ? 'Kategoriyi Düzenle' : ($selectedParent ? 'Yeni Alt Kategori' : 'Yeni Kategori')?></h2><p><?=$editingCategory ? 'Bu değişiklik mevcut kasa kayıtlarını etkilemez.' : ($selectedParent ? e($selectedParent['name']) . ' altında yeni bir alt kategori oluşturun.' : 'Alt kategori eklemek için önce ana kategoriyi seçin.')?></p></div><?php if ($selectedParent): ?><a class="back-link" href="<?=url('cash-categories.php')?>">← Ana kategorilere dön</a><?php endif ?></header>
     <form class="category-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="<?=$editingCategory ? 'update' : 'save'?>"><?php if ($editingCategory): ?><input type="hidden" name="id" value="<?=(int)$editingCategory['id']?>"><?php endif ?>
       <?php if ($editingCategory): ?><label>Kategori adı<input name="name" maxlength="150" required value="<?=e($editingCategory['name'])?>"></label><div class="category-form-note"><?=$editingCategory['parent_id'] === null ? 'Ana kategori' : 'Alt kategori'?></div><div class="category-form-actions"><button>Güncelle</button><a href="<?=url('cash-categories.php' . ($editingCategory['parent_id'] ? '?parent=' . (int)$editingCategory['parent_id'] : ''))?>">İptal</a></div><?php else: ?>
       <label>Kategori adı<input name="name" maxlength="150" required></label>

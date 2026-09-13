@@ -79,6 +79,7 @@ try {
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
 if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
+$isEmbeddedWindow = (string)($_POST['_vox_window'] ?? $_GET['_vox_window'] ?? '') === '1';
 $fields = ['branch_id','record_date','full_name','national_id','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_detail','notes'];
 $patient = array_fill_keys($fields, '');
 $patient['patient_status'] = 'active';
@@ -162,6 +163,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $values['created_by']=(int)($_SESSION['user']['id'] ?? 0) ?: null;
             $columns=array_keys($values); $stmt=db()->prepare('INSERT INTO patients ('.implode(',',$columns).') VALUES ('.implode(',',array_fill(0,count($columns),'?')).')'); $stmt->execute(array_values($values));
         }
+        if ($isEmbeddedWindow) {
+            ?><!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Kaydedildi</title></head><body><script>window.parent.postMessage({type:'vox-patient-saved'},location.origin);</script></body></html><?php
+            exit;
+        }
         redirect($returnTo);
     }
 }
@@ -179,6 +184,62 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 <style>.merged-input input[name="proximity_relation"],.merged-input input[name="proximity_relation_secondary"]{font-family:Tahoma,'Segoe UI',sans-serif!important;font-variant:normal!important;text-transform:none!important}</style>
 <style>
 .patient-rating{display:flex;align-items:center;gap:5px;min-height:40px}.patient-rating input{position:absolute;opacity:0}.patient-rating label{font-size:29px;line-height:1;color:#d7d6de;cursor:pointer;transition:color .15s,transform .15s}.patient-rating label.is-selected,.patient-rating label:hover{color:#f3a64a}.patient-rating label:hover{transform:scale(1.08)}.patient-rating:focus-within{outline:2px solid rgba(32,164,71,.35);outline-offset:5px;border-radius:5px}.merged-input textarea[name="patient_rating_comment"]{height:38px!important;min-height:38px!important;padding-top:8px!important;resize:none!important}
+</style>
+<style>
+/* Referans klasik Windows Yeni Hasta formu */
+.patient-form-page{padding:4px!important;background:#d8e9f8!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+html:has(body#vox-app.vox-embedded-window>main.patient-form-page),
+body#vox-app.vox-embedded-window:has(>main.patient-form-page){background:#dcebf8!important}
+body#vox-app>main.patient-form-page,
+body#vox-app.vox-embedded-window>main.patient-form-page{padding:0!important;overflow:hidden!important}
+body#vox-app.vox-embedded-window>main.patient-form-page{height:auto!important;min-height:0!important}
+body#vox-app>main.patient-form-page .vuexy-form-card,
+body#vox-app.vox-embedded-window>main.patient-form-page .vuexy-form-card{width:100%!important;height:100%!important;margin:0!important;border:0!important}
+body#vox-app.vox-embedded-window>main.patient-form-page .vuexy-form-card{height:auto!important;min-height:0!important;overflow:visible!important}
+.patient-form-page .vuexy-form-card{height:100%!important;min-height:0!important;border:1px solid #6796c5!important;border-radius:0!important;background:#dcebf8!important;box-shadow:none!important;overflow:auto!important}
+.patient-form-page .vuexy-form-header{display:none!important}
+.patient-form-page .vuexy-icon-form.classic-patient-form{display:flex!important;flex-direction:column!important;gap:4px!important;min-height:100%!important;padding:4px!important;background:#dcebf8!important}
+body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-patient-form{height:auto!important;min-height:0!important}
+.classic-patient-section{margin:0!important;padding:0 7px 7px!important;border:1px solid #79a5d0!important;border-radius:2px!important;background:#edf5fd!important;box-shadow:inset 0 1px #fff!important}
+.classic-patient-section-title{height:23px!important;margin:0 -7px 7px!important;padding:3px 9px!important;border-bottom:1px solid #79a5d0!important;background:linear-gradient(#f8fcff,#cfe4f8)!important;color:#124c82!important;font:700 13px/17px Tahoma,"Segoe UI",sans-serif!important}
+.classic-patient-section-title i{display:inline-block;width:17px;margin-right:4px;color:#1769a8!important;text-align:center;font-style:normal}
+.classic-patient-grid{display:grid!important;gap:5px 8px!important;align-items:start!important}
+.classic-basic-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.classic-service-grid,.classic-application-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.classic-patient-form .icon-form-row.classic-field{display:block!important;min-width:0!important;margin:0!important}
+.classic-patient-form .icon-form-label{display:block!important;height:17px!important;margin:0!important;padding:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+.classic-patient-form .merged-input{min-height:23px!important;height:auto!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important;overflow:visible!important}
+.classic-patient-form .merged-input:focus-within{border-color:#2c72b5!important;box-shadow:0 0 0 1px #85b8e8!important}
+.classic-patient-form .merged-icon{display:none!important}
+.classic-patient-form .merged-input input,.classic-patient-form .merged-input select,.classic-patient-form .merged-input textarea{height:21px!important;min-height:21px!important;padding:2px 5px!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important}
+.classic-patient-form .merged-input textarea{height:38px!important;min-height:38px!important;padding-top:4px!important;resize:vertical!important}
+.classic-patient-form .patient-name-display{left:5px!important;right:5px!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important}
+.classic-patient-form .phone-input input{padding-left:5px!important}
+.classic-patient-form .proximity-toggle{display:none!important}
+.classic-patient-form #proximity-row.is-hidden{display:block!important}
+.classic-patient-form #proximity-secondary-row{display:none!important}
+.classic-patient-form .field-address,.classic-patient-form .field-comment{grid-column:span 2!important}
+.classic-patient-form .field-address .merged-input textarea{height:39px!important;min-height:39px!important}
+.classic-patient-form .field-comment .merged-input textarea{height:23px!important;min-height:23px!important;padding-top:3px!important;resize:none!important}
+.classic-patient-form .patient-rating{height:29px!important;min-height:29px!important;gap:2px!important;padding:0!important}
+.classic-patient-form .patient-rating label{display:grid!important;place-items:center!important;width:18px!important;height:28px!important;border:1px solid #a5bdd4!important;background:linear-gradient(#fff,#dbe8f3)!important;color:#8fa5ba!important;font-size:20px!important;line-height:1!important}
+.classic-patient-form .patient-rating label.is-selected,.classic-patient-form .patient-rating label:hover{color:#f2a22d!important}
+.classic-patient-form .check-row{height:29px!important;padding:5px 4px!important;gap:18px!important;font-size:11px!important}
+.classic-patient-form .check-row input{width:13px!important;height:13px!important;accent-color:#149447!important}
+.classic-patient-form .source-unit-row[hidden]{display:none!important}
+.classic-patient-form .vuexy-form-actions{order:99!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;display:flex!important;align-items:center!important;gap:7px!important;border:1px solid #79a5d0!important;border-radius:2px!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
+.classic-form-note{margin-right:auto;color:#5b6875;font:11px Tahoma,"Segoe UI",sans-serif}
+.classic-form-note .required-mark{font-weight:700}
+.classic-patient-form .vuexy-form-actions .button{order:10!important;min-width:114px!important;height:29px!important;min-height:29px!important;margin-left:0!important;padding:0 10px!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;box-shadow:inset 1px 1px rgba(255,255,255,.55),1px 1px 2px rgba(0,0,0,.18)!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important}
+.classic-patient-form .vuexy-form-actions .button:hover{background:linear-gradient(#78df80,#27ac40 55%,#168d30)!important}
+.classic-patient-form .patient-services-button{order:9!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-width:114px!important;height:29px!important;min-height:29px!important;margin:0!important;padding:0 10px!important;border:1px solid #b96b00!important;border-radius:3px!important;background:linear-gradient(#ffd45c,#f7aa24 55%,#e88c00)!important;color:#111!important;box-shadow:inset 1px 1px rgba(255,255,255,.62),1px 1px 2px rgba(0,0,0,.2)!important;text-decoration:none!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important;text-shadow:0 1px rgba(255,255,255,.45)!important}
+.classic-patient-form .patient-services-button:hover{background:linear-gradient(#ffe07a,#ffb936 55%,#ef9708)!important;color:#111!important}
+.classic-patient-form .patient-services-button i{color:#111!important;font-size:15px!important}
+.classic-patient-form .cancel-link{display:none!important}
+.classic-patient-form .form-section-title{display:none!important}
+.patient-form-page .form-alert{margin:6px!important;border-radius:2px!important;font-size:11px!important}
+@media(max-width:900px){.classic-basic-grid,.classic-service-grid,.classic-application-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:600px){.classic-basic-grid,.classic-service-grid,.classic-application-grid{grid-template-columns:1fr!important}.classic-patient-form .field-address,.classic-patient-form .field-comment{grid-column:auto!important}}
 </style>
 <main class="patient-container patient-form-page"><section class="vuexy-form-card" data-static-form><header class="vuexy-form-header"><a class="patient-form-home" href="<?=e(url($returnTo))?>" title="Hasta listesine dön" aria-label="Hasta listesine dön"><i class="icon-base ti tabler-home" aria-hidden="true"></i></a><h2><?=$id?'Hasta Düzenle':'Yeni Hasta Kaydı'?></h2></header><?php if($error):?><div class="form-alert"><?=e($error)?></div><?php endif?><form class="vuexy-icon-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="return" value="<?=e($returnTo)?>">
 <h3 class="form-section-title">Temel Bilgiler</h3>
@@ -204,8 +265,83 @@ patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 <div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ünite No seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e($unit['unit_no'])?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><input name="source_detail" value="<?=e($patient['source_detail'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Açıklama</label><div class="merged-input"><span class="merged-icon">▱</span><textarea name="notes"><?=e($patient['notes'])?></textarea></div></div>
-<div class="vuexy-form-actions"><?php if($id):?><a href="<?=e(url('patient-followup.php?id='.$id))?>" title="Hizmetler" aria-label="Hizmetler" style="display:grid;place-items:center;width:40px;min-width:40px;height:40px;min-height:40px;padding:0;border-radius:6px;background:#f3a64a;color:#fff;text-decoration:none"><i class="icon-base ti tabler-heart-handshake" style="font-size:20px"></i></a><?php endif?><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url($returnTo))?>">İptal</a></div></form></section></main>
+<div class="vuexy-form-actions"><?php if($id):?><a class="patient-services-button" href="<?=e(url('patient-followup.php?id='.$id.'&from_patient_card=1'))?>" title="Hizmetler" aria-label="Hizmetler"><i class="icon-base ti tabler-heart-handshake" aria-hidden="true"></i><span>Hizmetler</span></a><?php endif?><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url($returnTo))?>">İptal</a></div></form></section></main>
 <script>
+(()=>{
+  const form=document.querySelector('.vuexy-icon-form');
+  if(!form||form.dataset.classicReady==='1')return;
+  form.dataset.classicReady='1';
+  form.classList.add('classic-patient-form');
+  form.querySelectorAll(':scope > .form-section-title').forEach(title=>title.remove());
+  const actions=form.querySelector('.vuexy-form-actions');
+  const rowFor=name=>form.querySelector(`[name="${name}"]`)?.closest('.icon-form-row');
+  const makeSection=(title,icon,className,fields)=>{
+    const section=document.createElement('section');
+    section.className='classic-patient-section';
+    const heading=document.createElement('h3');
+    heading.className='classic-patient-section-title';
+    heading.innerHTML=`<i aria-hidden="true">${icon}</i>${title}`;
+    const grid=document.createElement('div');
+    grid.className=`classic-patient-grid ${className}`;
+    fields.forEach(([name,fieldClass])=>{
+      const row=rowFor(name);
+      if(!row)return;
+      row.classList.add('classic-field',fieldClass||`field-${name.replaceAll('_','-')}`);
+      grid.append(row);
+    });
+    section.append(heading,grid);
+    form.insertBefore(section,actions);
+  };
+  makeSection('Temel Bilgiler','♟','classic-basic-grid',[
+    ['full_name','field-name'],['national_id','field-national'],['branch_id','field-branch'],['record_date','field-record-date'],
+    ['birth_date','field-birth-date'],['phone_primary','field-phone-primary'],['proximity_relation','field-proximity'],['phone_secondary','field-phone-secondary'],
+    ['address','field-address'],['patient_rating','field-rating'],['patient_rating_comment','field-comment'],['patient_status','field-status'],
+    ['proximity_relation_secondary','field-secondary-proximity']
+  ]);
+  makeSection('Hizmet Bilgileri','▪','classic-service-grid',[
+    ['social_security','field-social-security'],['report_status','field-report-status'],['report_info','field-report-info']
+  ]);
+  makeSection('Başvuru ve Açıklamalar','▦','classic-application-grid',[
+    ['source_id','field-source'],['source_detail','field-source-detail'],['source_unit_id','field-source-unit'],['notes','field-notes']
+  ]);
+  const statusLabel=rowFor('patient_status')?.querySelector('.icon-form-label');
+  if(statusLabel)statusLabel.textContent='Hasta Durumu';
+  const national=document.querySelector('input[name="national_id"]');
+  if(national)national.placeholder='11 haneli T.C. Kimlik No';
+  const primary=document.querySelector('input[name="phone_primary"]');
+  if(primary)primary.placeholder='05xx xxx xx xx';
+  const address=document.querySelector('textarea[name="address"]');
+  if(address)address.placeholder='Adres bilgilerini giriniz';
+  const comment=document.querySelector('textarea[name="patient_rating_comment"]');
+  if(comment)comment.placeholder='Yorum giriniz';
+  const detail=document.querySelector('input[name="source_detail"]');
+  if(detail)detail.placeholder='Başvuru detayı giriniz';
+  const notes=document.querySelector('textarea[name="notes"]');
+  if(notes)notes.placeholder='Açıklama giriniz';
+  const save=actions?.querySelector('button.button');
+  if(save){save.type='submit';save.textContent='▣ Kaydet (F2)';save.setAttribute('aria-label','Kaydet');}
+  if(actions){const note=document.createElement('span');note.className='classic-form-note';note.innerHTML='Zorunlu alanlar <span class="required-mark">*</span> ile gösterilmiştir.';actions.prepend(note);}
+  document.addEventListener('keydown',event=>{if(event.key==='F2'){event.preventDefault();save?.click();}});
+})();
+(()=>{
+  const servicesLink=document.querySelector('.patient-services-button');
+  if(!servicesLink)return;
+  const windowTitle=<?=json_encode('Hizmetler - ' . (string)($patient['full_name'] ?? ''),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
+  servicesLink.addEventListener('click',event=>{
+    const targetUrl=servicesLink.href;
+    if(window.parent!==window){
+      event.preventDefault();
+      event.stopPropagation();
+      window.parent.postMessage({type:'vox-open-window',url:targetUrl,title:windowTitle},location.origin);
+      return;
+    }
+    if(typeof window.voxOpenWindow==='function'){
+      event.preventDefault();
+      event.stopPropagation();
+      window.voxOpenWindow(targetUrl,windowTitle);
+    }
+  });
+})();
 (()=>{
   const icons={
     branch_id:'tabler-building',record_date:'tabler-calendar',full_name:'tabler-user',national_id:'tabler-id-badge',

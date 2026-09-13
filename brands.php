@@ -262,12 +262,12 @@ if (($_GET['tab'] ?? '') === 'models' && $selectedBrandId === 0 && $_SERVER['REQ
 
 patient_header('Kurulum - Markalar', 'settings');
 ?>
-<main class="patient-container personnel-page brands-page">
+<main class="patient-container personnel-page brands-page setup-page">
   <nav class="settings-tabs brand-page-tabs" aria-label="Marka ve model yönetimi">
     <a class="<?=$activeSection === 'brands' ? 'active' : ''?>" href="<?=url('brands.php?tab=brands')?>">Markalar</a>
     <a class="<?=$activeSection === 'models' ? 'active' : ''?>" href="<?=url('brands.php?tab=models')?>">Modeller</a>
   </nav>
-  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeGroup=<?=json_encode($activeGroup)?>,items=[['hearing','İşitme Cihazı Markaları'],['battery','Pil Markaları']];nav.innerHTML='';items.forEach(([group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab=brands&group='+group;link.textContent=label;link.className=<?=json_encode($selectedBrandId === 0)?>&&activeGroup===group?'active':'';nav.append(link)})})();</script>
+  <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeGroup=<?=json_encode($activeGroup)?>,items=[['hearing','İşitme Cihazı Markaları'],['battery','Pil Markaları']];nav.innerHTML='';items.forEach(([group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab=brands&group='+group;link.textContent=label;link.dataset.voxSameWindow='setup';link.className=<?=json_encode($selectedBrandId === 0)?>&&activeGroup===group?'active':'';nav.append(link)})})();</script>
   <?php if ($message): ?><p class="manage-message success"><?=e($message)?></p><?php endif; ?>
   <?php if ($error): ?><p class="manage-message error"><?=e($error)?></p><?php endif; ?>
 

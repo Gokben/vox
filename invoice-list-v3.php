@@ -9,6 +9,7 @@ $sql='SELECT MAX(m.invoice_no) invoice_no,m.movement_type,MIN(m.movement_date) m
 $sortQuery=http_build_query(['q'=>$filterText?:null,'account_id'=>$filterAccountId?:null,'date_start'=>$filterDateStart?:null,'date_end'=>$filterDateEnd?:null,'date_sort'=>$dateSort==='asc'?'desc':'asc']);
 $accounts=$pdo->query("SELECT id,title,short_name FROM current_accounts WHERE account_type IN ('supplier','both') ORDER BY COALESCE(short_name,title)")->fetchAll();$selectedAccountName='';foreach($accounts as $account)if((int)$account['id']===$filterAccountId){$selectedAccountName=(string)($account['short_name']?:$account['title']);break;}
 patient_header('Fatura Listesi','stock');?>
+<link rel="stylesheet" href="<?=url('assets/classic-stock-menu.css?v=20260823-3')?>">
 <main class="patient-container inv-list"><section><header><div><h1>Fatura Listesi</h1><p>Stok giriş ve çıkış faturaları.</p></div><a href="<?=e(url('invoice-entry.php'))?>">Fatura Girişi</a></header><?php if(isset($_GET['saved'])):?><p class="notice">Fatura kaydedildi.</p><?php endif?>
 <form class="invoice-filter" method="get" autocomplete="off">
 <div class="filter-text"><i class="ti tabler-search"></i><input name="q" value="<?=e($filterText)?>" placeholder="Stok, cari, fatura no veya tarih ara"></div>

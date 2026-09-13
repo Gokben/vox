@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 putenv('APP_ENV=local');require __DIR__.'/config.php';
 $pdo=db();$pdo->exec('DROP TABLE IF EXISTS patients');$pdo->exec('DROP TABLE IF EXISTS settings');$pdo->exec('DROP TABLE IF EXISTS users');
 $pdo->exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT,name VARCHAR(150) NOT NULL,email VARCHAR(190) NOT NULL UNIQUE,password_hash VARCHAR(255) NOT NULL,role VARCHAR(20) NOT NULL DEFAULT 'User',active INTEGER NOT NULL DEFAULT 1,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");

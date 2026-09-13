@@ -112,10 +112,11 @@ patient_header('Görev Takip', 'kanban');
 <link rel="stylesheet" href="<?=url('assets/kanban.css?v=20260719-1')?>">
 <link rel="stylesheet" href="<?=url('assets/kanban-colors.css?v=20260719-1')?>">
 <link rel="stylesheet" href="<?=url('assets/kanban-vuexy.css?v=20260719-1')?>">
+<link rel="stylesheet" href="<?=url('assets/classic-kanban.css?v=20260823-3')?>">
 <main class="kanban-page">
   <div class="kanban-page-head">
     <div><h1>Görev Takip</h1><p>Görevlerinizi sürükleyerek süreçte ilerletin.</p></div>
-    <a class="button kanban-new-button" href="<?=e(url('task-form.php'))?>">+ Yeni görev</a>
+    <a class="button kanban-new-button" href="<?=e(url('task-form.php'))?>">+ Yeni Görev</a>
   </div>
   <section class="kanban-board" aria-label="Görev panosu">
     <?php foreach ($columns as $key => $label): $tasks = $tasksByColumn[$key]; ?>

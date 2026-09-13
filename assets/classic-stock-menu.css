@@ -1,0 +1,219 @@
+/* VOX Windows shell for the four screens beneath the Stoklar menu. */
+body#vox-app.vox-classic-list-page > main.stock-exit-page,
+body#vox-app.vox-classic-list-page > main.stock-list-page,
+body#vox-app.vox-classic-list-page > main.price-lists-page,
+body#vox-app.vox-classic-list-page > main.inv-list {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100vh !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 4px !important;
+  overflow: hidden !important;
+  background: #dcebf8 !important;
+  color: #102f2b !important;
+  font: 12px/1.25 Arial, Helvetica, sans-serif !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-exit-card,
+body#vox-app.vox-classic-list-page .stock-list-card,
+body#vox-app.vox-classic-list-page .price-lists-card,
+body#vox-app.vox-classic-list-page .inv-list > section {
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border: 1px solid #78aee0 !important;
+  border-radius: 0 !important;
+  background: #dcebf8 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-exit-card > header,
+body#vox-app.vox-classic-list-page .stock-list-heading,
+body#vox-app.vox-classic-list-page .price-lists-card > header,
+body#vox-app.vox-classic-list-page .inv-list > section > header {
+  display: flex !important;
+  flex: 0 0 36px !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #a9c8df !important;
+  border-radius: 0 !important;
+  background: #e5f2ed !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-exit-card > header > :is(h1,p),
+body#vox-app.vox-classic-list-page .stock-list-heading > span,
+body#vox-app.vox-classic-list-page .price-lists-card > header > div,
+body#vox-app.vox-classic-list-page .inv-list > section > header > div {
+  display: none !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-new-button,
+body#vox-app.vox-classic-list-page .new-list-header-button,
+body#vox-app.vox-classic-list-page .inv-list > section > header > a {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 27px !important;
+  min-height: 27px !important;
+  margin: 0 0 0 auto !important;
+  padding: 0 10px !important;
+  border: 1px solid #087c38 !important;
+  border-radius: 3px !important;
+  background: linear-gradient(#28bc62, #07943e) !important;
+  color: #fff !important;
+  font: 700 12px/25px Arial, sans-serif !important;
+  text-decoration: none !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.45) !important;
+}
+
+body#vox-app.vox-classic-list-page .new-list-header-button {
+  width: 28px !important;
+  padding: 0 !important;
+  font-size: 18px !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-exit-card > header {
+  display: none !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-exit-search,
+body#vox-app.vox-classic-list-page .stock-search,
+body#vox-app.vox-classic-list-page .invoice-filter {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  min-height: 38px !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #a9c8df !important;
+  background: #e5f2ed !important;
+  color: #183b36 !important;
+}
+
+body#vox-app.vox-classic-list-page :is(.stock-exit-search,.stock-search,.invoice-filter) input,
+body#vox-app.vox-classic-list-page :is(.stock-search,.invoice-filter) select,
+body#vox-app.vox-classic-list-page .invoice-filter button {
+  box-sizing: border-box !important;
+  height: 27px !important;
+  min-height: 27px !important;
+  border-radius: 0 !important;
+  font: 12px Arial, sans-serif !important;
+}
+
+body#vox-app.vox-classic-list-page .stock-exit-search input { width: 360px !important; padding: 0 7px !important; }
+body#vox-app.vox-classic-list-page .stock-search input { max-width: 420px !important; padding: 0 7px !important; }
+body#vox-app.vox-classic-list-page .stock-search select { min-width: 170px !important; padding: 0 7px !important; }
+
+body#vox-app.vox-classic-list-page .stock-exit-table-wrap,
+body#vox-app.vox-classic-list-page .stock-list-card > .table-responsive,
+body#vox-app.vox-classic-list-page .price-lists-card > .table-responsive,
+body#vox-app.vox-classic-list-page .inv-list .wrap {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  background: #fff !important;
+}
+
+body#vox-app.vox-classic-list-page .price-list-form {
+  display: grid !important;
+  flex: 0 0 auto !important;
+  grid-template-columns: 1.3fr 1fr 1fr 28px 28px !important;
+  gap: 7px !important;
+  align-items: end !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 5px 8px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #a9c8df !important;
+  background: #e5f2ed !important;
+}
+
+body#vox-app.vox-classic-list-page .price-list-form label { gap: 2px !important; font: 700 11px Arial, sans-serif !important; }
+body#vox-app.vox-classic-list-page .price-list-form :is(input,select) { height: 27px !important; padding: 0 6px !important; border-radius: 0 !important; font: 12px Arial, sans-serif !important; }
+body#vox-app.vox-classic-list-page .price-list-form :is(button,.price-list-cancel) { width: 28px !important; height: 27px !important; min-height: 27px !important; border-radius: 3px !important; }
+body#vox-app.vox-classic-list-page .price-list-alert { flex: 0 0 auto !important; margin: 3px 8px !important; padding: 5px 8px !important; border-radius: 0 !important; }
+
+body#vox-app.vox-classic-list-page :is(.stock-actions,.price-list-actions) { white-space: nowrap !important; }
+body#vox-app.vox-classic-list-page .stock-actions .stock-action-button,
+body#vox-app.vox-classic-list-page .price-list-actions > a,
+body#vox-app.vox-classic-list-page .price-list-actions > form,
+body#vox-app.vox-classic-list-page .price-list-actions > form > button {
+  box-sizing: border-box !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 5px !important;
+}
+
+body#vox-app.vox-classic-list-page .price-list-actions { grid-template-columns: repeat(3,28px) !important; gap: 5px !important; }
+body#vox-app.vox-classic-list-page .stock-actions { gap: 5px !important; }
+body#vox-app.vox-classic-list-page .stock-image-cell img { width: 28px !important; height: 28px !important; border-radius: 0 !important; }
+body#vox-app.vox-classic-list-page .price-lists-card table tbody td { height: 34px !important; }
+
+body#vox-app.vox-classic-list-page .inv-list .edit {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 5px !important;
+  background: #13aa4b !important;
+  color: #fff !important;
+  font-size: 0 !important;
+}
+body#vox-app.vox-classic-list-page .inv-list .edit i { font-size: 16px !important; line-height: 1 !important; }
+body#vox-app.vox-classic-list-page .inv-list table tbody td { height: 34px !important; }
+
+body#vox-app.vox-classic-list-page .invoice-filter { gap: 12px !important; }
+body#vox-app.vox-classic-list-page .invoice-filter .filter-text { width: 270px !important; }
+body#vox-app.vox-classic-list-page .invoice-filter .filter-company { width: 250px !important; }
+body#vox-app.vox-classic-list-page .invoice-filter .filter-dates { gap: 7px !important; margin-left: auto !important; }
+body#vox-app.vox-classic-list-page .invoice-filter .filter-dates label { gap: 1px !important; width: 145px !important; font-size: 11px !important; }
+body#vox-app.vox-classic-list-page .column-trigger { padding: 0 8px !important; border-radius: 3px !important; background: linear-gradient(#28bc62,#07943e) !important; color: #fff !important; }
+
+body#vox-app.vox-classic-list-page table { background: #fff !important; }
+body#vox-app.vox-classic-list-page table th,
+body#vox-app.vox-classic-list-page table td {
+  box-sizing: border-box !important;
+  height: 27px !important;
+  padding: 3px 6px !important;
+  border-right: 1px solid #d4dfdc !important;
+  border-bottom: 1px solid #d4dfdc !important;
+  border-radius: 0 !important;
+  font: 12px/1.15 Arial, sans-serif !important;
+}
+body#vox-app.vox-classic-list-page table th { background: linear-gradient(#f8fbfa,#e7efec) !important; color: #153a34 !important; font-weight: 700 !important; }
+body#vox-app.vox-classic-list-page table tbody tr:hover td { background: #eaf6f0 !important; }
+
+@media (max-width: 900px) {
+  body#vox-app.vox-classic-list-page > main.stock-exit-page,
+  body#vox-app.vox-classic-list-page > main.stock-list-page,
+  body#vox-app.vox-classic-list-page > main.price-lists-page,
+  body#vox-app.vox-classic-list-page > main.inv-list { height: auto !important; min-height: 100vh !important; overflow: visible !important; }
+}

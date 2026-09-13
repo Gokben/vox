@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 // Kurulumdan sonra bu dosyayı sunucudan silin.
 $hash = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && strlen($_POST['password'] ?? '') >= 10) $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);

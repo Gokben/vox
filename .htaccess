@@ -1,6 +1,17 @@
 Options -Indexes
 DirectoryIndex index.php
+
+# ERP alt dizinini PHP 8.2 ile çalıştır ve uygulama bağlantılarını /erp altında tut.
+SetEnv APP_BASE_PATH /erp
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php82 .php .phtml
+</IfModule>
+
 <FilesMatch "^(config(?:\.local)?\.php|.*\.sql)$">
   Require all denied
 </FilesMatch>
 
+# Kurulum ve bakım araçları yalnızca CLI içindir.
+<FilesMatch "^(config\.php|database\.sql|local-init\.php|vox-init\.php|password\.php)$">
+  Require all denied
+</FilesMatch>

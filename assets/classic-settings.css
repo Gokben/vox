@@ -1,0 +1,152 @@
+:root{--vs-bg:#dcebf8;--vs-panel:#edf6fd;--vs-toolbar:#e6f2ec;--vs-line:#82b3df;--vs-grid:#d4e0da;--vs-text:#17382f;--vs-title:#07508a}
+body#vox-app:has(>main .settings-tabs),body#vox-app:has(>main.designer-page),body#vox-app:has(>main.designer),body#vox-app.settings-linked-page{background:var(--vs-bg)!important;color:var(--vs-text)!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+body#vox-app>main:is(.personnel-page,.branch-page,.employee-page){box-sizing:border-box!important;width:100%!important;max-width:none!important;min-height:100vh!important;margin:0!important;padding:0!important;background:var(--vs-bg)!important;overflow:auto!important}
+body#vox-app .settings-tabs{position:sticky!important;z-index:35!important;top:0!important;display:flex!important;align-items:center!important;gap:3px!important;box-sizing:border-box!important;width:100%!important;min-height:34px!important;margin:0!important;padding:3px 5px!important;border:0!important;border-bottom:1px solid #9bbfa7!important;background:var(--vs-toolbar)!important;overflow-x:auto!important;white-space:nowrap!important}
+body#vox-app .settings-tabs a{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;height:27px!important;min-height:27px!important;margin:0!important;padding:0 9px!important;border:1px solid #8daf9f!important;border-radius:3px!important;background:linear-gradient(#f8fffb,#dceee5)!important;color:#17483a!important;font:700 11px/25px Tahoma,"Segoe UI",sans-serif!important;text-decoration:none!important;white-space:nowrap!important}
+body#vox-app .settings-tabs a.active{border-color:#087d3c!important;background:linear-gradient(#28b85b,#10933f)!important;color:#fff!important}
+body#vox-app :is(.vuexy-form-card,.branch-card,.employee-card){box-sizing:border-box!important;width:calc(100% - 8px)!important;margin:4px!important;border:1px solid var(--vs-line)!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;overflow:hidden!important}
+body#vox-app :is(.vuexy-form-card,.branch-card,.employee-card)>:is(header,summary),body#vox-app :is(.form-card-title,.employee-accordion>summary){box-sizing:border-box!important;display:flex!important;align-items:center!important;width:100%!important;min-height:29px!important;margin:0!important;padding:4px 8px!important;border-bottom:1px solid var(--vs-line)!important;background:linear-gradient(#f4faff,#d8eafa)!important;list-style:none!important}
+body#vox-app :is(.form-card-title,.branch-card>header,.employee-card>header,.employee-accordion>summary) :is(h1,h2){margin:0!important;color:var(--vs-title)!important;font:700 13px/20px Arial,sans-serif!important}
+body#vox-app :is(.form-card-title,.branch-card>header,.employee-card>header,.employee-accordion>summary) p{margin:0 0 0 8px!important;color:#557086!important;font:11px/20px Arial,sans-serif!important}
+body#vox-app :is(.definition-chevron,.social-security-chevron,.new-user-chevron,.employee-chevron){right:8px!important;width:20px!important;height:20px!important;font-size:15px!important}
+body#vox-app :is(.personnel-form,.branch-form,.employee-form){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-items:start!important;gap:5px 8px!important;box-sizing:border-box!important;width:100%!important;margin:0!important;padding:6px!important;background:var(--vs-bg)!important}
+body#vox-app :is(.personnel-form,.branch-form,.employee-form)>label{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:2px!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;height:auto!important;margin:0!important;padding:0!important;color:var(--vs-text)!important;font:700 11px/15px Arial,sans-serif!important}
+body#vox-app :is(.personnel-form,.branch-form,.employee-form) :is(input:not([type=checkbox]),select,textarea){box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:none!important;height:27px!important;min-height:27px!important;margin:0!important;padding:3px 6px!important;border:1px solid #79a9d4!important;border-radius:0!important;background:#fff!important;color:var(--vs-text)!important;font:12px Arial,sans-serif!important;box-shadow:none!important}
+body#vox-app :is(.personnel-form,.branch-form,.employee-form) textarea{height:46px!important;min-height:46px!important;resize:vertical!important}
+body#vox-app :is(.personnel-form,.branch-form,.employee-form) .wide{grid-column:1/-1!important}
+body#vox-app :is(.personnel-check,.definition-form .check){display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:flex-start!important;gap:2px!important;height:auto!important;min-height:27px!important}
+body#vox-app :is(.personnel-check,.definition-form .check)>span:last-child{display:flex!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;height:27px!important;padding:3px 6px!important;border:1px solid #79a9d4!important;background:#fff!important;font-weight:400!important}
+body#vox-app :is(.personnel-actions,.employee-form .actions,.branch-form>.wide:last-child){grid-column:1/-1!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important;box-sizing:border-box!important;min-height:35px!important;margin:0!important;padding:3px!important;border:1px solid var(--vs-line)!important;background:linear-gradient(#f4faff,#d8eafa)!important}
+body#vox-app :is(.personnel-actions,.employee-form .actions,.branch-form>.wide:last-child) button.vox-classic-save,body#vox-app :is(.personnel-actions,.employee-form .actions,.branch-form>.wide:last-child) button:not(.delete,.delete-definition){box-sizing:border-box!important;width:104px!important;min-width:104px!important;height:29px!important;min-height:29px!important;margin:0!important;padding:0 9px!important;border:1px solid #087d3c!important;border-radius:4px!important;background:linear-gradient(#31c765,#0e9c3f)!important;color:#fff!important;font:700 12px/27px Tahoma,sans-serif!important;white-space:nowrap!important}
+body#vox-app :is(.personnel-actions,.employee-form .actions,.branch-form>.wide:last-child)>a{display:none!important}
+body#vox-app :is(.table-responsive,.table-scroll){width:100%!important;margin:0!important;overflow:auto!important}
+body#vox-app table.personnel-table,body#vox-app :is(.branch-card,.employee-card) table{width:100%!important;margin:0!important;border-collapse:separate!important;border-spacing:0!important;background:#fff!important;color:var(--vs-text)!important;font-family:Tahoma,"Segoe UI",sans-serif!important}
+body#vox-app :is(.branch-card,.employee-card) table thead th,body#vox-app table.personnel-table thead th{height:22px!important;min-height:22px!important;padding:2px 20px 2px 5px!important;border:0!important;border-right:1px solid #cbd8d2!important;border-bottom:1px solid #aebfb8!important;background:linear-gradient(#fdfefe,#e1e8e5)!important;color:#17382f!important;text-align:left!important;white-space:nowrap!important;font:700 11px/16px Tahoma,sans-serif!important}
+body#vox-app :is(.branch-card,.employee-card) table tbody td,body#vox-app table.personnel-table tbody td{height:29px!important;min-height:29px!important;padding:2px 5px!important;border:0!important;border-right:1px solid #e1e9e5!important;border-bottom:1px solid #d9e2de!important;background:#fff!important;color:#172f28!important;font:11px/15px Tahoma,sans-serif!important;vertical-align:middle!important}
+body#vox-app :is(.branch-card,.employee-card) table tbody tr:nth-child(even) td,body#vox-app table.personnel-table tbody tr:nth-child(even) td{background:#fbfdfc!important}
+body#vox-app :is(.branch-card,.employee-card) table tbody tr:hover td,body#vox-app table.personnel-table tbody tr:hover td{background:#eaf7f0!important}
+body#vox-app :is(.branch-card,.employee-card) table th:last-child,body#vox-app :is(.branch-card,.employee-card) table td:last-child,body#vox-app table.personnel-table th:last-child,body#vox-app table.personnel-table td:last-child{width:145px!important;min-width:145px!important;max-width:145px!important;text-align:center!important;white-space:nowrap!important}
+body#vox-app :is(.edit-definition,.delete-definition,.edit-personnel,.branch-card .edit,.branch-card .toggle){display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:58px!important;height:27px!important;min-height:27px!important;margin:0 2px!important;padding:0 7px!important;border:0!important;border-radius:4px!important;color:#fff!important;font:700 11px/27px Tahoma,sans-serif!important;text-decoration:none!important;white-space:nowrap!important}
+body#vox-app :is(.edit-definition,.edit-personnel,.branch-card .edit){background:#12a64a!important}body#vox-app :is(.delete-definition,.branch-card .toggle){background:#e44950!important}body#vox-app .delete-definition.disabled{background:#9ca5ad!important;opacity:.65!important}
+body#vox-app .employee-icon-action{box-sizing:border-box!important;width:28px!important;min-width:28px!important;height:28px!important;min-height:28px!important;margin:0 2px!important;padding:0!important;border-radius:5px!important}body#vox-app .employee-icon-action i{font-size:15px!important}
+body#vox-app :is(.role-pill,.status-pill,.status-toggle){display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;min-width:52px!important;height:22px!important;min-height:22px!important;margin:0!important;padding:0 6px!important;border-radius:3px!important;font:700 10px/20px Tahoma,sans-serif!important}
+body#vox-app :is(.vox-message,.notice,.form-alert){margin:3px 5px!important;padding:5px 8px!important;border-radius:0!important;font:11px/16px Tahoma,sans-serif!important}
+body#vox-app .print-design-form{box-sizing:border-box!important;width:calc(100% - 8px)!important;margin:4px!important;border:1px solid var(--vs-line)!important;border-radius:0!important;background:var(--vs-bg)!important;box-shadow:none!important}body#vox-app .print-settings-panel{border-color:var(--vs-line)!important;border-radius:0!important;background:var(--vs-panel)!important}body#vox-app .anamnesis-design-actions{justify-content:flex-end!important}
+body#vox-app>main.designer-page{box-sizing:border-box!important;width:100%!important;max-width:none!important;min-height:100vh!important;margin:0!important;padding:4px!important;background:var(--vs-bg)!important}body#vox-app .designer-head{box-sizing:border-box!important;min-height:30px!important;margin:0!important;padding:4px 8px!important;border:1px solid var(--vs-line)!important;background:linear-gradient(#f4faff,#d8eafa)!important}body#vox-app .designer-head h1{margin:0!important;color:var(--vs-title)!important;font:700 13px/20px Arial,sans-serif!important}body#vox-app .designer-head p,body#vox-app .designer-head .designer-back{display:none!important}body#vox-app .designer-workspace{border:1px solid var(--vs-line)!important;border-radius:0!important;background:var(--vs-bg)!important;box-shadow:none!important}body#vox-app .designer-tools{background:var(--vs-panel)!important;border-color:var(--vs-line)!important}body#vox-app #visual-designer-form>footer{box-sizing:border-box!important;display:flex!important;justify-content:flex-end!important;gap:5px!important;min-height:36px!important;padding:3px!important;border:1px solid var(--vs-line)!important;background:linear-gradient(#f4faff,#d8eafa)!important}body#vox-app #visual-designer-form>footer button{height:29px!important;min-height:29px!important;padding:0 9px!important;border-radius:4px!important;font:700 12px Tahoma,sans-serif!important}
+body#vox-app.settings-linked-page{min-height:100vh!important;margin:0!important;background:var(--vs-bg)!important;color:var(--vs-text)!important;font-family:Tahoma,"Segoe UI",sans-serif!important}body#vox-app.settings-linked-page>header{display:none!important}body#vox-app.settings-linked-page>main.profile-container{box-sizing:border-box!important;width:100%!important;max-width:none!important;min-height:100vh!important;margin:0!important;padding:4px!important;background:var(--vs-bg)!important}
+body#vox-app.settings-linked-page :is(.title-row,.profile-tabs){box-sizing:border-box!important;min-height:30px!important;margin:0 0 4px!important;padding:3px 7px!important;border:1px solid var(--vs-line)!important;border-radius:0!important;background:linear-gradient(#f4faff,#d8eafa)!important}body#vox-app.settings-linked-page .title-row h1{margin:0!important;color:var(--vs-title)!important;font:700 13px/20px Arial,sans-serif!important}body#vox-app.settings-linked-page .title-row p{display:none!important}body#vox-app.settings-linked-page .profile-tabs{display:flex!important;gap:3px!important;background:var(--vs-toolbar)!important}body#vox-app.settings-linked-page .profile-tab{height:25px!important;padding:0 9px!important;border:1px solid #8daf9f!important;border-radius:3px!important;background:#f5fffa!important;color:#17483a!important;font:700 11px/23px Tahoma,sans-serif!important;text-decoration:none!important}body#vox-app.settings-linked-page .profile-tab.active{background:linear-gradient(#28b85b,#10933f)!important;color:#fff!important}
+body#vox-app.settings-linked-page .profile-card{box-sizing:border-box!important;width:100%!important;margin:0 0 4px!important;padding:6px!important;border:1px solid var(--vs-line)!important;border-radius:0!important;background:var(--vs-bg)!important;box-shadow:none!important}body#vox-app.settings-linked-page .profile-card>h2{box-sizing:border-box!important;margin:-6px -6px 6px!important;padding:4px 8px!important;border-bottom:1px solid var(--vs-line)!important;background:linear-gradient(#f4faff,#d8eafa)!important;color:var(--vs-title)!important;font:700 13px/20px Arial,sans-serif!important}
+body#vox-app.settings-linked-page :is(.profile-form,.password-form){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px 8px!important}body#vox-app.settings-linked-page :is(.profile-form,.password-form)>label{display:flex!important;flex-direction:column!important;gap:2px!important;font:700 11px/15px Arial,sans-serif!important}body#vox-app.settings-linked-page :is(.profile-form,.password-form) :is(input,select){box-sizing:border-box!important;width:100%!important;height:27px!important;min-height:27px!important;padding:3px 6px!important;border:1px solid #79a9d4!important;border-radius:0!important;background:#fff!important;font:12px Arial,sans-serif!important}body#vox-app.settings-linked-page :is(.profile-actions,.password-form>button){grid-column:1/-1!important}body#vox-app.settings-linked-page .profile-actions{display:flex!important;justify-content:flex-end!important;min-height:36px!important;padding:3px!important;border:1px solid var(--vs-line)!important;background:linear-gradient(#f4faff,#d8eafa)!important}body#vox-app.settings-linked-page .profile-actions>a{display:none!important}body#vox-app.settings-linked-page .save-profile{box-sizing:border-box!important;width:104px!important;height:29px!important;min-height:29px!important;padding:0 9px!important;border-radius:4px!important;background:linear-gradient(#31c765,#0e9c3f)!important;color:#fff!important;font:700 12px Tahoma,sans-serif!important}body#vox-app.settings-linked-page .avatar-editor{margin:0 0 6px!important;padding:5px!important;border:1px solid var(--vs-line)!important;border-radius:0!important;background:var(--vs-panel)!important}
+@media(max-width:900px){body#vox-app :is(.personnel-form,.branch-form,.employee-form),body#vox-app.settings-linked-page :is(.profile-form,.password-form){grid-template-columns:1fr!important}body#vox-app :is(.personnel-actions,.employee-form .actions,.branch-form>.wide:last-child),body#vox-app :is(.personnel-form,.branch-form,.employee-form) .wide{grid-column:1!important}}
+
+/* Ortak ikon dönüştürücüsünden gelen eylemler tüm ayar listelerinde aynı ölçüdedir. */
+body#vox-app table .vox-icon-action,
+body#vox-app table :is(a,button).employee-icon-action {
+  display:inline-grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  max-height:28px!important;
+  margin:0 2px!important;
+  padding:0!important;
+  border-radius:5px!important;
+  font-size:0!important;
+}
+body#vox-app table .vox-icon-action i { font-size:15px!important;line-height:1!important; }
+body#vox-app table .edit-personnel.vox-icon-action,
+body#vox-app table .edit-definition.vox-icon-action,
+body#vox-app table .delete-definition.vox-icon-action {
+  width:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  max-height:28px!important;
+  padding:0!important;
+  font-size:0!important;
+}
+body#vox-app table .employee-status {
+  box-sizing:border-box!important;
+  min-width:52px!important;
+  width:auto!important;
+  height:22px!important;
+  min-height:22px!important;
+  margin:0!important;
+  padding:0 6px!important;
+  border-radius:3px!important;
+  font:700 10px/20px Tahoma,sans-serif!important;
+}
+body#vox-app :is(.form-card-title,.branch-card>header,.employee-card>header,.employee-accordion>summary) p { display:none!important; }
+body#vox-app :is(.vuexy-form-card,.branch-card,.employee-card)>:is(header,summary),
+body#vox-app :is(.form-card-title,.employee-accordion>summary) { height:29px!important;min-height:29px!important; }
+
+/* Ayarlar > Anamnez ekranının yönlendirildiği güncel görsel tasarımcı. */
+body#vox-app>main.designer {
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:none!important;
+  min-height:100vh!important;
+  margin:0!important;
+  padding:4px!important;
+  background:var(--vs-bg)!important;
+}
+body#vox-app .designer>header {
+  display:flex!important;
+  align-items:center!important;
+  box-sizing:border-box!important;
+  min-height:30px!important;
+  margin:0 0 4px!important;
+  padding:4px 8px!important;
+  border:1px solid var(--vs-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app .designer>header h1 { margin:0!important;color:var(--vs-title)!important;font:700 13px/20px Arial,sans-serif!important; }
+body#vox-app .designer>header :is(p,a) { display:none!important; }
+body#vox-app .question-blocks {
+  box-sizing:border-box!important;
+  max-height:88px!important;
+  margin:0 0 4px!important;
+  padding:4px!important;
+  border:1px solid var(--vs-line)!important;
+  border-radius:0!important;
+  background:var(--vs-panel)!important;
+}
+body#vox-app .question-blocks button { height:25px!important;padding:0 7px!important;border-radius:2px!important;font:700 10px/23px Tahoma,sans-serif!important; }
+body#vox-app .designer-layout { grid-template-columns:210px minmax(0,1fr)!important;gap:4px!important; }
+body#vox-app .toolbox {
+  box-sizing:border-box!important;
+  padding:6px!important;
+  border:1px solid var(--vs-line)!important;
+  border-radius:0!important;
+  background:var(--vs-panel)!important;
+}
+body#vox-app .toolbox h2 { margin:0 0 5px!important;color:var(--vs-title)!important;font:700 12px/18px Arial,sans-serif!important; }
+body#vox-app .toolbox>button { min-height:27px!important;margin:3px 0!important;padding:3px 6px!important;border-radius:2px!important;font:700 11px/19px Tahoma,sans-serif!important; }
+body#vox-app .toolbox label { margin:4px 0!important;font:11px/15px Arial,sans-serif!important; }
+body#vox-app .toolbox input { box-sizing:border-box!important;height:25px!important;margin-top:2px!important;border:1px solid #79a9d4!important;border-radius:0!important;background:#fff!important; }
+body#vox-app .canvas-area { min-height:650px!important;padding:5px!important;border:1px solid var(--vs-line)!important;border-radius:0!important;background:#cbdbea!important; }
+body#vox-app .designer>footer {
+  display:flex!important;
+  justify-content:flex-end!important;
+  gap:5px!important;
+  box-sizing:border-box!important;
+  min-height:36px!important;
+  margin:4px 0 0!important;
+  padding:3px!important;
+  border:1px solid var(--vs-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app .designer>footer button { box-sizing:border-box!important;height:29px!important;min-height:29px!important;padding:0 9px!important;border-radius:4px!important;font:700 12px Tahoma,sans-serif!important; }
+
+/* Şubeler: kayıt düğmesi sağda, liste eylemleri ortak 28px ikon ölçüsünde kalır. */
+body#vox-app .branch-form>.branch-form-actions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important;width:100%!important;min-height:35px!important;margin:0!important;padding:3px!important}
+body#vox-app .branch-card table td:last-child{display:table-cell!important;width:76px!important;min-width:76px!important;max-width:76px!important;padding:2px 5px!important;text-align:center!important;white-space:nowrap!important}
+body#vox-app .branch-card table td:last-child form{display:inline-flex!important;width:28px!important;height:28px!important;margin:0 2px!important;vertical-align:middle!important}
+body#vox-app .branch-card table :is(.edit.vox-icon-action,.branch-toggle-action){display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:28px!important;min-width:28px!important;max-width:28px!important;height:28px!important;min-height:28px!important;max-height:28px!important;margin:0 2px!important;padding:0!important;border:0!important;border-radius:5px!important;color:#fff!important;font-size:0!important;line-height:1!important;vertical-align:middle!important}
+body#vox-app .branch-card table .edit.vox-icon-action{background:#12a64a!important}
+body#vox-app .branch-card table .branch-toggle-action{background:#e44950!important}
+body#vox-app .branch-card table :is(.edit.vox-icon-action,.branch-toggle-action) i{width:15px!important;height:15px!important;font-size:15px!important;line-height:1!important}

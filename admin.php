@@ -11,7 +11,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  if($name==='')$error='Ad soyad alanı zorunludur.';elseif(!filter_var($email,FILTER_VALIDATE_EMAIL))$error='Geçerli bir e-posta adresi girin.';elseif(strlen($password)<6)$error='Şifre en az 6 karakter olmalıdır.';elseif($password!==$confirm)$error='Şifre ve şifre tekrarı aynı olmalıdır.';else{$check=db()->prepare('SELECT id FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1');$check->execute([$email]);if($check->fetch())$error='Bu e-posta adresi zaten kullanılıyor. Aynı e-posta ile ikinci personel oluşturulamaz.';else try{$insert=db()->prepare('INSERT INTO users(name,email,password_hash,role,active) VALUES(?,?,?,?,1)');$insert->execute([$name,$email,password_hash($password,PASSWORD_DEFAULT),$role]);$message='Personel başarıyla eklendi.';}catch(PDOException $e){$error='Personel kaydedilemedi. E-posta adresini kontrol edin.';}}
 }
 $personnel=db()->query('SELECT id,name,email,role,active,created_at FROM users ORDER BY id DESC')->fetchAll();
-patient_header('Ayarlar - Kullanıcı Yönetimi','settings');
+patient_header('Kurulum - Kullanıcı Yönetimi','settings');
 ?>
 <main class="patient-container personnel-page">
  <nav class="settings-tabs"><a class="active" href="<?=url('admin.php')?>">Kullanıcı Yönetimi</a><a href="<?=url('branches.php')?>">Şubeler</a><a href="<?=url('employees.php')?>">Çalışanlar</a></nav>

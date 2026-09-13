@@ -1,0 +1,297 @@
+:root {
+  --vsetup-bg:#dcebf8;
+  --vsetup-panel:#eef6fd;
+  --vsetup-toolbar:#e7f1ec;
+  --vsetup-line:#79a9d4;
+  --vsetup-grid:#d2ddd8;
+  --vsetup-title:#064d75;
+  --vsetup-text:#17382f;
+}
+
+body#vox-app:has(main.setup-page) { overflow-x:hidden!important;background:var(--vsetup-bg)!important;color:var(--vsetup-text)!important;font-family:Tahoma,"Segoe UI",sans-serif!important; }
+body#vox-app main.setup-page {
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:none!important;
+  min-height:100vh!important;
+  margin:0!important;
+  padding:0!important;
+  overflow-x:hidden!important;
+  background:var(--vsetup-bg)!important;
+}
+body#vox-app main.setup-page>.setup-tabs { margin:0!important; }
+
+/* Kurulum kartları ve pencere içi başlıklar */
+body#vox-app main.setup-page :is(.manage-card,.category-card,.vuexy-form-card) {
+  box-sizing:border-box!important;
+  width:calc(100% - 8px)!important;
+  margin:4px!important;
+  border:1px solid var(--vsetup-line)!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+body#vox-app main.setup-page :is(.manage-head,.category-card>header,.form-card-title) {
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  width:100%!important;
+  min-height:29px!important;
+  margin:0!important;
+  padding:4px 8px!important;
+  border-bottom:1px solid var(--vsetup-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app main.setup-page :is(.manage-head,.category-card>header,.form-card-title) :is(h1,h2) { margin:0!important;color:var(--vsetup-title)!important;font:700 13px/20px Arial,sans-serif!important; }
+body#vox-app main.setup-page :is(.manage-head,.category-card>header,.form-card-title) p { display:none!important; }
+body#vox-app main.setup-page .category-page-head {
+  box-sizing:border-box!important;
+  min-height:30px!important;
+  margin:4px!important;
+  padding:4px 8px!important;
+  border:1px solid var(--vsetup-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app main.setup-page .category-page-head h1 { margin:0!important;color:var(--vsetup-title)!important;font:700 13px/20px Arial,sans-serif!important; }
+body#vox-app main.setup-page .category-page-head p { display:none!important; }
+body#vox-app main.setup-page .category-page-head .back-link { float:right!important;margin:-20px 0 0!important;font:700 11px/20px Tahoma,sans-serif!important; }
+body#vox-app main.setup-page .category-card>header .back-link { margin:0 0 0 auto!important;color:#1769aa!important;font:700 11px/20px Tahoma,sans-serif!important;text-decoration:none!important; }
+
+/* Kayıt ve düzenleme formları */
+body#vox-app main.setup-page :is(.manage-form,.category-form,.personnel-form) {
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:start!important;
+  gap:5px 8px!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  margin:0!important;
+  padding:6px!important;
+  border:0!important;
+  background:var(--vsetup-panel)!important;
+}
+body#vox-app main.setup-page .admin-new-card:not([open])>.manage-form { display:none!important; }
+body#vox-app main.setup-page :is(.manage-form,.category-form,.personnel-form)>label {
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:2px!important;
+  min-width:0!important;
+  max-width:none!important;
+  margin:0!important;
+  color:var(--vsetup-text)!important;
+  font:700 11px/15px Arial,sans-serif!important;
+}
+body#vox-app main.setup-page :is(.manage-form,.category-form,.personnel-form) :is(input:not([type=checkbox]),select,textarea) {
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:27px!important;
+  min-height:27px!important;
+  margin:0!important;
+  padding:3px 6px!important;
+  border:1px solid var(--vsetup-line)!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:var(--vsetup-text)!important;
+  font:12px Arial,sans-serif!important;
+  box-shadow:none!important;
+}
+body#vox-app main.setup-page :is(.form-actions,.category-form-actions,.personnel-actions) {
+  grid-column:1/-1!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:5px!important;
+  box-sizing:border-box!important;
+  min-height:35px!important;
+  margin:0!important;
+  padding:3px!important;
+  border:1px solid var(--vsetup-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app main.setup-page :is(.form-actions,.category-form-actions,.personnel-actions)>a { display:none!important; }
+body#vox-app main.setup-page :is(.form-actions,.category-form-actions,.personnel-actions)>button,
+body#vox-app main.setup-page .category-form>button {
+  box-sizing:border-box!important;
+  width:104px!important;
+  min-width:104px!important;
+  height:29px!important;
+  min-height:29px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  border:1px solid #087d3c!important;
+  border-radius:4px!important;
+  background:linear-gradient(#31c765,#0e9c3f)!important;
+  color:#fff!important;
+  font:700 12px/27px Tahoma,sans-serif!important;
+}
+body#vox-app main.setup-page .category-form>button { grid-column:1/-1!important;justify-self:end!important; }
+body#vox-app main.setup-page .category-form-note { height:27px!important;min-height:27px!important;font:11px/27px Tahoma,sans-serif!important; }
+
+/* Marka/model alt sekmeleri */
+body#vox-app main.setup-page .brand-page-tabs { min-height:33px!important;margin:0 4px 4px!important;padding:3px!important;border:1px solid #8bb8d8!important;border-radius:0!important;background:#dcecf8!important; }
+body#vox-app main.setup-page .brand-page-tabs a { height:25px!important;min-height:25px!important;padding:0 9px!important;border:1px solid #7fa9c7!important;border-radius:3px!important;background:linear-gradient(#f8fcff,#d9eaf7)!important;color:#174f78!important;font:700 11px/23px Tahoma,sans-serif!important; }
+body#vox-app main.setup-page .brand-page-tabs a.active { border-color:#145f96!important;background:linear-gradient(#3e96d1,#1769aa)!important;color:#fff!important; }
+body#vox-app main.setup-page .brand-tabs { gap:2px!important;padding:3px 4px 0!important;border-color:#8bb8d8!important;background:#e7f2fa!important; }
+body#vox-app main.setup-page .brand-tab { box-sizing:border-box!important;min-height:26px!important;height:26px!important;margin:0!important;padding:0 5px!important;border:1px solid #8db4d0!important;border-radius:3px 3px 0 0!important;background:linear-gradient(#f8fcff,#d9eaf7)!important;color:#174f78!important;font:700 10px/24px Tahoma,sans-serif!important; }
+body#vox-app main.setup-page .brand-tab.active { border-color:#145f96!important;background:linear-gradient(#3e96d1,#1769aa)!important;color:#fff!important; }
+body#vox-app main.setup-page .model-search-icon { display:none!important; }
+body#vox-app main.setup-page .model-search input { height:27px!important;min-height:27px!important;padding:3px 6px!important;border:1px solid var(--vsetup-line)!important;border-radius:0!important;font:11px Arial,sans-serif!important; }
+
+/* Ortak kompakt liste */
+body#vox-app main.setup-page :is(.manage-table-wrap,.category-table-wrap,.table-responsive) { width:100%!important;margin:0!important;overflow:auto!important; }
+body#vox-app main.setup-page :is(.manage-table,.category-table-wrap table,.personnel-table) { width:100%!important;margin:0!important;border-collapse:separate!important;border-spacing:0!important;background:#fff!important;color:var(--vsetup-text)!important;font-family:Tahoma,"Segoe UI",sans-serif!important; }
+body#vox-app main.setup-page :is(.manage-table,.category-table-wrap table,.personnel-table) thead th {
+  box-sizing:border-box!important;
+  height:22px!important;
+  min-height:22px!important;
+  padding:2px 5px!important;
+  border:0!important;
+  border-right:1px solid #cbd8d2!important;
+  border-bottom:1px solid #aebfb8!important;
+  background:linear-gradient(#fdfefe,#e1e8e5)!important;
+  color:#17382f!important;
+  text-align:left!important;
+  white-space:nowrap!important;
+  font:700 11px/16px Tahoma,sans-serif!important;
+}
+body#vox-app main.setup-page :is(.manage-table,.category-table-wrap table,.personnel-table) tbody td {
+  box-sizing:border-box!important;
+  height:29px!important;
+  min-height:29px!important;
+  padding:2px 5px!important;
+  border:0!important;
+  border-right:1px solid #e1e9e5!important;
+  border-bottom:1px solid #d9e2de!important;
+  background:#fff!important;
+  color:#172f28!important;
+  font:11px/15px Tahoma,sans-serif!important;
+  vertical-align:middle!important;
+}
+body#vox-app main.setup-page :is(.manage-table,.category-table-wrap table,.personnel-table) tbody tr:nth-child(even) td { background:#fbfdfc!important; }
+body#vox-app main.setup-page :is(.manage-table,.category-table-wrap table,.personnel-table) tbody tr:hover td { background:#eaf7f0!important; }
+body#vox-app main.setup-page :is(.category-status,.status-pill) { display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;min-width:52px!important;height:22px!important;min-height:22px!important;padding:0 6px!important;border-radius:3px!important;font:700 10px/20px Tahoma,sans-serif!important; }
+
+/* Kurulum sekmelerinin tabloları mevcut ekran içinde sabit kalır; sütunları sürüklenemez. */
+body#vox-app main.setup-page table.vox-setup-fixed-list {
+  width:100%!important;
+  min-width:100%!important;
+  table-layout:fixed!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list :is(th,td) {
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table :is(th,td):last-child {
+  display:table-cell!important;
+  width:145px!important;
+  min-width:145px!important;
+  max-width:145px!important;
+  text-align:center!important;
+  vertical-align:middle!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table td:last-child>:is(a,form,button) {
+  display:inline-flex!important;
+  margin:0 2px!important;
+  vertical-align:middle!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list:is(.brands-table,.models-table) :is(th,td):first-child { width:70px!important; }
+body#vox-app main.setup-page table.vox-setup-fixed-list .vox-shared-column-resizer { display:none!important; }
+
+/* Tüm Kurulum listelerinde eylem alanı ve ikonlar sabittir. */
+body#vox-app main.setup-page :is(.manage-table td:last-child,.category-actions,.personnel-table td:last-child) { width:145px!important;min-width:145px!important;max-width:145px!important;text-align:center!important;white-space:nowrap!important; }
+body#vox-app main.setup-page :is(.manage-table td:last-child,.category-actions) { display:flex!important;align-items:center!important;justify-content:center!important;gap:4px!important;padding:2px!important; }
+body#vox-app main.setup-page :is(.manage-table td:last-child,.category-actions) form { display:inline-flex!important;width:28px!important;height:28px!important;margin:0!important;padding:0!important; }
+body#vox-app main.setup-page :is(.row-action,.category-actions a,.category-actions button,.edit-definition,.delete-definition,.vox-icon-action) {
+  display:inline-grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  max-height:28px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:5px!important;
+  color:#fff!important;
+  font-size:0!important;
+  line-height:1!important;
+}
+body#vox-app main.setup-page :is(.row-action,.category-actions a,.category-actions button,.edit-definition,.delete-definition,.vox-icon-action) :is(i,svg) { width:15px!important;height:15px!important;font-size:15px!important;line-height:1!important; }
+body#vox-app main.setup-page :is(.row-action.models,.category-actions .children) { background:#f4a43a!important; }
+body#vox-app main.setup-page :is(.row-action.edit,.category-actions .edit,.edit-definition,.vox-icon-edit) { background:#12a64a!important; }
+body#vox-app main.setup-page :is(.row-action.delete,.category-actions .delete,.delete-definition,.vox-icon-delete) { background:#e44950!important; }
+body#vox-app main.setup-page .delete-definition.disabled { background:#9ca5ad!important;opacity:.65!important; }
+body#vox-app main.setup-page :is(.manage-message,.category-notice,.vox-message) { margin:3px 5px!important;padding:5px 8px!important;border-radius:0!important;font:11px/16px Tahoma,sans-serif!important; }
+
+/* Kurulum sekmelerindeki tüm satır eylemleri aynı ölçü, boşluk ve ikon hizasını kullanır. */
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table :is(th,td):last-child {
+  width:126px!important;
+  min-width:126px!important;
+  max-width:126px!important;
+  padding:2px 4px!important;
+  text-align:center!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table td:last-child {
+  font-size:0!important;
+  line-height:0!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table td:last-child>:is(a,button,form) {
+  display:inline-grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:30px!important;
+  min-width:30px!important;
+  max-width:30px!important;
+  height:30px!important;
+  min-height:30px!important;
+  max-height:30px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  vertical-align:middle!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table td:last-child>:is(a,button,form)+:is(a,button,form) {
+  margin-left:5px!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table td:last-child>form>button {
+  display:grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:30px!important;
+  min-width:30px!important;
+  max-width:30px!important;
+  height:30px!important;
+  min-height:30px!important;
+  max-height:30px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:5px!important;
+}
+body#vox-app main.setup-page table.vox-setup-fixed-list.vox-classic-table td:last-child :is(a,button) :is(i,svg) {
+  display:block!important;
+  place-self:center!important;
+  box-sizing:border-box!important;
+  width:16px!important;
+  min-width:16px!important;
+  height:16px!important;
+  min-height:16px!important;
+  margin:0!important;
+  padding:0!important;
+  font-size:16px!important;
+  line-height:16px!important;
+  transform:none!important;
+}
+
+@media(max-width:900px) {
+  body#vox-app main.setup-page :is(.manage-form,.category-form,.personnel-form) { grid-template-columns:1fr!important; }
+  body#vox-app main.setup-page :is(.form-actions,.category-form-actions,.personnel-actions),body#vox-app main.setup-page .category-form>button { grid-column:1!important; }
+}

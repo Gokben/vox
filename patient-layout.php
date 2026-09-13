@@ -13,6 +13,8 @@ if (!function_exists('format_date_tr')) {
 
 function patient_header(string $title, string $active = 'patients'): void
 {
+    $embeddedWindow = isset($_GET['_vox_window']) && (string)$_GET['_vox_window'] === '1';
+    $isPatientList = strtolower(basename((string)($_SERVER['SCRIPT_NAME'] ?? ''))) === 'patients.php';
     $userId = (int)($_SESSION['user']['id'] ?? 0);
     if ($userId > 0) {
         try {
@@ -45,9 +47,10 @@ function patient_header(string $title, string $active = 'patients'): void
     ?>
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=e($title)?> | <?=APP_NAME?></title><link rel="icon" type="image/png" href="<?=url('assets/favicon.png?v=20260713')?>">
-<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260815-1')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260725-6')?>"><link id="vuexy-layout-fixes" rel="stylesheet" href="<?=url('assets/vuexy-layout-fixes.css?v=20')?>"><link rel="stylesheet" href="<?=url('assets/design-system.css?v=2')?>"><script src="<?=url('assets/theme.js?v=20260815-1')?>" defer></script>
-<style>.help-page-link{display:grid;place-items:center;width:30px;height:30px;color:inherit;text-decoration:none}.help-page-link i{font-size:20px}.stock-entry-filter>a{display:none!important}.patient-brand{transition:none!important}</style>
-</head><body id="vox-app"><script>try{if(window.matchMedia('(min-width:901px)').matches&&localStorage.getItem('vox-sidebar-collapsed')==='true')document.body.classList.add('menu-collapsed','layout-menu-collapsed')}catch(error){}</script><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260713-9')?>" alt="VOX"><b>VOX</b></a><div class="header-tools"><button class="plain-tool" type="button" title="Arama">⌕</button><a class="help-page-link" href="<?=url('release-notes.php')?>" title="Yardım ve sürüm notları" aria-label="Yardım ve sürüm notları"><i class="ti tabler-help-circle" aria-hidden="true"></i></a><button id="theme-toggle" class="plain-tool" type="button" title="Görünümü değiştir">☼</button><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>">Ayarlar</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kartları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('admin.php')?>"><span><i class="icon-base ti tabler-settings"></i></span> Ayarlar</a><?php endif?></nav></header>
+<link rel="stylesheet" href="<?=url('assets/amerce/fonts/fonts.css')?>"><link rel="stylesheet" href="<?=url('assets/patients.css?v=20260823-gold-menu-icons')?>"><link rel="stylesheet" href="<?=url('assets/classic-lists.css?v=20260823-10')?>"><link rel="stylesheet" href="<?=url('assets/multi-window.css?v=20260824-6')?>"><link rel="stylesheet" href="<?=url('assets/classic-forms.css?v=20260823-4')?>"><link rel="stylesheet" href="<?=url('assets/classic-settings.css?v=20260825-unified')?>"><link rel="stylesheet" href="<?=url('assets/classic-setup.css?v=20260825-9')?>"><link rel="stylesheet" href="<?=url('assets/vendor/fonts/iconify-icons.css?v=10.11.1')?>"><link rel="stylesheet" href="<?=url('assets/employees-buttons.css?v=20260725-6')?>"><link id="vuexy-layout-fixes" rel="stylesheet" href="<?=url('assets/vuexy-layout-fixes.css?v=20')?>"><link rel="stylesheet" href="<?=url('assets/design-system.css?v=2')?>"><script src="<?=url('assets/theme.js?v=20260815-1')?>" defer></script><script src="<?=url('assets/classic-lists.js?v=20260825-15')?>" defer></script><script src="<?=url('assets/multi-window.js?v=20260825-44') ?>" defer></script><script src="<?=url('assets/classic-forms.js?v=20260823-4')?>" defer></script><script src="<?=url('assets/session-timeout.js?v=20260825-1')?>" data-timeout="<?=SESSION_IDLE_TIMEOUT?>" data-logout-url="<?=e(url('logout.php?timeout=1'))?>" data-heartbeat-url="<?=e(url('session-heartbeat.php'))?>" defer></script>
+<link rel="stylesheet" href="<?=url('assets/accordion-indicators.css?v=20260824-1')?>">
+<style>.help-page-link{display:grid;place-items:center;width:30px;height:30px;color:inherit;text-decoration:none}.help-page-link i{font-size:20px}.stock-entry-filter>a{display:none!important}.patient-brand{transition:none!important}.patient-nav .vox-menu-logout{margin-top:10px!important}.patient-nav .vox-menu-logout .ti{color:#d6b45e!important}</style><?php if($isPatientList):?><script>document.documentElement.classList.add('vox-patient-list')</script><?php endif?>
+</head><body id="vox-app"<?=$embeddedWindow?' class="vox-embedded-window"':''?>><script>try{if(window.matchMedia('(min-width:901px)').matches&&localStorage.getItem('vox-sidebar-collapsed')==='true')document.body.classList.add('menu-collapsed','layout-menu-collapsed')}catch(error){}</script><header class="patient-header"><div class="patient-topbar"><a class="patient-brand" href="<?=url('index.php')?>"><img src="<?=url('assets/vox-logo-02.png?v=20260823-green-pillow-transparent')?>" alt="VOX"><b>VOX ERP</b></a><div class="page-context"><span>İŞLEM MERKEZİ</span><strong><?=e($title)?></strong></div><div class="header-tools"><div class="account"><button id="account-toggle" class="account-button" type="button"><span class="avatar"><?php if($avatar):?><img src="<?=url($avatar)?>" alt="<?=e($rawName)?> profil fotoğrafı"><?php else:?><?=$initial?><?php endif?></span><span class="account-name"><?=$name?><small><?=$role?></small></span><span>⌄</span></button><div id="account-menu" class="account-menu"><a href="<?=url('profile.php')?>">Profilim</a><?php if(is_admin()):?><a href="<?=url('brands.php')?>">Kurulum</a><?php endif?><a class="logout" href="<?=url('logout.php')?>">Çıkış yap</a></div></div></div></div><nav id="vox-main-menu" class="patient-nav"><a class="<?=$active==='home'?'active':''?>" href="<?=url('index.php')?>"><span><i class="icon-base ti tabler-smart-home"></i></span> Ana Sayfa</a><a class="<?=$active==='patients'?'active':''?>" href="<?=url('patients.php')?>"><span><i class="icon-base ti tabler-layout-sidebar"></i></span> Hasta Kartları</a><a class="<?=$active==='new'?'active':''?>" href="<?=url('patient-form.php')?>"><span><i class="icon-base ti tabler-user-plus"></i></span> Yeni Hasta</a><a class="<?=$active==='kanban'?'active':''?>" href="<?=url('kanban.php')?>"><span><i class="icon-base ti tabler-layout-kanban"></i></span> Kanban</a><a href="#"><span><i class="icon-base ti tabler-refresh"></i></span> Takipler</a><a href="#"><i class="icon-base ti tabler-shopping-cart"></i></span> Satışlar</a><a href="#"><span><i class="icon-base ti tabler-file-report"></i></span> Raporlar</a><?php if(is_admin()):?><a href="<?=url('brands.php')?>"><span><i class="icon-base ti tabler-tools"></i></span> Kurulum</a><?php endif?></nav></header><div class="desktop-taskbar"><button class="desktop-start" type="button" aria-label="Menüyü aç">Başlat</button><span class="desktop-task-title"><?=e($title)?></span><span class="desktop-clock"><?=date('H:i')?></span></div>
 <?php
 }
 
@@ -55,11 +58,13 @@ function patient_footer(): void
 {
     ?>
 <script>
-document.querySelector('.patient-nav a[href*="index.php"]')?.setAttribute('href', <?=json_encode(url('index.php'))?>);
+document.querySelector('.patient-nav a[href*="index.php"]')?.remove();
 const stockMenuLink = document.createElement('a');
 stockMenuLink.href = <?= json_encode(url('stocks.php')) ?>;
 stockMenuLink.innerHTML = '<span><i class="icon-base ti tabler-package"></i></span> Stoklar';
-document.querySelector('.patient-nav a[href*="admin.php"]')?.before(stockMenuLink);
+const setupAnchorForModules = document.querySelector('.patient-nav a[href*="brands.php"]');
+if (setupAnchorForModules) setupAnchorForModules.before(stockMenuLink);
+else document.querySelector('.patient-nav')?.append(stockMenuLink);
 const stockGroup = document.createElement('div');
 stockGroup.className = 'report-menu-group';
 const stockSubmenu = document.createElement('div');
@@ -114,7 +119,7 @@ preCashMenuLink.after(currentAccountsMenuLink);
 if (location.pathname.endsWith('/current-accounts.php')) currentAccountsMenuLink.classList.add('active');
 const unitsMenuLink = document.createElement('a');
 unitsMenuLink.href = <?= json_encode(url('units.php')) ?>;
-unitsMenuLink.innerHTML = '<span><i class="icon-base ti tabler-building"></i></span> Üniteler';
+unitsMenuLink.innerHTML = '<span><i class="icon-base ti tabler-building"></i></span> Ünite';
 currentAccountsMenuLink.after(unitsMenuLink);
 if (location.pathname.endsWith('/units.php')) unitsMenuLink.classList.add('active');
 const unitsGroup = document.createElement('div');
@@ -140,52 +145,30 @@ unitsGroup.replaceWith(standaloneUnitsMenuLink);
 standaloneUnitsMenuLink.after(companiesMenuLink);
 if (location.pathname.endsWith('/units.php')) standaloneUnitsMenuLink.classList.add('active');
 if (location.pathname.endsWith('/companies.php')) standaloneUnitsMenuLink.classList.remove('active');
-const setupMenuLink = document.createElement('a');
-setupMenuLink.href = '#';
-setupMenuLink.innerHTML = '<span><i class="icon-base ti tabler-tools"></i></span> Kurulum';
-document.querySelector('.patient-nav a[href*="admin.php"]')?.after(setupMenuLink);
-const setupGroup = document.createElement('div');
-setupGroup.className = 'report-menu-group';
-const setupSubmenu = document.createElement('div');
-setupSubmenu.className = 'report-submenu';
-const brandsMenuLink = document.createElement('a');
-brandsMenuLink.href = <?= json_encode(url('brands.php')) ?>;
-brandsMenuLink.textContent = 'Markalar';
-const cashCategoriesMenuLink = document.createElement('a');
-cashCategoriesMenuLink.href = <?= json_encode(url('cash-categories.php')) ?>;
-cashCategoriesMenuLink.textContent = 'Kasa Kategorileri';
-const serviceNamesMenuLink = document.createElement('a');
-serviceNamesMenuLink.href = <?= json_encode(url('service-names.php')) ?>;
-serviceNamesMenuLink.textContent = 'Hizmet Adı';
-const serviceTypesMenuLink = document.createElement('a');
-serviceTypesMenuLink.href = <?= json_encode(url('service-types.php')) ?>;
-serviceTypesMenuLink.textContent = 'Hizmet Yerleri';
-if (location.pathname.endsWith('/brands.php') || location.pathname.endsWith('/cash-categories.php') || location.pathname.endsWith('/service-types.php')) {
-  setupMenuLink.classList.add('active');
-  if (location.pathname.endsWith('/cash-categories.php')) cashCategoriesMenuLink.classList.add('active');
-  if (location.pathname.endsWith('/service-types.php')) serviceTypesMenuLink.classList.add('active');
-}
-if (location.pathname.endsWith('/service-names.php')) { setupMenuLink.classList.add('active'); serviceNamesMenuLink.classList.add('active'); }
-setupSubmenu.append(brandsMenuLink, cashCategoriesMenuLink, serviceNamesMenuLink, serviceTypesMenuLink);
-setupMenuLink.setAttribute('aria-haspopup', 'true');
-setupMenuLink.setAttribute('aria-expanded', 'false');
-setupMenuLink.addEventListener('click', event => {
-  event.preventDefault();
-  const isOpen = setupGroup.classList.toggle('open');
-  setupMenuLink.setAttribute('aria-expanded', String(isOpen));
-  sessionStorage.setItem('vox.setupMenuOpen', isOpen ? '1' : '0');
-});
-setupSubmenu.addEventListener('click', event => {
-  if (event.target.closest('a')) sessionStorage.setItem('vox.setupMenuOpen', '1');
-});
-setupMenuLink.before(setupGroup);
-setupGroup.append(setupMenuLink, setupSubmenu);
-const setupPages = ['brands.php','cash-categories.php','service-names.php','service-types.php'];
+const setupMenuLink = document.querySelector('.patient-nav a[href*="brands.php"]');
+const setupPages = ['brands.php','cash-categories.php','service-names.php','service-types.php','admin.php','branches.php','employees.php','social-securities.php','sources.php','complaints.php','banks.php','anamnesis-questions.php'];
 const isSetupPage = setupPages.includes(location.pathname.split('/').pop());
-if (isSetupPage || sessionStorage.getItem('vox.setupMenuOpen') === '1') {
-  setupGroup.classList.add('open');
-  setupMenuLink.setAttribute('aria-expanded', 'true');
-}
+try { sessionStorage.removeItem('vox.setupMenuOpen'); } catch (_) {}
+document.querySelectorAll('.patient-nav > .report-menu-group').forEach(group => {
+  const trigger = group.querySelector(':scope > a');
+  if (!trigger || !trigger.textContent.toLocaleLowerCase('tr-TR').includes('kurulum')) return;
+  const directLink = setupMenuLink || trigger;
+  directLink.href = <?= json_encode(url('brands.php')) ?>;
+  directLink.removeAttribute('aria-haspopup');
+  directLink.removeAttribute('aria-expanded');
+  group.replaceWith(directLink);
+});
+setupMenuLink?.setAttribute('href', <?= json_encode(url('brands.php')) ?>);
+setupMenuLink?.removeAttribute('aria-haspopup');
+setupMenuLink?.removeAttribute('aria-expanded');
+if (isSetupPage) setupMenuLink?.classList.add('active');
+const logoutMenuLink = document.createElement('a');
+logoutMenuLink.href = <?= json_encode(url('logout.php')) ?>;
+logoutMenuLink.className = 'vox-menu-logout';
+logoutMenuLink.innerHTML = '<span><i class="icon-base ti tabler-logout"></i></span> Çıkış';
+logoutMenuLink.title = 'Yazılımdan çıkış yap';
+if (setupMenuLink?.isConnected) setupMenuLink.after(logoutMenuLink);
+else document.querySelector('.patient-nav')?.append(logoutMenuLink);
 const reportMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Raporlar'));
 const followUpMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Takipler'));
 const salesMenuLink = [...document.querySelectorAll('.patient-nav > a')].find(link => link.textContent.includes('Satışlar'));
@@ -429,7 +412,11 @@ function setTheme(value){root.dataset.theme=value;localStorage.setItem('vox-them
 setTheme(localStorage.getItem('vox-theme')||'light');if(theme)theme.addEventListener('click',()=>setTheme(root.dataset.theme==='dark'?'light':'dark'));
 const accountButton=document.getElementById('account-toggle'),accountMenu=document.getElementById('account-menu');
 if(accountButton){accountButton.addEventListener('click',e=>{e.stopPropagation();accountMenu.classList.toggle('open')});document.addEventListener('click',()=>accountMenu.classList.remove('open'));}
-const settingsPages={
+const setupTabPages={
+  'brands.php':['<?=url('brands.php')?>','Markalar / Modeller'],
+  'cash-categories.php':['<?=url('cash-categories.php')?>','Kasa Kategorileri'],
+  'service-names.php':['<?=url('service-names.php')?>','Hizmet Adı'],
+  'service-types.php':['<?=url('service-types.php')?>','Hizmet Yerleri'],
   'admin.php':['<?=url('admin.php')?>','Kullanıcı Yönetimi'],
   'branches.php':['<?=url('branches.php')?>','Şubeler'],
   'employees.php':['<?=url('employees.php')?>','Çalışanlar'],
@@ -440,15 +427,22 @@ const settingsPages={
   'anamnesis-questions.php':['<?=url('anamnesis-questions.php')?>','Anamnez']
 };
 const currentSettingsPage=location.pathname.split('/').pop()||'index.php';
-if(settingsPages[currentSettingsPage]){
-  let settingsTabs=document.querySelector('.settings-tabs');
-  if(!settingsTabs){
-    const settingsContainer=document.querySelector('.social-settings');
-    if(settingsContainer){settingsTabs=document.createElement('nav');settingsTabs.className='settings-tabs';settingsContainer.prepend(settingsTabs);}
+if(setupTabPages[currentSettingsPage]){
+  const setupContainer=document.querySelector('main');
+  let setupTabs=document.querySelector('main > .setup-tabs');
+  if(!setupTabs){
+    setupTabs=document.querySelector('main > .settings-tabs:not(.brand-page-tabs)');
+    if(setupTabs) setupTabs.classList.add('setup-tabs');
   }
-  if(settingsTabs){
-    settingsTabs.replaceChildren(...Object.entries(settingsPages).map(([page,data])=>{
-      const link=document.createElement('a');link.href=data[0];link.textContent=data[1];
+  if(!setupTabs&&setupContainer){
+    setupTabs=document.createElement('nav');
+    setupTabs.className='settings-tabs setup-tabs';
+    setupContainer.prepend(setupTabs);
+  }
+  if(setupTabs){
+    setupTabs.setAttribute('aria-label','Kurulum ekranları');
+    setupTabs.replaceChildren(...Object.entries(setupTabPages).map(([page,data])=>{
+      const link=document.createElement('a');link.href=data[0];link.textContent=data[1];link.dataset.voxSameWindow='setup';
       if(page===currentSettingsPage)link.classList.add('active');return link;
     }));
   }
@@ -483,11 +477,12 @@ if(settingsPages[currentSettingsPage]){
     const chevron=document.createElement('span');
     chevron.className='new-record-chevron';
     chevron.setAttribute('aria-hidden','true');
-    chevron.textContent='⌄';
+    chevron.textContent='+';
     header.appendChild(chevron);
     const toggle=()=>{
       const collapsed=card.classList.toggle('new-record-collapsed');
       header.setAttribute('aria-expanded',String(!collapsed));
+      chevron.textContent=collapsed?'+':'−';
     };
     header.addEventListener('click',toggle);
     header.addEventListener('keydown',event=>{
@@ -496,7 +491,7 @@ if(settingsPages[currentSettingsPage]){
   };
   document.querySelectorAll('.vuexy-form-card,.branch-card').forEach(setupNewRecordAccordion);
   const style=document.createElement('style');
-  style.textContent='.new-record-toggle{position:relative;display:block!important;cursor:pointer;user-select:none}.new-record-toggle:focus-visible{outline:2px solid #19a94b;outline-offset:-3px}.new-record-chevron{position:absolute;right:24px;top:50%;font-size:24px;line-height:1;transform:translateY(-50%) rotate(0);transition:transform .2s ease}.new-record-collapsed .new-record-chevron{transform:translateY(-50%) rotate(-90deg)}.new-record-collapsed>:not(header){display:none!important}';
+  style.textContent='body#vox-app main .new-record-toggle{position:relative;display:block!important;cursor:pointer!important;user-select:none!important}body#vox-app main .new-record-toggle:focus-visible{outline:2px solid #19a94b!important;outline-offset:-3px!important}body#vox-app main .new-record-chevron{position:absolute!important;right:8px!important;top:50%!important;display:grid!important;place-items:center!important;width:32px!important;height:27px!important;margin:0!important;padding:0!important;transform:translateY(-50%)!important;color:#e00000!important;font:700 25px/25px Arial,sans-serif!important}body#vox-app main .new-record-collapsed>:not(header){display:none!important}';
   document.head.appendChild(style);
 })();
 </script>
@@ -608,27 +603,6 @@ if(settingsPages[currentSettingsPage]){
 })();
 </script>
 <script>
-(()=>{
-  const notificationKey='vox-save-notification';
-  const showSavedNotification=()=>{
-    document.querySelector('.vox-save-notification')?.remove();
-    const notice=document.createElement('div');
-    notice.className='vox-save-notification';
-    notice.textContent='Kaydedildi';
-    document.body.append(notice);
-    setTimeout(()=>notice.classList.add('visible'),0);
-    setTimeout(()=>{notice.classList.remove('visible');setTimeout(()=>notice.remove(),220);},2600);
-  };
-  const isSaveAction=button=>/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test((button?.textContent||'').trim())||/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test(button?.getAttribute('title')||'')||/^(kaydet|güncelle|kaydı güncelle|değişiklikleri kaydet)$/i.test(button?.getAttribute('aria-label')||'');
-  if(sessionStorage.getItem(notificationKey)==='1'){sessionStorage.removeItem(notificationKey);showSavedNotification();}
-  document.addEventListener('submit',event=>{const form=event.target;if(event.defaultPrevented||!(form instanceof HTMLFormElement)||form.method.toLowerCase()==='get')return;sessionStorage.setItem(notificationKey,'1');showSavedNotification();},true);
-  document.addEventListener('click',event=>{const button=event.target.closest('button');if(button&&isSaveAction(button))showSavedNotification();});
-  const style=document.createElement('style');
-  style.textContent='.vox-save-notification{position:fixed;z-index:3000;right:24px;bottom:24px;padding:12px 18px;border-radius:7px;background:#19a94b;color:#fff;font-weight:700;box-shadow:0 8px 22px rgba(25,169,75,.28);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s}.vox-save-notification.visible{opacity:1;transform:translateY(0)}';
-  document.head.append(style);
-})();
-</script>
-<script>
 /* Parasal girişleri yazarken Türkçe binlik ayıracıyla gösterir. */
 (() => {
   const moneyName = /(price|amount|cost|tutar|sgk|payment|gross|unit_price|purchase)/i;
@@ -687,6 +661,64 @@ if(settingsPages[currentSettingsPage]){
   }))).observe(document.documentElement, {childList:true, subtree:true});
 })();
 </script>
-<script>document.querySelectorAll('.cash-table-wrap tbody tr td:nth-child(5)').forEach(cell=>{if(cell.textContent.trim()==='—')cell.textContent='EFT / Havale';});</script></body></html>
+<script>document.querySelectorAll('.cash-table-wrap tbody tr td:nth-child(5)').forEach(cell=>{if(cell.textContent.trim()==='—')cell.textContent='EFT / Havale';});</script><script>
+(() => {
+  const toggle = () => {
+    const open = document.body.classList.toggle('desktop-menu-open');
+    document.getElementById('desktop-menu-toggle')?.setAttribute('aria-expanded', String(open));
+  };
+  document.getElementById('desktop-menu-toggle')?.addEventListener('click', toggle);
+  document.querySelector('.desktop-start')?.addEventListener('click', toggle);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') document.body.classList.remove('desktop-menu-open'); });
+})();
+</script>
+<script>
+/* Liste dışındaki klasik iş pencerelerini masaüstüne kapatıp görev çubuğundan geri açar. */
+(() => {
+  if (!window.matchMedia('(min-width:901px)').matches) return;
+  const main = document.querySelector('body#vox-app > main');
+  const topbar = document.querySelector('.patient-topbar');
+  const task = document.querySelector('.desktop-task-title');
+  if (!main || !topbar || !task) return;
+
+  const path = location.pathname.toLowerCase();
+  const mainClasses = String(main.className || '').toLowerCase();
+  const listPath = /\/(?:patients|appointment-list|daily-events-list|invoice-list(?:-v\d+)?|result-list|sgk-list|stocks|stock-movements|stock-prices|price-lists|technical-service|current-accounts|current-account-movements|current-account-documents|hearing-devices|unit-patients|company-patients)\.php$/.test(path);
+  const listClass = /(?:^|\s)[a-z0-9_-]*list(?:-page)?(?:\s|$)/.test(mainClasses) || main.matches('.datatable-page');
+  if (listPath || listClass || document.querySelector('.vox-list-window-controls')) return;
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'vox-work-window-close';
+  closeButton.title = 'Pencereyi kapat';
+  closeButton.setAttribute('aria-label', 'Pencereyi kapat');
+  closeButton.textContent = '×';
+  topbar.append(closeButton);
+
+  const closeWindow = () => {
+    document.body.classList.add('vox-work-window-closed');
+    task.classList.add('vox-window-can-restore');
+    task.title = 'Pencereyi geri aç';
+  };
+  const restoreWindow = () => {
+    if (!document.body.classList.contains('vox-work-window-closed')) return;
+    document.body.classList.remove('vox-work-window-closed');
+    task.classList.remove('vox-window-can-restore');
+    task.removeAttribute('title');
+  };
+  closeButton.addEventListener('click', closeWindow);
+  task.addEventListener('click', restoreWindow);
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @media (min-width:901px){
+      body#vox-app .vox-work-window-close{position:absolute!important;top:4px!important;right:5px!important;width:22px!important;min-width:22px!important;height:22px!important;min-height:22px!important;margin:0!important;padding:0!important;display:grid!important;place-items:center!important;border:1px solid rgba(255,255,255,.72)!important;border-radius:2px!important;background:linear-gradient(#4b8f7d,#155445)!important;color:#fff!important;font:700 16px/18px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #06382e!important;box-shadow:inset 1px 1px rgba(255,255,255,.28)!important;cursor:pointer!important}
+      body#vox-app .vox-work-window-close:hover{background:linear-gradient(#e88470,#a52d20)!important}
+      body#vox-app.vox-work-window-closed .patient-topbar,body#vox-app.vox-work-window-closed>main{display:none!important}
+      body#vox-app .desktop-task-title.vox-window-can-restore{cursor:pointer!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.32)!important}
+    }`;
+  document.head.append(style);
+})();
+</script></body></html>
 <?php
 }

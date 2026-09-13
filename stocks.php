@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
 $stocks = $pdo->query("SELECT s.*, COALESCE(m.stock_quantity, 0) AS stock_quantity FROM stock_cards s LEFT JOIN (SELECT stock_id, SUM(CASE WHEN movement_type = 'Giriş' THEN quantity WHEN movement_type = 'Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) m ON m.stock_id = s.id ORDER BY s.stock_name, s.brand, s.model, s.id DESC")->fetchAll();
 patient_header('Stok Kartları Listesi', 'stock');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-stock-menu.css?v=20260823-3')?>">
 <main class="patient-container stock-list-page">
   <section class="vuexy-form-card stock-list-card">
     <header class="form-card-title stock-list-heading">

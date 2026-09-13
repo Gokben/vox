@@ -25,6 +25,24 @@
   window.voxFormatDate=trDate;
 })();
 
+// Ortak şablonu kullanmayan eski kayıt ekranlarını da klasik form düğmelerine bağla.
+(() => {
+  const themeScript = document.currentScript;
+  const assetsBase = themeScript?.src ? new URL('.', themeScript.src) : new URL('assets/', location.href);
+  if (!document.querySelector('link[href*="classic-forms.css"]')) {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = new URL('classic-forms.css?v=20260823-3', assetsBase).href;
+    document.head.append(stylesheet);
+  }
+  if (!document.querySelector('script[src*="classic-forms.js"]')) {
+    const script = document.createElement('script');
+    script.src = new URL('classic-forms.js?v=20260823-4', assetsBase).href;
+    script.defer = true;
+    document.head.append(script);
+  }
+})();
+
 (() => {
   function initActionIcons() {
     if (!document.querySelector('link[href*="iconify-icons.css"]')) {

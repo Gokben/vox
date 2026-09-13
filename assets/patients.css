@@ -121,3 +121,97 @@ body.menu-collapsed .patient-nav>.report-menu-group>a span{width:auto!important;
 
 /* Ekrana sığmayan liste ve tablolar */
 .table-wrap{display:block;width:100%;max-width:100%;overflow-x:scroll!important;overflow-y:hidden!important;scrollbar-gutter:stable;padding-bottom:2px}.table-wrap>.patient-table{width:max-content!important;min-width:2200px!important}.account-menu{max-height:calc(100vh - 80px);overflow-y:auto}.table-wrap::-webkit-scrollbar,.account-menu::-webkit-scrollbar{height:12px;width:10px}.table-wrap::-webkit-scrollbar-thumb,.account-menu::-webkit-scrollbar-thumb{background:#20a447;border:2px solid #e8f7ed;border-radius:10px}.table-wrap::-webkit-scrollbar-track,.account-menu::-webkit-scrollbar-track{background:#e8f7ed}
+
+/* VOX SPA ortak uygulama kabuğu — menü ve iş ekranı düzeni */
+body#vox-app{background:#f6efe1!important;color:#253a34!important}
+body#vox-app .patient-header{box-shadow:none!important;background:transparent!important}
+body#vox-app .patient-brand{background:#083329!important;border-color:rgba(255,255,255,.14)!important;color:#fff!important}
+body#vox-app .patient-brand img{width:42px!important;height:42px!important;object-fit:contain!important;filter:brightness(0) invert(1)!important}
+body#vox-app .patient-brand b{font-family:Tahoma,"Segoe UI",sans-serif!important;font-size:17px!important;letter-spacing:.8px!important;color:#fff!important}
+body#vox-app .patient-topbar{background:#fff9ed!important;border-bottom:1px solid #decda7!important;box-shadow:0 2px 9px rgba(42,47,35,.08)!important}
+body#vox-app .page-context{display:flex;flex-direction:column;gap:2px;min-width:0}
+body#vox-app .page-context span{color:#88734a;font-size:10px;font-weight:700;letter-spacing:1.05px}
+body#vox-app .page-context strong{overflow:hidden;color:#193e34;text-overflow:ellipsis;white-space:nowrap;font-size:18px;font-weight:700}
+body#vox-app .plain-tool,body#vox-app .help-page-link,body#vox-app .account-button{color:#25473d!important}
+body#vox-app .avatar{background:linear-gradient(135deg,#4ca98a,#0d5343)!important;border-color:#d5ad55!important}
+body#vox-app .patient-nav{background:#083329!important;border-right:1px solid rgba(255,255,255,.17)!important}
+body#vox-app .patient-nav::before{color:rgba(255,255,255,.56)!important;content:'KLINİK YÖNETİMİ'!important}
+body#vox-app .patient-nav>a,body#vox-app .patient-nav>.report-menu-group>a{color:rgba(255,255,255,.9)!important}
+body#vox-app .patient-nav>a:hover,body#vox-app .patient-nav>a.active,body#vox-app .patient-nav>.report-menu-group>a:hover,body#vox-app .patient-nav>.report-menu-group>a.active{background:linear-gradient(90deg,rgba(255,255,255,.15),rgba(255,255,255,.06))!important;color:#fff!important;box-shadow:inset 3px 0 0 #d6b45e!important}
+body#vox-app .patient-nav .report-submenu a{color:rgba(255,255,255,.72)!important}
+body#vox-app .patient-nav .report-submenu a:hover,body#vox-app .patient-nav .report-submenu a.active{background:rgba(255,255,255,.1)!important;color:#fff!important}
+body#vox-app .patient-container{background:#f6efe1!important}
+body#vox-app .page-head h1,body#vox-app .patient-container h1{color:#193e34!important}
+body#vox-app .card,body#vox-app .vuexy-form-card,body#vox-app .technical-card,body#vox-app .account-card{border:1px solid #e1d4b8!important;box-shadow:0 5px 15px rgba(55,46,25,.07)!important}
+@media (min-width:901px){
+  body#vox-app{padding-left:252px!important}
+  body#vox-app .patient-topbar{left:252px!important;height:72px!important;padding:0 30px!important}
+  body#vox-app .patient-brand{width:252px!important;height:72px!important;padding:0 23px!important}
+  body#vox-app .patient-nav{top:72px!important;width:252px!important;padding-top:18px!important}
+  body#vox-app .patient-container,body#vox-app .dashboard,body#vox-app .employee-page{padding-top:104px!important}
+  body#vox-app.menu-collapsed{padding-left:76px!important}
+  body#vox-app.menu-collapsed .patient-topbar{left:76px!important}
+  body#vox-app.menu-collapsed .patient-brand{width:76px!important}
+}
+
+/* Başlat menüsündeki tüm ikonlar VOX altın rengindedir. */
+body#vox-app .patient-nav a i,
+body#vox-app .patient-nav a .icon-base,
+body#vox-app .patient-nav .report-submenu a i{
+  color:#d6b45e!important;
+  text-shadow:0 1px 1px rgba(0,0,0,.38)!important;
+}
+@media (max-width:900px){
+  body#vox-app .patient-topbar{height:64px!important;background:#fff9ed!important}
+  body#vox-app .patient-brand{background:#083329!important}
+  body#vox-app .page-context strong{font-size:14px!important}
+  body#vox-app .page-context span{font-size:9px!important}
+  body#vox-app .patient-nav{background:#083329!important}
+}
+/* F:\Vox_ui referansındaki masaüstü-pencere yerleşimi. VOX renkleri korunur. */
+.desktop-menu-toggle,.desktop-taskbar{display:none}
+@media (min-width:901px){
+  html,body{height:100%;overflow:hidden!important}
+  body#vox-app{padding-left:0!important;background:radial-gradient(ellipse at 52% 48%,#0c4b3f 0%,#083329 58%,#05251e 100%)!important}
+  body#vox-app .patient-header{position:static!important;z-index:auto!important}
+  body#vox-app .patient-topbar{position:fixed!important;z-index:45!important;top:8vh!important;left:10vw!important;right:10vw!important;height:31px!important;margin:0!important;padding:2px 7px!important;background:linear-gradient(180deg,#236e5d 0%,#0e4b3d 45%,#083329 100%)!important;border:1px solid #d7b463!important;border-radius:5px 5px 0 0!important;box-shadow:inset 1px 1px rgba(255,255,255,.24),2px 2px 8px rgba(0,0,0,.35)!important}
+  body#vox-app .desktop-menu-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;height:24px!important;min-height:24px!important;margin:0 8px 0 0!important;padding:0 8px!important;border:1px solid rgba(255,255,255,.62)!important;border-radius:3px!important;background:linear-gradient(#3c8b75,#145745)!important;color:#fff!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #083329!important}
+  body#vox-app .patient-brand{position:static!important;width:auto!important;height:25px!important;margin:0 14px 0 0!important;padding:0!important;background:transparent!important;border:0!important;gap:6px!important}
+  body#vox-app .patient-brand img{width:25px!important;height:25px!important;filter:none!important}
+  body#vox-app .patient-brand b{font-size:12px!important;letter-spacing:.45px!important;color:#fff!important;text-shadow:1px 1px #083329!important}
+  body#vox-app .page-context{gap:0!important}
+  body#vox-app .page-context span{display:none!important}
+  body#vox-app .page-context strong{color:#fff!important;font:700 12px/24px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #083329!important}
+  body#vox-app .header-tools{margin-left:auto!important;gap:4px!important}
+  body#vox-app .plain-tool,body#vox-app .help-page-link{width:23px!important;height:23px!important;color:#fff!important}
+  body#vox-app .account{display:none!important}
+  body#vox-app .patient-nav{position:fixed!important;z-index:60!important;top:0!important;bottom:31px!important;left:0!important;width:238px!important;height:auto!important;padding:14px 8px 10px!important;transform:translateX(-102%)!important;transition:transform .25s ease!important;background:#083329!important;border:0!important;border-right:1px solid rgba(255,255,255,.42)!important;box-shadow:3px 0 14px rgba(0,0,0,.3)!important}
+  body#vox-app.desktop-menu-open .patient-nav{transform:translateX(0)!important}
+  body#vox-app .patient-nav::before{padding:9px 12px 12px!important;color:#e5eac9!important;content:'VOX ERP MENÜSÜ'!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;letter-spacing:.6px!important}
+  body#vox-app .patient-nav>a,body#vox-app .patient-nav>.report-menu-group>a{min-height:35px!important;margin:2px 0!important;padding:8px 10px!important;border-radius:4px!important;color:#fff!important;font:13px/1.2 Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px rgba(0,0,0,.35)!important}
+  body#vox-app .patient-nav>a:hover,body#vox-app .patient-nav>a.active,body#vox-app .patient-nav>.report-menu-group>a:hover,body#vox-app .patient-nav>.report-menu-group>a.active{background:linear-gradient(90deg,#fff,#d9f0e3)!important;color:#083329!important;box-shadow:inset 1px 1px rgba(255,255,255,.8)!important;text-shadow:none!important}
+  body#vox-app .patient-nav .report-submenu{margin:1px 0 4px 14px!important}
+  body#vox-app .patient-nav .report-submenu a{color:#e5f3ed!important;font-size:12px!important}
+  body#vox-app .patient-nav .report-submenu a:hover,body#vox-app .patient-nav .report-submenu a.active{background:rgba(255,255,255,.14)!important;color:#fff!important}
+  body#vox-app > main{position:fixed!important;z-index:10!important;top:calc(8vh + 31px)!important;right:10vw!important;bottom:42px!important;left:10vw!important;width:auto!important;min-height:0!important;margin:0!important;padding:14px 16px!important;overflow:auto!important;background:#f6efe1!important;border:1px solid #d7b463!important;border-top:0!important;box-shadow:inset 1px 1px rgba(255,255,255,.9),3px 5px 12px rgba(0,0,0,.3)!important}
+  body#vox-app > main.patient-container{max-width:none!important}
+  body#vox-app .desktop-taskbar{position:fixed!important;z-index:70!important;right:0!important;bottom:0!important;left:0!important;height:31px!important;padding:2px 8px 2px 0!important;display:flex!important;align-items:center!important;gap:6px!important;background:linear-gradient(#236e5d,#0b4035 54%,#062f27)!important;border-top:1px solid rgba(255,255,255,.35)!important}
+  body#vox-app .desktop-start{height:27px!important;min-height:27px!important;margin:0!important;padding:0 16px 0 11px!important;border:1px solid #0a2d25!important;border-radius:0 4px 4px 0!important;background:linear-gradient(#62aa8f,#1a624f 52%,#0e4a3b)!important;color:#fff!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #062f27!important}
+  body#vox-app .desktop-task-title{min-width:190px!important;height:25px!important;padding:5px 10px!important;overflow:hidden!important;border:1px solid #0a3a2f!important;background:linear-gradient(#337d68,#145342)!important;color:#fff!important;text-overflow:ellipsis!important;white-space:nowrap!important;font:11px Tahoma,"Segoe UI",sans-serif!important}
+  body#vox-app .desktop-clock{margin-left:auto!important;padding:5px 10px!important;color:#fff!important;font:11px Tahoma,"Segoe UI",sans-serif!important}
+}
+/* Klasik masaüstü arka planında VOX filigranı */
+@media (min-width:901px){
+  body#vox-app::before{
+    position:fixed;
+    z-index:0;
+    top:50%;left:50%;
+    width:min(58vw,820px);height:min(58vw,820px);
+    background:url('vox-desktop-white-transparent.png') center/contain no-repeat;
+    content:'';
+    opacity:.16;
+    pointer-events:none;
+    transform:translate(-50%,-51%);
+    filter:drop-shadow(0 10px 22px rgba(0,0,0,.22));
+  }
+}

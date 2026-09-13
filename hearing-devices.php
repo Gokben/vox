@@ -106,6 +106,7 @@ foreach ($deviceGroups as $device) {
 
 patient_header('İşitme Cihazları', 'stock');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-menu-lists.css?v=20260823-2')?>">
 <style>
 .hearing-devices-page{max-width:1500px;margin:0 auto;padding:96px 20px 48px}.hearing-devices-card{overflow:hidden;border:1px solid var(--line);border-radius:9px;background:var(--card);box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1)}.hearing-devices-head{padding:22px 24px;border-bottom:1px solid var(--line)}.hearing-devices-head h1{margin:0 0 5px;font-size:21px}.hearing-devices-head p{margin:0;color:var(--muted)}.hearing-devices-tools{display:flex;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line)}.hearing-devices-tools input{width:min(420px,100%);height:39px;padding:0 12px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);color:var(--text);font:inherit}.hearing-devices-scroll{overflow:auto}.hearing-devices-table{width:100%;min-width:1000px;border-collapse:collapse}.hearing-devices-table th,.hearing-devices-table td{padding:14px 18px;border-bottom:1px solid var(--line);text-align:left}.hearing-devices-table th{font-size:12px;text-transform:uppercase}.hearing-devices-table td{font-size:13px;color:var(--muted)}.serial-number{font-weight:700;color:#dc3545!important}.hearing-devices-empty{text-align:center!important;padding:38px!important}.hearing-devices-foot{padding:15px 24px;color:var(--muted)}@media(max-width:560px){.hearing-devices-page{padding:92px 14px 30px}.hearing-devices-tools input{width:100%}}
 </style>
@@ -200,7 +201,7 @@ document.querySelectorAll('.hearing-devices-table tbody tr').forEach((row, index
   input.addEventListener('change', saveSerial);
   input.addEventListener('blur', saveSerial);
 });
-const hearingDevicesHeader = document.querySelector('.hearing-devices-head');
+const hearingDevicesHeader = document.querySelector('.hearing-devices-tools');
 if (hearingDevicesHeader) {
   const saveButton = document.createElement('button');
   saveButton.type = 'button';

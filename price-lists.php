@@ -71,6 +71,7 @@ $brands = $pdo->query("SELECT DISTINCT brand FROM stock_cards WHERE stock_type='
 $priceLists = $pdo->query('SELECT * FROM stock_price_lists ORDER BY valid_from DESC,id DESC')->fetchAll();
 patient_header('Liste Fiyatları', 'stock');
 ?>
+<link rel="stylesheet" href="<?=url('assets/classic-stock-menu.css?v=20260823-3')?>">
 <main class="patient-container price-lists-page"><section class="price-lists-card">
   <header><div><h1>Liste Fiyatları</h1><p>Markalara ait liste fiyatı geçerlilik dönemlerini yönetin.</p></div><a class="new-list-header-button" href="<?=e(url('price-lists.php?new=1'))?>" title="Yeni liste oluştur" aria-label="Yeni liste oluştur">+</a></header>
   <?php if ($error): ?><p class="price-list-alert error"><?=e($error)?></p><?php elseif (isset($_GET['saved'])): ?><p class="price-list-alert success">Liste fiyatı dönemi kaydedildi.</p><?php endif; ?>

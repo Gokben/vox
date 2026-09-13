@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'repair_accessories' => $accessories,
         'repair_quantity' => $quantity,
         'purchase_date' => trim((string)($_POST['purchase_date'] ?? '')),
-        'serial_no_2' => trim((string)($_POST['serial_no_2'] ?? '')),
+        'serial_no_2' => $quantity === 2 ? trim((string)($_POST['serial_no_2'] ?? '')) : '',
         'repair_customer_issues' => $customerIssues,
         'repair_technician_issues' => $technicianIssues,
         'branch_delivery_date' => trim((string)($_POST['branch_delivery_date'] ?? '')),
@@ -98,7 +98,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $save = $pdo->prepare('INSERT INTO external_technical_services(external_patient_id,record_no,service_date,device,serial_no,complaint,technician_note,delivery_date,repair_details) VALUES(?,?,?,?,?,?,?,?,?)');
         $save->execute([$id, 'DS-' . ($last + 1), date('Y-m-d'), $device, $serial, $complaint, $note, $deliveryDate, $detailsJson]);
     }
-    redirect('technical-service.php');
+    $returnQuery = http_build_query([
+        'id' => $id,
+        'edit' => $editId ?: null,
+        'saved' => 1,
+    ]);
+    redirect('external-technical-repair.php?' . $returnQuery);
 }
 
 $issues = array_values(array_filter(complaint_definitions(), static fn(array $issue): bool => (int)($issue['active'] ?? 0) === 1));
@@ -124,6 +129,20 @@ $printDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $printDateValue)
 
 patient_header('Teknik Servis / Tamir Formu', 'stock');
 ?>
+<?php if (isset($_GET['saved'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  if(window.parent===window){ window.location.replace('<?=url('technical-service.php')?>'); return; }
+  window.parent.postMessage({
+    type:'vox-return-window',
+    url:'<?=url('technical-service.php')?>',
+    title:'Teknik Servis',
+    refresh:true
+  },location.origin);
+});
+</script>
+<?php endif; ?>
+<link rel="stylesheet" href="<?=url('assets/classic-technical-service.css?v=20260825-9')?>">
 <main class="patient-container external-repair-page">
   <section class="external-repair-card">
     <header>
@@ -159,7 +178,7 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
               </div>
               <div class="form-row two serial-row">
                 <label>Seri No 1<input class="form-control" name="serial_no" value="<?=e((string)($repair['serial_no'] ?? ''))?>"></label>
-                <label>Seri No 2<input class="form-control" name="serial_no_2" value="<?=e((string)($savedDetails['serial_no_2'] ?? ''))?>"></label>
+                <label class="serial-second" <?=((int)($savedDetails['repair_quantity'] ?? 1) === 2)?'':'hidden'?>>Seri No 2<input class="form-control" name="serial_no_2" value="<?=e((string)($savedDetails['serial_no_2'] ?? ''))?>"></label>
               </div>
             </section>
             <section class="tab-pane" data-panel="complaint">
@@ -193,7 +212,7 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
         <h3><i class="ti tabler-files"></i> Servis Evrakları</h3>
         <div class="service-document-links"></div>
       </section>
-      <footer><button type="button" class="technical-print-button" title="Yazdır" aria-label="Teknik servis formunu yazdır"><i class="ti tabler-printer"></i></button><a href="<?=e(url('technical-service.php'))?>" title="İptal"><i class="ti tabler-arrow-back-up"></i></a><button class="button" title="Tamir Formunu Kaydet" aria-label="Tamir Formunu Kaydet"><i class="ti tabler-device-floppy"></i></button></footer>
+      <footer><button type="button" class="technical-print-button" title="Yazdır" aria-label="Teknik servis formunu yazdır"><i class="ti tabler-printer"></i></button><button class="button" title="Kaydet" aria-label="Kaydet"><i class="ti tabler-device-floppy"></i> Kaydet</button></footer>
     </form>
   </section>
 </main>
@@ -212,7 +231,7 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
     <div></div>
   </div>
   <div class="print-choice-row">
-    <table class="print-warranty"><thead><tr><th colspan="2">GARANTİ KAPSAMI</th></tr><tr><td>EVET</td><td>HAYIR</td></tr></thead><tbody><tr><td data-print="warranty-yes"></td><td data-print="warranty-no"></td></tr></tbody></table>
+    <table class="print-warranty"><thead><tr><th colspan="2">GARANTİ</th></tr><tr><td>EVET</td><td>HAYIR</td></tr></thead><tbody><tr><td data-print="warranty-yes"></td><td data-print="warranty-no"></td></tr></tbody></table>
     <div class="print-device-options">
       <table class="print-priority"><thead><tr><th>ACİL</th><th>NORMAL</th></tr></thead><tbody><tr><td data-print="urgent"></td><td data-print="normal"></td></tr></tbody></table>
       <table class="print-accessories"><thead><tr><th colspan="5">CİHAZ İLE BİRLİKTE GÖNDERİLEN</th></tr><tr><td>KALIP</td><td>DOME</td><td>CHARGER</td><td>RECEIVER</td><td>CİHAZ KUTUSU</td></tr></thead><tbody><tr><?php foreach(['Kulak Kalıbı','Dome','Şarj Cihazı','Receiver','Cihaz Kutusu'] as $item):?><td data-accessory="<?=e($item)?>"></td><?php endforeach?></tr></tbody></table>
@@ -230,7 +249,26 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
 <style>
 .form-tabs-card .service-select-line{flex-direction:row!important;align-items:center!important;gap:12px!important;padding-top:28px!important;white-space:nowrap}.form-tabs-card .service-select-line select{flex:1!important}@media(max-width:700px){.form-tabs-card .service-select-line{padding-top:0!important}}
 </style>
-<style>.form-tabs-card .serial-row{margin-top:16px!important}.form-tabs-card .serial-control{display:flex!important;align-items:center!important;gap:8px!important}.form-tabs-card .serial-control input[type=checkbox]{flex:0 0 17px!important;width:17px!important;height:17px!important;min-height:17px!important}.form-tabs-card .serial-control .form-control{flex:1!important}.warranty-options{display:flex;align-items:center;gap:20px}.external-tabs-form footer a,.external-tabs-form footer button{width:42px!important;padding:0!important}.external-tabs-form footer a i,.external-tabs-form footer button i{font-size:20px!important;line-height:1!important}</style>
+<style>.form-tabs-card .serial-row{margin-top:16px!important}.form-tabs-card .serial-row.single{grid-template-columns:1fr!important}.form-tabs-card .serial-second[hidden]{display:none!important}.form-tabs-card .serial-control{display:flex!important;align-items:center!important;gap:8px!important}.form-tabs-card .serial-control input[type=checkbox]{flex:0 0 17px!important;width:17px!important;height:17px!important;min-height:17px!important}.form-tabs-card .serial-control .form-control{flex:1!important}.warranty-options{display:flex;align-items:center;gap:20px}.external-tabs-form footer a,.external-tabs-form footer button{width:42px!important;padding:0!important}.external-tabs-form footer a i,.external-tabs-form footer button i{font-size:20px!important;line-height:1!important}</style>
+<script>
+(()=>{
+  const quantity=document.querySelector('.external-tabs-form [name="quantity"]');
+  const row=document.querySelector('.external-tabs-form .serial-row');
+  const second=document.querySelector('.external-tabs-form [name="serial_no_2"]');
+  const label=second?.closest('label');
+  if(!quantity||!row||!second||!label)return;
+  const sync=()=>{
+    const count=Math.max(1,Math.min(2,Number(quantity.value)||1));
+    quantity.value=String(count);
+    label.hidden=count!==2;
+    row.classList.toggle('single',count!==2);
+    if(count!==2)second.value='';
+  };
+  quantity.addEventListener('input',sync);
+  quantity.addEventListener('change',sync);
+  sync();
+})();
+</script>
 <style>
 .service-documents{width:min(100%,520px);margin-top:22px;padding:16px 18px;border:1px solid #e2e1e8;border-radius:8px;background:#fafafa}.service-documents h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;color:#3c394d;font-size:15px}.service-documents h3 .ti{color:#7367f0;font-size:19px}.service-document-links{display:grid;gap:8px}.service-document-link{display:flex;align-items:center;gap:9px;min-height:39px;padding:7px 11px;border:1px solid #dcd9e4;border-radius:7px;background:#fff;color:#444050;text-decoration:none}.service-document-link:hover{border-color:#7367f0;color:#6558e8}.service-document-link .tabler-download{margin-left:auto;color:#19a94b;font-size:19px}.service-documents-empty{margin:0;color:#8c8898;font-size:13px}[data-theme=dark] .service-documents{background:#292c40;border-color:#454a63}[data-theme=dark] .service-document-link{background:#34384f;border-color:#50556f;color:#fff}
 </style>
@@ -240,31 +278,31 @@ patient_header('Teknik Servis / Tamir Formu', 'stock');
 #technical-print-sheet{display:none;box-sizing:border-box;width:190mm;min-height:270mm;padding:4mm 5mm 10mm;color:#111;background:#fff;font-family:Arial,sans-serif;font-size:8.5pt;line-height:1.15}.print-brand{display:flex;align-items:center;gap:2mm;height:18mm;margin:0 0 7mm}.print-brand img{display:block;width:31mm;max-height:17mm;object-fit:contain}.print-brand span{height:5mm;flex:1;margin-right:26mm;background:#8bd347}.print-brand+h1{display:inline-block;margin:0 0 10mm;padding:2.1mm 1.5mm 1.8mm;background:#050505;color:#fff;font-size:12pt;font-weight:400;line-height:1}.print-date{height:7mm;margin:0 24mm 5mm 0;text-align:right}.print-date strong{display:inline-block;min-width:27mm;text-align:left}.print-info-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:0;margin-bottom:7mm}.print-info-grid>div{box-sizing:border-box;min-height:7mm;padding:2.2mm 1mm 1mm;border-bottom:0.3mm dotted #555}.print-info-grid>div:nth-child(odd){margin-right:0}.print-info-grid b{font-weight:400}.print-choice-row{display:grid;grid-template-columns:48mm 1fr;align-items:end;gap:18mm;margin:0 0 7mm}.print-choice-row table,.print-accessories,.print-complaints{border-collapse:collapse;table-layout:fixed}.print-choice-row th,.print-accessories th,.print-complaints th{height:7mm;box-sizing:border-box;padding:1.8mm 1mm;background:#050505!important;color:#fff!important;font-weight:400;-webkit-print-color-adjust:exact;print-color-adjust:exact}.print-choice-row td,.print-accessories td{box-sizing:border-box;height:9mm;padding:1mm;border:0.25mm solid #aaa;text-align:center}.print-warranty{width:48mm}.print-device-options{display:flex;flex-direction:column;align-items:flex-end}.print-priority{width:42mm;margin:0 0 0 auto}.print-accessories{width:100%;margin:-0.25mm 0 0}.print-accessories th{font-size:8.5pt}.print-accessories td{font-size:7pt}.print-complaints{width:100%;margin:0 0 7mm}.print-complaints th{font-size:9pt}.print-complaints td{box-sizing:border-box;height:5.5mm;padding:0.8mm 1mm;border-bottom:0.25mm solid #aaa;background:rgba(255,255,255,.55)}.print-complaints .print-question{text-align:left}.print-complaints .mark{display:inline-flex;box-sizing:border-box;width:4.5mm;height:4.5mm;margin-right:2.5mm;border:0.25mm solid #777;align-items:center;justify-content:center;vertical-align:middle;font-size:10pt;line-height:1}.print-note{box-sizing:border-box;min-height:30mm;padding:2mm 1mm;border-top:0.25mm solid #888;border-bottom:0.25mm solid #888}.print-note b{display:inline-block;margin-right:5mm;font-weight:400}.print-note span{white-space:pre-wrap}
 #technical-print-sheet{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 /* Referans teknik servis formunun A4 oranları */
-#technical-print-sheet{width:190mm;min-height:277mm;padding:10mm 16mm 16mm;border:.35mm solid #111;font-size:6.8pt;line-height:1.08}
+#technical-print-sheet{box-sizing:border-box;width:190mm;height:277mm;min-height:277mm;max-height:277mm;padding:9mm 14mm 12mm;border:.35mm solid #111;overflow:hidden;font-size:9pt;line-height:1.18}
 #technical-print-sheet .print-brand{width:140mm;height:15mm;margin:0 0 7mm;gap:2mm}
 #technical-print-sheet .print-brand img{width:27mm;max-height:14mm}
 #technical-print-sheet .print-brand span{height:4.5mm;margin-right:0}
-#technical-print-sheet .print-brand+h1{margin:0 0 8mm;padding:2mm 1mm 1.7mm;font-size:9pt}
-#technical-print-sheet .print-date{height:6mm;margin:0 28mm 5mm 0;font-size:9px}
+#technical-print-sheet .print-brand+h1{margin:0 0 7mm;padding:2mm 1mm 1.7mm;font-size:11pt}
+#technical-print-sheet .print-date{height:6mm;margin:0 24mm 4mm 0;font-size:9pt}
 #technical-print-sheet .print-date strong{min-width:24mm}
-#technical-print-sheet .print-info-grid{width:140mm;margin:0 0 13mm;grid-template-columns:1.08fr .92fr}
-#technical-print-sheet .print-info-grid>div{min-height:6mm;padding:2mm .5mm .7mm;font-size:9px}
+#technical-print-sheet .print-info-grid{width:146mm;margin:0 0 10mm;grid-template-columns:1.08fr .92fr}
+#technical-print-sheet .print-info-grid>div{min-height:6.5mm;padding:1.8mm .7mm .7mm;border-bottom:0!important;font-size:9pt;line-height:1.18}
 #technical-print-sheet .print-info-grid>div:nth-child(even){position:relative;top:6mm}
 #technical-print-sheet .print-info-grid>div:nth-child(2),#technical-print-sheet .print-info-grid>div:nth-child(8){border-bottom:0}
 #technical-print-sheet .print-info-grid>div:nth-child(8){visibility:hidden}
-#technical-print-sheet .print-choice-row{width:140mm;grid-template-columns:32mm 94mm;gap:14mm;align-items:end;margin:0 0 7mm}
-#technical-print-sheet .print-choice-row th,#technical-print-sheet .print-accessories th,#technical-print-sheet .print-complaints th{height:6mm;padding:1.6mm .7mm;font-size:7pt}
+#technical-print-sheet .print-choice-row{width:146mm;grid-template-columns:34mm 98mm;gap:14mm;align-items:end;margin:0 0 6mm}
+#technical-print-sheet .print-choice-row th,#technical-print-sheet .print-accessories th,#technical-print-sheet .print-complaints th{height:6mm;padding:1.4mm .7mm;font-size:8.5pt}
 #technical-print-sheet .print-choice-row td,#technical-print-sheet .print-accessories td{height:7mm;padding:.8mm .5mm}
-#technical-print-sheet .print-warranty{width:32mm}
-#technical-print-sheet .print-priority{width:34mm}
-#technical-print-sheet .print-device-options{width:94mm}
-#technical-print-sheet .print-accessories{width:94mm}
-#technical-print-sheet .print-accessories td{font-size:5.8pt;white-space:nowrap}
-#technical-print-sheet .print-complaints{width:140mm;margin:0 0 0}
+#technical-print-sheet .print-warranty{width:34mm}
+#technical-print-sheet .print-priority{width:36mm}
+#technical-print-sheet .print-device-options{width:98mm}
+#technical-print-sheet .print-accessories{width:98mm}
+#technical-print-sheet .print-accessories td{font-size:8pt;white-space:nowrap}
+#technical-print-sheet .print-complaints{width:146mm;margin:0 0 0}
 #technical-print-sheet .print-complaints th{height:6mm}
-#technical-print-sheet .print-complaints td{height:4.7mm;padding:.45mm .8mm;font-size:10px}
+#technical-print-sheet .print-complaints td{height:5.2mm;padding:.55mm .9mm;font-size:8.5pt;line-height:1.15}
 #technical-print-sheet .print-complaints .mark{width:3.8mm;height:3.8mm;margin-right:10px;font-size:8pt}
-#technical-print-sheet .print-note{width:140mm;min-height:22mm;padding:2.5mm .5mm;font-size:6.5pt}
+#technical-print-sheet .print-note{width:146mm;min-height:20mm;padding:2.2mm .7mm;font-size:8.5pt;line-height:1.2}
 @media print{
   @page{size:A4 portrait;margin:10mm}
   body{background:#fff!important}
@@ -282,7 +320,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   const documentsByService=<?=json_encode($serviceDocuments, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;
   const render=()=>{
     const selected=select.value.trim();
-    section.hidden=!selected;
+    const activeTab=document.querySelector('.external-tabs-form [data-tab].active')?.dataset.tab||'general';
+    section.hidden=!selected||activeTab!=='general';
     links.replaceChildren();
     if(!selected)return;
     const documents=documentsByService[selected]||[];
@@ -301,6 +340,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   const form=document.querySelector('.external-tabs-form');
+  document.body.dataset.repairTab='general';
   const printButton=form?.querySelector('.technical-print-button');
   const sheet=document.getElementById('technical-print-sheet');
   if(!form||!printButton||!sheet)return;
@@ -323,9 +363,30 @@ document.addEventListener('DOMContentLoaded',()=>{
     setText('urgent',checked('[name="repair_priority"][value="urgent"]')?'X':'');
     setText('normal',checked('[name="repair_priority"][value="urgent"]')?'':'X');
     setText('note',form.querySelector('[name="technician_note"]')?.value.trim()||'');
-    sheet.querySelectorAll('[data-accessory]').forEach(cell=>{cell.textContent=checked('[name="repair_accessories[]"][value="'+CSS.escape(cell.dataset.accessory)+'"]')?'X':'';});
+    const accessoryTable=sheet.querySelector('.print-accessories');
+    const accessoryCells=[...sheet.querySelectorAll('[data-accessory]')];
+    const accessoryHeaders=[...(accessoryTable?.querySelectorAll('thead tr:nth-child(2)>td')||[])];
+    const selectedAccessories=new Set(Array.from(form.querySelectorAll('[name="repair_accessories[]"]:checked'),input=>input.value));
+    let visibleAccessoryCount=0;
+    accessoryCells.forEach((cell,index)=>{
+      const selected=selectedAccessories.has(cell.dataset.accessory);
+      cell.style.display=selected?'table-cell':'none';
+      cell.textContent=selected?'X':'';
+      if(accessoryHeaders[index])accessoryHeaders[index].style.display=selected?'table-cell':'none';
+      if(selected)visibleAccessoryCount++;
+    });
+    if(accessoryTable){
+      accessoryTable.style.display=visibleAccessoryCount?'table':'none';
+      const heading=accessoryTable.querySelector('thead tr:first-child>th');
+      if(heading)heading.colSpan=Math.max(1,visibleAccessoryCount);
+    }
     const selectedIssues=new Set(Array.from(form.querySelectorAll('[name="repair_customer_issues[]"]:checked'),input=>input.value));
-    sheet.querySelectorAll('[data-print-issue]').forEach(row=>{row.querySelector('.mark').textContent=selectedIssues.has(row.dataset.printIssue)?'X':'';});
+    sheet.querySelectorAll('[data-print-issue]').forEach(row=>{
+      const selected=selectedIssues.has(row.dataset.printIssue);
+      row.hidden=!selected;
+      row.style.display=selected?'table-row':'none';
+      row.querySelector('.mark').textContent=selected?'X':'';
+    });
     window.print();
   });
 });
@@ -333,13 +394,47 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   const form=document.querySelector('.external-tabs-form');
+  const fitActiveTab=()=>{
+    if(!form||window.parent===window)return;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const formBottom=form.getBoundingClientRect().bottom;
+      const activeTab=form.querySelector('[data-tab].active')?.dataset.tab||'general';
+      const measuredHeight=Math.ceil(formBottom+31+10);
+      const requestedHeight=activeTab==='general'?Math.max(458,measuredHeight):measuredHeight;
+      window.parent.postMessage({type:'vox-fit-content-window',height:requestedHeight,width:740},location.origin);
+    }));
+  };
+  const quantityInput=form?.querySelector('[name="quantity"]');
+  const serialRow=form?.querySelector('.serial-row');
+  const secondSerial=form?.querySelector('[name="serial_no_2"]');
+  const secondSerialLabel=secondSerial?.closest('label');
+  const syncSerialFields=()=>{
+    if(!quantityInput||!serialRow||!secondSerial||!secondSerialLabel)return;
+    const quantity=Math.max(1,Math.min(2,Number(quantityInput.value)||1));
+    quantityInput.value=String(quantity);
+    const hasSecondDevice=quantity===2;
+    secondSerialLabel.hidden=!hasSecondDevice;
+    serialRow.classList.toggle('single',!hasSecondDevice);
+    if(!hasSecondDevice)secondSerial.value='';
+    fitActiveTab();
+  };
+  quantityInput?.addEventListener('input',syncSerialFields);
+  quantityInput?.addEventListener('change',syncSerialFields);
+  syncSerialFields();
   form?.addEventListener('submit',event=>{const quantity=Math.max(1,Math.min(2,Number(form.querySelector('[name="quantity"]')?.value)||1));const first=form.querySelector('[name="serial_no"]')?.value.trim()||'',second=form.querySelector('[name="serial_no_2"]')?.value.trim()||'',serialCount=[first,second].filter(Boolean).length;if(serialCount===quantity)return;event.preventDefault();alert('Adet bilgisi ile doldurulmuş seri numarası sayısı aynı olmalıdır. Adet: '+quantity+', girilen seri numarası: '+serialCount+'.');(serialCount<quantity?(!first?form.querySelector('[name="serial_no"]'):form.querySelector('[name="serial_no_2"]')):form.querySelector('[name="serial_no_2"]'))?.focus();});
   form?.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{
     const tab=button.dataset.tab;
+    document.body.dataset.repairTab=tab;
     form.querySelectorAll('[data-tab],.tab-pane').forEach(item=>item.classList.remove('active'));
     button.classList.add('active');
     form.querySelector('.tab-pane[data-panel="'+tab+'"]').classList.add('active');
+    const documents=document.getElementById('service-documents');
+    const serviceSelected=!!form.querySelector('[name="repair_technician"]')?.value.trim();
+    if(documents)documents.hidden=tab!=='general'||!serviceSelected;
+    fitActiveTab();
+    setTimeout(fitActiveTab,90);
   }));
+  [0,80,220].forEach(delay=>setTimeout(fitActiveTab,delay));
   const payment=form?.querySelector('[name="repair_service_fee_payment_type"]');
   const extra=document.getElementById('payment-extra');
   const saved=<?=json_encode($savedDetails, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>;

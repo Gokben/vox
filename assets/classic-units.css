@@ -1,0 +1,395 @@
+:root {
+  --vu-bg:#dcebf8;
+  --vu-panel:#edf6fd;
+  --vu-toolbar:#e6f2ec;
+  --vu-line:#82b3df;
+  --vu-grid:#d4e0da;
+  --vu-text:#17382f;
+  --vu-title:#07508a;
+}
+
+body#vox-app {
+  background:var(--vu-bg)!important;
+  color:var(--vu-text)!important;
+  font-family:Tahoma,"Segoe UI",sans-serif!important;
+}
+
+/* Ünite ana listesi */
+body#vox-app.vox-classic-list-page>main.unit-list-page {
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:none!important;
+  height:100vh!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:var(--vu-bg)!important;
+}
+body#vox-app .unit-list {
+  display:flex!important;
+  flex-direction:column!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  border:1px solid var(--vu-line)!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  overflow:auto!important;
+}
+body#vox-app .unit-list-toolbar {
+  position:sticky!important;
+  z-index:20!important;
+  top:0!important;
+  display:flex!important;
+  flex:0 0 34px!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-height:34px!important;
+  height:34px!important;
+  padding:3px 7px!important;
+  border:0!important;
+  border-bottom:1px solid #9bbfa7!important;
+  background:var(--vu-toolbar)!important;
+}
+body#vox-app .unit-list-toolbar h2 { display:none!important; }
+body#vox-app .unit-list-toolbar .button {
+  position:static!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  min-width:98px!important;
+  height:27px!important;
+  min-height:27px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  border:1px solid #087d3c!important;
+  border-radius:4px!important;
+  background:linear-gradient(#28b85b,#10933f)!important;
+  color:#fff!important;
+  font:700 11px/25px Tahoma,"Segoe UI",sans-serif!important;
+  text-decoration:none!important;
+}
+body#vox-app .unit-list table { flex:0 0 auto!important;width:100%!important;min-width:760px!important;margin:0!important;table-layout:fixed!important; }
+body#vox-app .unit-list table th:last-child,
+body#vox-app .unit-list table td:last-child { width:132px!important;min-width:132px!important;max-width:132px!important;text-align:center!important; }
+body#vox-app .unit-list tbody tr { height:34px!important; }
+body#vox-app .unit-list .unit-actions {
+  display:grid!important;
+  grid-template-columns:repeat(4,28px)!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important;
+  width:124px!important;
+  min-width:124px!important;
+  margin:0 auto!important;
+}
+body#vox-app .unit-list .unit-actions>a,
+body#vox-app .unit-list .unit-actions>form,
+body#vox-app .unit-list .unit-actions>form>button {
+  box-sizing:border-box!important;
+  width:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  max-height:28px!important;
+  margin:0!important;
+  padding:0!important;
+  border-radius:5px!important;
+}
+body#vox-app .unit-list .unit-actions>a,
+body#vox-app .unit-list .unit-actions>form>button { display:grid!important;place-items:center!important; }
+body#vox-app .unit-list .unit-actions .icon-base { font-size:15px!important;line-height:1!important; }
+
+/* Yeni / düzenle ünite kartı */
+body#vox-app>main.unit-form-page {
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:none!important;
+  min-height:100vh!important;
+  margin:0!important;
+  padding:4px!important;
+  background:var(--vu-bg)!important;
+}
+body#vox-app .unit-form-page .vuexy-form-card {
+  box-sizing:border-box!important;
+  width:100%!important;
+  margin:0!important;
+  border:1px solid var(--vu-line)!important;
+  border-radius:0!important;
+  background:var(--vu-bg)!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+body#vox-app .unit-form-page .vuexy-form-header {
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  height:29px!important;
+  min-height:29px!important;
+  padding:3px 8px!important;
+  border-bottom:1px solid var(--vu-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app .unit-form-page .vuexy-form-header h2 { margin:0!important;color:var(--vu-title)!important;font:700 13px/21px Arial,sans-serif!important; }
+body#vox-app .unit-form-page .vuexy-form-header .cancel-link { display:none!important; }
+body#vox-app .unit-form-page .vuexy-icon-form {
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:start!important;
+  gap:5px 8px!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  margin:0!important;
+  padding:5px!important;
+  background:var(--vu-bg)!important;
+}
+body#vox-app .unit-form-page .form-section-title {
+  grid-column:1/-1!important;
+  box-sizing:border-box!important;
+  min-height:25px!important;
+  margin:0!important;
+  padding:4px 8px!important;
+  border:1px solid var(--vu-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+  color:var(--vu-title)!important;
+  font:700 13px/16px Arial,sans-serif!important;
+}
+body#vox-app .unit-form-page .unit-edit-row {
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:2px!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  margin:0!important;
+}
+body#vox-app .unit-form-page .unit-edit-label {
+  display:block!important;
+  flex:none!important;
+  box-sizing:border-box!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:15px!important;
+  margin:0!important;
+  padding:0!important;
+  color:var(--vu-text)!important;
+  font:700 11px/15px Arial,sans-serif!important;
+}
+body#vox-app .unit-form-page .unit-edit-control {
+  display:flex!important;
+  flex:none!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  height:27px!important;
+  min-height:27px!important;
+  border:1px solid #79a9d4!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+body#vox-app .unit-form-page .merged-icon { display:none!important; }
+body#vox-app .unit-form-page .unit-edit-control :is(input,select,textarea) {
+  display:block!important;
+  position:static!important;
+  box-sizing:border-box!important;
+  flex:1 1 auto!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:25px!important;
+  min-height:25px!important;
+  margin:0!important;
+  padding:3px 6px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:var(--vu-text)!important;
+  font:12px Arial,sans-serif!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+body#vox-app .unit-form-page .unit-edit-row:has(textarea) { grid-column:span 3!important; }
+body#vox-app .unit-form-page .unit-edit-row:has(textarea) .unit-edit-control { height:46px!important; }
+body#vox-app .unit-form-page .unit-edit-control textarea { height:44px!important;min-height:44px!important;resize:vertical!important; }
+body#vox-app .unit-form-page .unit-rating { display:flex!important;align-items:center!important;box-sizing:border-box!important;height:27px!important;min-height:27px!important;gap:2px!important; }
+body#vox-app .unit-form-page .unit-rating label { font-size:23px!important;line-height:25px!important; }
+body#vox-app .unit-form-page .vuexy-form-actions {
+  grid-column:1/-1!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  gap:6px!important;
+  box-sizing:border-box!important;
+  min-height:36px!important;
+  margin:0!important;
+  padding:3px!important;
+  border:1px solid var(--vu-line)!important;
+  background:linear-gradient(#f4faff,#d8eafa)!important;
+}
+body#vox-app .unit-form-page .vuexy-form-actions .button {
+  box-sizing:border-box!important;
+  width:104px!important;
+  min-width:104px!important;
+  height:29px!important;
+  min-height:29px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  border-radius:4px!important;
+  background:linear-gradient(#31c765,#0e9c3f)!important;
+  color:#fff!important;
+  font:700 12px/27px Tahoma,sans-serif!important;
+}
+body#vox-app .unit-form-page .vuexy-form-actions .cancel-link { display:none!important; }
+
+/* Ünite hastaları ve ziyaretler */
+body#vox-app.vox-classic-list-page>main.unit-patients-page,
+body#vox-app.vox-classic-list-page>main.unit-visits-page {
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:none!important;
+  height:100vh!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  background:var(--vu-bg)!important;
+  overflow:hidden!important;
+}
+body#vox-app :is(.unit-patients-card,.unit-visits-card) {
+  display:flex!important;
+  flex-direction:column!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  border:1px solid var(--vu-line)!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  overflow:auto!important;
+}
+body#vox-app :is(.unit-patients-head,.unit-visits-head) {
+  display:flex!important;
+  flex:0 0 34px!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  box-sizing:border-box!important;
+  min-height:34px!important;
+  padding:3px 7px!important;
+  border-bottom:1px solid #9bbfa7!important;
+  background:var(--vu-toolbar)!important;
+}
+body#vox-app :is(.unit-patients-head,.unit-visits-head) h2 { display:none!important; }
+body#vox-app :is(.unit-patients-head,.unit-visits-head) p { margin:0!important;color:var(--vu-text)!important;font:700 12px/20px Tahoma,sans-serif!important; }
+body#vox-app :is(.unit-patients-head>a,.unit-visits-back,.unit-visits-new) {
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  height:27px!important;
+  min-height:27px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  border:1px solid #bc7206!important;
+  border-radius:4px!important;
+  background:linear-gradient(#ffc45b,#f4a136)!important;
+  color:#111!important;
+  font:700 11px/25px Tahoma,sans-serif!important;
+  text-decoration:none!important;
+}
+body#vox-app .unit-visits-new { border-color:#087d3c!important;background:linear-gradient(#28b85b,#10933f)!important;color:#fff!important; }
+body#vox-app .unit-visits-head-actions { display:flex!important;align-items:center!important;gap:5px!important; }
+body#vox-app :is(.unit-patients-table,.unit-visits-table) { width:100%!important;min-width:900px!important;margin:0!important; }
+body#vox-app.vox-classic-list-page table.unit-patients-table.vox-classic-table{width:100%!important;min-width:1180px!important;table-layout:fixed!important}
+body#vox-app .unit-patients-table :is(th,td):nth-child(2){width:8%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(3){width:14%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(4){width:9%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(5){width:9%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(6){width:9%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(7){width:11%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(8){width:9%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(9){width:9%}
+body#vox-app .unit-patients-table :is(th,td):nth-child(10){width:16%}
+body#vox-app .unit-patients-table th:last-child,
+body#vox-app .unit-patients-table td:last-child { width:130px!important;min-width:130px!important;max-width:130px!important;text-align:center!important;white-space:nowrap!important; }
+body#vox-app .unit-patients-table th:last-child{width:130px!important;min-width:130px!important;max-width:130px!important;text-align:center!important}
+body#vox-app .unit-patient-financial-input { box-sizing:border-box!important;width:90px!important;height:25px!important;padding:2px 5px!important;border:1px solid #79a9d4!important;border-radius:0!important;font:11px Tahoma,sans-serif!important; }
+body#vox-app .unit-patient-financial-form{display:inline-flex!important;vertical-align:middle!important;margin:0!important}
+body#vox-app .unit-patient-actions{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-width:114px!important;white-space:nowrap!important}
+body#vox-app .unit-patient-actions .unit-patient-financial-form{display:flex!important;flex:0 0 114px!important}
+body#vox-app :is(.unit-patient-financial-save,.unit-patient-edit,.unit-visit-edit,.unit-visit-delete) {
+  display:inline-grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  width:28px!important;
+  min-width:28px!important;
+  height:28px!important;
+  min-height:28px!important;
+  margin:0!important;
+  padding:0!important;
+  border-radius:5px!important;
+}
+body#vox-app :is(.unit-patient-financial-save,.unit-patient-edit) .icon-base{display:block!important;width:15px!important;height:15px!important;margin:0!important;color:#fff!important;font-size:15px!important;line-height:15px!important}
+body#vox-app .unit-visits-form {
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:5px 8px!important;
+  padding:6px!important;
+  border-bottom:1px solid var(--vu-line)!important;
+  background:var(--vu-bg)!important;
+}
+body#vox-app .unit-visits-form label { padding:0!important;font:700 11px/27px Arial,sans-serif!important; }
+body#vox-app .unit-visits-form :is(input,textarea) { box-sizing:border-box!important;width:100%!important;height:27px!important;min-height:27px!important;padding:3px 6px!important;border:1px solid #79a9d4!important;border-radius:0!important;background:#fff!important;font:12px Arial,sans-serif!important; }
+body#vox-app .unit-visits-form textarea { height:46px!important;min-height:46px!important;resize:vertical!important; }
+body#vox-app .unit-visits-actions { grid-column:1/-1!important;display:flex!important;justify-content:flex-end!important;margin:0!important; }
+body#vox-app .unit-visits-actions .button { width:104px!important;height:29px!important;min-height:29px!important;padding:0 9px!important;border-radius:4px!important;font:700 12px Tahoma,sans-serif!important; }
+body#vox-app :is(.unit-patients-success,.unit-visits-alert,.unit-visits-success) { margin:3px 6px!important;padding:5px 8px!important;border-radius:0!important;font-size:11px!important; }
+
+@media(max-width:900px) {
+  body#vox-app .unit-form-page .vuexy-icon-form { grid-template-columns:1fr!important; }
+  body#vox-app .unit-form-page :is(.form-section-title,.unit-edit-row:has(textarea),.vuexy-form-actions) { grid-column:1!important; }
+}
+
+/* Bağlı ekranlardaki özel eylemler ortak form dönüştürücüsünden etkilenmez. */
+body#vox-app .unit-patient-financial-save.vox-classic-save {
+  position:relative!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:114px!important;
+  min-width:114px!important;
+  max-width:114px!important;
+  height:29px!important;
+  min-height:29px!important;
+  max-height:29px!important;
+  padding:0 10px!important;
+  overflow:hidden!important;
+  color:#fff!important;
+  font:700 12px/27px Tahoma,"Segoe UI",sans-serif!important;
+  white-space:nowrap!important;
+}
+body#vox-app .unit-patient-financial-save.vox-classic-save::before {
+  content:none!important;
+}
+body#vox-app .unit-patient-financial-save.vox-classic-save .icon-base{display:block!important;color:#fff!important;font-size:14px!important;line-height:1!important}
+body#vox-app .unit-visits-head .unit-visits-new {
+  border-color:#087d3c!important;
+  background:linear-gradient(#28b85b,#10933f)!important;
+  color:#fff!important;
+}
+body#vox-app .unit-visits-form {
+  grid-template-columns:130px minmax(0,1fr)!important;
+  align-items:start!important;
+}
+body#vox-app .unit-visits-form label { line-height:27px!important; }
+body#vox-app .unit-visits-actions { grid-column:2!important; }
