@@ -28,7 +28,7 @@
     const listFiles = new Set([
       'appointment-list.php','anamnesis-questions.php','admin.php','banks.php','branches.php','brands.php',
       'cash-categories.php','cash.php','company-patients.php','complaints.php',
-      'current-account-documents.php','current-account-movements.php','current-accounts.php','daily-events-list.php',
+      'company-finance.php','current-account-documents.php','current-account-movements.php','current-accounts.php','daily-events-list.php',
       'employees.php','hearing-devices.php','invoice-list.php','invoice-list-v2.php','invoice-list-v3.php','models.php',
       'patient-results.php','patients.php','price-lists.php','result-list.php','sales.php','service-names.php',
       'service-types.php','sgk-list.php','social-securities.php','sources.php','stock-movements.php','stock-prices.php',
@@ -260,7 +260,10 @@
         document.body.classList.add('vox-shared-list-minimized');
         task.title = 'Listeyi geri aç';
       }
-      if (action === 'close') location.href = 'index.php';
+      if (action === 'close') {
+        const editingAccount = file === 'company-finance.php' || (file === 'current-accounts.php' && (new URLSearchParams(location.search).has('edit') || document.querySelector('.new-account-card[open]')));
+        location.href = editingAccount ? 'current-accounts.php' + (new URLSearchParams(location.search).get('_vox_window') === '1' ? '?_vox_window=1' : '') : 'index.php';
+      }
       if (action === 'maximize') {
         const maximizing = !document.body.classList.contains('vox-shared-list-maximized');
         if (maximizing) savedRect = {bar:topbar.getAttribute('style'), main:main.getAttribute('style')};
@@ -274,6 +277,7 @@
         }
       }
     });
+    if (file === 'company-finance.php' && !document.body.classList.contains('vox-shared-list-maximized')) controls.querySelector('[data-window-action="maximize"]')?.click();
     task.addEventListener('click', () => {
       document.body.classList.remove('vox-shared-list-minimized');
       task.removeAttribute('title');

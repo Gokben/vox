@@ -268,7 +268,7 @@ patient_header('Kurulum - Markalar', 'settings');
     <a class="<?=$activeSection === 'models' ? 'active' : ''?>" href="<?=url('brands.php?tab=models')?>">Modeller</a>
   </nav>
   <script>(()=>{const nav=document.querySelector('.brand-page-tabs');if(!nav)return;const activeGroup=<?=json_encode($activeGroup)?>,items=[['hearing','İşitme Cihazı Markaları'],['battery','Pil Markaları']];nav.innerHTML='';items.forEach(([group,label])=>{const link=document.createElement('a');link.href=<?=json_encode(url('brands.php'))?>+'?tab=brands&group='+group;link.textContent=label;link.dataset.voxSameWindow='setup';link.className=<?=json_encode($selectedBrandId === 0)?>&&activeGroup===group?'active':'';nav.append(link)})})();</script>
-  <?php if ($message): ?><p class="manage-message success"><?=e($message)?></p><?php endif; ?>
+
   <?php if ($error): ?><p class="manage-message error"><?=e($error)?></p><?php endif; ?>
 
   <div class="brand-tab-panel" <?=$activeSection !== 'brands' ? 'hidden' : ''?>>
@@ -332,7 +332,7 @@ patient_header('Kurulum - Markalar', 'settings');
   </details>
   <section class="vuexy-form-card manage-card list-admin-card">
     <header class="form-card-title manage-head models-list-head">
-      <div class="model-list-title"><h2><?=e($selectedBrand['name'] ?? 'Marka')?> <?= $activeGroup === 'battery' ? 'Pil Numaraları' : 'Model Listesi' ?></h2><p><?= $visibleModelCount ?> kayıt</p></div>
+      <div class="model-list-title"><?php if ($activeGroup === 'battery'): ?><h2><?=e($selectedBrand['name'] ?? 'Marka')?> Pil Numaraları</h2><?php endif ?><p><?= $visibleModelCount ?> kayıt</p></div>
       <label class="model-search">
         <span class="model-search-icon" aria-hidden="true">⌕</span>
         <input type="search" id="model-search" placeholder="Bu markanın modellerinde ara" autocomplete="off" aria-label="Modellerde ara">

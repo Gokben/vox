@@ -21,6 +21,19 @@ function source_definitions(): array
                 $insert->execute([$name, 1, $order + 1]);
             }
         }
+        // Eski tablolarda name UNIQUE olmayabilir; INSERT IGNORE tek başına yetmez.
+        $locked = $driver !== 'sqlite';
+        if ($locked && (int)$pdo->query("SELECT GET_LOCK('vox_source_seed', 10)")->fetchColumn() !== 1) {
+            throw new RuntimeException('Kaynak listesi kilidi alınamadı.');
+        }
+        try {
+            $insertSource = $pdo->prepare('INSERT INTO source_definitions(name,active,sort_order) SELECT ?,1,? WHERE NOT EXISTS (SELECT 1 FROM source_definitions WHERE name=?)');
+            foreach (['Kurumlar' => 20, 'Firmalar' => 21] as $name => $order) {
+                $insertSource->execute([$name, $order, $name]);
+            }
+        } finally {
+            if ($locked) $pdo->query("SELECT RELEASE_LOCK('vox_source_seed')");
+        }
         $initialized = true;
     }
 
@@ -49,6 +62,12 @@ function ensure_patient_source_schema(): void
             ? 'ALTER TABLE patients ADD COLUMN source_unit_id INTEGER NULL'
             : 'ALTER TABLE patients ADD COLUMN source_unit_id INT UNSIGNED NULL AFTER source_id');
     }
+    if (!in_array('source_referral_detail', $columns, true)) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN source_referral_detail TEXT NULL');
+    }
+    if (!in_array('source_account_id', $columns, true)) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN source_account_id INTEGER NULL');
+    }
     if (!in_array('source_company_id', $columns, true)) {
         $pdo->exec($driver === 'sqlite'
             ? 'ALTER TABLE patients ADD COLUMN source_company_id INTEGER NULL'
@@ -60,4 +79,28 @@ function ensure_patient_source_schema(): void
             : 'ALTER TABLE patients ADD COLUMN service_location VARCHAR(150) NULL AFTER service_type_id');
     }
     $initialized = true;
+}
+
+function patient_source_account_error(PDO $pdo, string $sourceName, string $accountId): string
+{
+    if ($accountId === '') return '';
+    $type = ['Kurumlar' => 'institution', 'Firmalar' => 'customer'][$sourceName] ?? null;
+    if (!$type || !preg_match('/^[1-9][0-9]*$/D', $accountId)) return 'Geçerli bir kaynak cari kartı seçin.';
+    $statement = $pdo->prepare('SELECT id FROM current_accounts WHERE id=? AND account_type=?');
+    $statement->execute([$accountId, $type]);
+    return $statement->fetchColumn() === false ? 'Cari kartın tipi seçilen kaynakla uyuşmuyor.' : '';
+}
+
+/** Aynı adlı seçenekleri bir kez gösterir; hastanın mevcut kaynak kimliğini korur. */
+function patient_source_options(array $sources, int $selectedId): array
+{
+    $options = [];
+    foreach ($sources as $source) {
+        if (!(int)$source['active'] && (int)$source['id'] !== $selectedId) continue;
+        $key = mb_strtolower(trim((string)$source['name']), 'UTF-8');
+        if (!isset($options[$key]) || (int)$source['id'] === $selectedId) {
+            $options[$key] = $source;
+        }
+    }
+    return array_values($options);
 }

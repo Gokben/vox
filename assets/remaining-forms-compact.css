@@ -1,0 +1,27 @@
+@media screen {
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page){width:100%!important;max-width:none!important;min-height:0!important;margin:0!important;padding:8px!important;font:12px Tahoma,"Segoe UI",sans-serif!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page)>section{padding:6px!important;border:1px solid #7cafe5!important;border-radius:0!important;box-shadow:none!important;background:#deecf9!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page)>section>header{padding:5px 8px!important;border:1px solid #7cafe5!important;background:linear-gradient(#f4faff,#dceeff)!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page)>section>header p{display:none!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) h1{font:700 13px Tahoma,"Segoe UI",sans-serif!important;margin:0!important;color:#0061a8!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) form{padding:6px!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) label{gap:2px!important;font-size:11px!important;color:#123f51!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=submit]),select){box-sizing:border-box!important;height:27px!important;min-height:27px!important;padding:3px 6px!important;border:1px solid #7cafe5!important;border-radius:0!important;background:#fff!important;color:#123f51!important;font:12px Tahoma,"Segoe UI",sans-serif!important;box-shadow:none!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) textarea{box-sizing:border-box!important;min-height:65px!important;padding:5px 6px!important;border:1px solid #7cafe5!important;border-radius:0!important;background:#fff!important;color:#123f51!important;font:12px Tahoma,"Segoe UI",sans-serif!important;resize:vertical}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) form h2{margin:6px 0!important;padding:4px 7px!important;border:1px solid #7cafe5!important;background:linear-gradient(#f4faff,#dceeff)!important;color:#0061a8!important;font:700 13px Tahoma,"Segoe UI",sans-serif!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) :is(.stock-entry-grid,.tracking-grid,.entry-prices-grid,.bulk-common,.task-form,.external-form-grid,.form-row,.price-list-form){gap:6px 8px!important;margin-top:6px!important;margin-bottom:6px!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) footer{margin-top:6px!important;padding:5px 0!important;gap:8px!important;border-top:1px solid #a8c8df!important}
+html body#vox-app main:is(.stock-entry-page,.bulk-battery-page,.task-form-page,.external-patient-page,.external-repair-page,.price-lists-page) footer :is(button,a){height:30px!important;min-height:30px!important;border-radius:3px!important}
+html body#vox-app .bulk-battery-page :is(th,td){padding:4px 6px!important;border-bottom:1px solid #bfd4e5!important;font-size:12px!important}
+html body#vox-app .bulk-battery-page th{background:linear-gradient(#f4faff,#dceeff)!important;color:#0061a8!important}
+html body#vox-app .external-repair-page .form-tabs-card{border:1px solid #7cafe5!important;border-radius:0!important;box-shadow:none!important;background:#deecf9!important}
+html body#vox-app .external-repair-page .form-tabs-card .card-body{padding:8px!important}
+html body#vox-app .external-repair-page .form-tabs-card .nav-link{padding:6px 10px!important;font-size:12px!important;border:1px solid #8db4d5!important;border-radius:0!important;background:#eaf4ff!important;color:#075786!important}
+html body#vox-app .external-repair-page .form-tabs-card .nav-link.active{background:#d0e6f8!important;font-weight:700!important}
+html body#vox-app .external-repair-page .form-tabs-card .service-select-line{padding-top:4px!important;margin-bottom:6px!important}
+html body#vox-app .external-repair-page .form-tabs-card .serial-row{margin-top:6px!important}
+html body#vox-app .external-repair-page .service-documents{padding:8px!important;margin-top:8px!important;border-radius:0!important}
+html body#vox-app .external-patient-page .icon-input{border-radius:0!important}
+html body#vox-app .external-patient-page .icon-input input,html body#vox-app .external-patient-page .icon-input textarea{padding-left:30px!important}
+html body#vox-app .price-lists-page .price-list-form :is(button,.price-list-cancel){height:30px!important;min-height:30px!important;border-radius:3px!important}
+}

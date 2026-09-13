@@ -21,3 +21,17 @@ echo "Server date and invoice regression tests passed\n";
 
 expect(vox_date_to_iso('1.9.2026'),'2026-09-01');
 expect(vox_date_to_iso('1.09.2026'),'2026-09-01');
+
+// Service action flags are not JSON payloads.
+$flags = ['save_sales_details'=>'1', 'return_to_sales_details'=>'1', 'service_date'=>'28.08.2026'];
+$normalized = vox_normalize_dates($flags);
+expect($normalized['save_sales_details'], '1');
+expect($normalized['return_to_sales_details'], '1');
+expect($normalized['service_date'], '2026-08-28');
+$plan = vox_normalize_dates(['cash_update_extra_term_schedule'=>'[{"date":"3.9.2026"}]']);
+expect(json_decode($plan['cash_update_extra_term_schedule'], true)[0]['date'], '2026-09-03');
+foreach ([['sales_details','broken'], ['repair_details','1'], ['term_schedule_json','broken'], ['sales_details','{"delivery_date":"31.02.2026"}']] as [$key,$value]) {
+    try { vox_normalize_dates([$key=>$value]); throw new RuntimeException('Invalid payload accepted'); }
+    catch (InvalidArgumentException $expected) {}
+}
+echo "Service action flags and nested date validation passed\n";

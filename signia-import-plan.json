@@ -1,0 +1,371 @@
+{
+  "source_pdf": "C:/Users/Baysan/Downloads/Signia Fiyat Listesi 2026 Temmuz.pdf",
+  "brand": "Signia",
+  "status": "prices_imported_mapping_continues",
+  "approved_rules": {
+    "model_naming": "Combine model and performance; also register in Signia model definitions",
+    "bundle_label": "Kit",
+    "kit_price": "Keep PDF price unchanged",
+    "kit_sale": "Whole kit only; components cannot be sold separately",
+    "stock_code": "Model name; append Kit for the five approved kits",
+    "intuis_cic": "Keep Intuis CIC 50/55/65 as one model and stock card; price TRY 51000",
+    "accessories": "Include all six PDF accessory rows",
+    "accessory_stock_type": "Sarf Malzeme (all six accessories, including chargers)",
+    "insio_device_type": "Kanal içi (CIC+TC)"
+  },
+  "kits": [
+    {
+      "model": "Active Pro 7IX",
+      "price_try": 244000,
+      "hearing_devices": 2,
+      "charger": 1
+    },
+    {
+      "model": "Active 1IX",
+      "price_try": 170000,
+      "hearing_devices": 2,
+      "charger": 1
+    },
+    {
+      "model": "Silk C&G 7IX",
+      "price_try": 244000,
+      "hearing_devices": 2,
+      "charger": 1
+    },
+    {
+      "model": "Silk C&G 3IX",
+      "price_try": 201000,
+      "hearing_devices": 2,
+      "charger": 1
+    },
+    {
+      "model": "Silk C&G 1IX",
+      "price_try": 170000,
+      "hearing_devices": 2,
+      "charger": 1
+    }
+  ],
+  "pending": [
+    "kit sales enforcement and validation",
+    "device type mapping"
+  ],
+  "stock_cards_created": 56,
+  "intuis_cic": {
+    "model": "Intuis CIC 50/55/65",
+    "stock_code": "Intuis CIC 50/55/65",
+    "price_try": 51000,
+    "device_type": "CIC"
+  },
+  "accessories": [
+    {
+      "model": "StreamLine TV / TV Sound",
+      "stock_code": "StreamLine TV / TV Sound",
+      "price_try": 18500
+    },
+    {
+      "model": "StreamLine Mic",
+      "stock_code": "StreamLine Mic",
+      "price_try": 18000
+    },
+    {
+      "model": "Charger (X-AX-IX)",
+      "stock_code": "Charger (X-AX-IX)",
+      "price_try": 12000
+    },
+    {
+      "model": "Perfectdry Lux",
+      "stock_code": "Perfectdry Lux",
+      "price_try": 6000
+    },
+    {
+      "model": "Multicharger (P-SP)",
+      "stock_code": "Multicharger (P-SP)",
+      "price_try": 12000
+    },
+    {
+      "model": "CROS/BICROS",
+      "stock_code": "CROS/BICROS",
+      "price_try": 14500
+    }
+  ],
+  "price_rows": [
+    {
+      "stock_code": "Styletto 7IX",
+      "price_try": 240000
+    },
+    {
+      "stock_code": "Styletto 3IX",
+      "price_try": 201000
+    },
+    {
+      "stock_code": "Styletto 1IX",
+      "price_try": 170000
+    },
+    {
+      "stock_code": "Active Pro 7IX Kit",
+      "price_try": 244000
+    },
+    {
+      "stock_code": "Active 1IX Kit",
+      "price_try": 170000
+    },
+    {
+      "stock_code": "Silk C&G 7IX Kit",
+      "price_try": 244000
+    },
+    {
+      "stock_code": "Silk C&G 3IX Kit",
+      "price_try": 201000
+    },
+    {
+      "stock_code": "Silk C&G 1IX Kit",
+      "price_try": 170000
+    },
+    {
+      "stock_code": "Insio 7IX",
+      "price_try": 87000
+    },
+    {
+      "stock_code": "Insio 3IX",
+      "price_try": 70000
+    },
+    {
+      "stock_code": "Insio 2IX",
+      "price_try": 66000
+    },
+    {
+      "stock_code": "Insio 1IX",
+      "price_try": 59000
+    },
+    {
+      "stock_code": "Pure C&G BCT 7IX",
+      "price_try": 116000
+    },
+    {
+      "stock_code": "Pure C&G BCT 3IX",
+      "price_try": 92000
+    },
+    {
+      "stock_code": "Pure C&G 7IX",
+      "price_try": 107360
+    },
+    {
+      "stock_code": "Pure C&G 3IX",
+      "price_try": 85400
+    },
+    {
+      "stock_code": "Pure C&G 1IX",
+      "price_try": 73200
+    },
+    {
+      "stock_code": "Pure 312 7AX",
+      "price_try": 83000
+    },
+    {
+      "stock_code": "Pure 312 3AX",
+      "price_try": 67000
+    },
+    {
+      "stock_code": "Pure 312 2AX",
+      "price_try": 62000
+    },
+    {
+      "stock_code": "Pure 312 1AX",
+      "price_try": 55000
+    },
+    {
+      "stock_code": "Motion C&G 7X",
+      "price_try": 107000
+    },
+    {
+      "stock_code": "Motion C&G P 7X",
+      "price_try": 107000
+    },
+    {
+      "stock_code": "Motion C&G SP 7X",
+      "price_try": 107000
+    },
+    {
+      "stock_code": "Motion C&G 3X",
+      "price_try": 85000
+    },
+    {
+      "stock_code": "Motion C&G P 3X",
+      "price_try": 85000
+    },
+    {
+      "stock_code": "Motion C&G SP 3X",
+      "price_try": 85000
+    },
+    {
+      "stock_code": "Motion C&G 1X",
+      "price_try": 73000
+    },
+    {
+      "stock_code": "Motion C&G P 1X",
+      "price_try": 73000
+    },
+    {
+      "stock_code": "Motion C&G SP 1X",
+      "price_try": 73000
+    },
+    {
+      "stock_code": "Silk 7X",
+      "price_try": 83000
+    },
+    {
+      "stock_code": "Silk 3X",
+      "price_try": 67000
+    },
+    {
+      "stock_code": "Silk 2X",
+      "price_try": 62000
+    },
+    {
+      "stock_code": "Silk 1X",
+      "price_try": 55000
+    },
+    {
+      "stock_code": "Intuis 4.7 M",
+      "price_try": 83000
+    },
+    {
+      "stock_code": "Intuis 4.7 P",
+      "price_try": 83000
+    },
+    {
+      "stock_code": "Intuis 4.7 SP",
+      "price_try": 83000
+    },
+    {
+      "stock_code": "Intuis 4.3 M",
+      "price_try": 67000
+    },
+    {
+      "stock_code": "Intuis 4.3 P",
+      "price_try": 67000
+    },
+    {
+      "stock_code": "Intuis 4.3 SP",
+      "price_try": 67000
+    },
+    {
+      "stock_code": "Intuis 4.2 M",
+      "price_try": 62000
+    },
+    {
+      "stock_code": "Intuis 4.2 P",
+      "price_try": 62000
+    },
+    {
+      "stock_code": "Intuis 4.2 SP",
+      "price_try": 62000
+    },
+    {
+      "stock_code": "Intuis 4.1 M",
+      "price_try": 55000
+    },
+    {
+      "stock_code": "Intuis 4.1 P",
+      "price_try": 55000
+    },
+    {
+      "stock_code": "Intuis 4.1 SP",
+      "price_try": 55000
+    },
+    {
+      "stock_code": "Intuis 4.0 M",
+      "price_try": 48000
+    },
+    {
+      "stock_code": "Intuis 4.0 P",
+      "price_try": 48000
+    },
+    {
+      "stock_code": "Intuis 4.0 SP",
+      "price_try": 48000
+    },
+    {
+      "stock_code": "Intuis CIC 50/55/65",
+      "price_try": 51000
+    },
+    {
+      "stock_code": "StreamLine TV / TV Sound",
+      "price_try": 18500
+    },
+    {
+      "stock_code": "StreamLine Mic",
+      "price_try": 18000
+    },
+    {
+      "stock_code": "Charger (X-AX-IX)",
+      "price_try": 12000
+    },
+    {
+      "stock_code": "Perfectdry Lux",
+      "price_try": 6000
+    },
+    {
+      "stock_code": "Multicharger (P-SP)",
+      "price_try": 12000
+    },
+    {
+      "stock_code": "CROS/BICROS",
+      "price_try": 14500
+    }
+  ],
+  "valid_from": "2026-07-01",
+  "valid_until": "2026-12-31",
+  "price_list_id": 5,
+  "approved_device_type_mapping": {
+    "Styletto 7IX": "Kanal İçi Alıcı RIC/RIE",
+    "Styletto 3IX": "Kanal İçi Alıcı RIC/RIE",
+    "Styletto 1IX": "Kanal İçi Alıcı RIC/RIE",
+    "Active Pro 7IX Kit": "Kanal içi (CIC)",
+    "Active 1IX Kit": "Kanal içi (CIC)",
+    "Silk C&G 7IX Kit": "Kanal içi (CIC)",
+    "Silk C&G 3IX Kit": "Kanal içi (CIC)",
+    "Silk C&G 1IX Kit": "Kanal içi (CIC)",
+    "Pure C&G BCT 7IX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure C&G BCT 3IX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure C&G 7IX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure C&G 3IX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure C&G 1IX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure 312 7AX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure 312 3AX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure 312 2AX": "Kanal İçi Alıcı RIC/RIE",
+    "Pure 312 1AX": "Kanal İçi Alıcı RIC/RIE",
+    "Motion C&G 7X": "Kulak arkası (BTE)",
+    "Motion C&G P 7X": "Kulak arkası (BTE)",
+    "Motion C&G SP 7X": "Kulak arkası (BTE)",
+    "Motion C&G 3X": "Kulak arkası (BTE)",
+    "Motion C&G P 3X": "Kulak arkası (BTE)",
+    "Motion C&G SP 3X": "Kulak arkası (BTE)",
+    "Motion C&G 1X": "Kulak arkası (BTE)",
+    "Motion C&G P 1X": "Kulak arkası (BTE)",
+    "Motion C&G SP 1X": "Kulak arkası (BTE)",
+    "Silk 7X": "Kanal içi (CIC)",
+    "Silk 3X": "Kanal içi (CIC)",
+    "Silk 2X": "Kanal içi (CIC)",
+    "Silk 1X": "Kanal içi (CIC)",
+    "Intuis 4.7 M": "Kulak arkası (BTE)",
+    "Intuis 4.7 P": "Kulak arkası (BTE)",
+    "Intuis 4.7 SP": "Kulak arkası (BTE)",
+    "Intuis 4.3 M": "Kulak arkası (BTE)",
+    "Intuis 4.3 P": "Kulak arkası (BTE)",
+    "Intuis 4.3 SP": "Kulak arkası (BTE)",
+    "Intuis 4.2 M": "Kulak arkası (BTE)",
+    "Intuis 4.2 P": "Kulak arkası (BTE)",
+    "Intuis 4.2 SP": "Kulak arkası (BTE)",
+    "Intuis 4.1 M": "Kulak arkası (BTE)",
+    "Intuis 4.1 P": "Kulak arkası (BTE)",
+    "Intuis 4.1 SP": "Kulak arkası (BTE)",
+    "Intuis 4.0 M": "Kulak arkası (BTE)",
+    "Intuis 4.0 P": "Kulak arkası (BTE)",
+    "Intuis 4.0 SP": "Kulak arkası (BTE)",
+    "Insio 7IX": "Kanal içi (CIC+TC)",
+    "Insio 3IX": "Kanal içi (CIC+TC)",
+    "Insio 2IX": "Kanal içi (CIC+TC)",
+    "Insio 1IX": "Kanal içi (CIC+TC)"
+  }
+}

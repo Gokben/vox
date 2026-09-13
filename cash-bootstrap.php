@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/cash-company.php';
 
 function ensure_cash_schema(PDO $pdo): void
 {
@@ -52,6 +53,8 @@ function ensure_cash_schema(PDO $pdo): void
         $pdo->exec("CREATE TABLE IF NOT EXISTS cash_closings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, closing_date DATE NOT NULL UNIQUE, expected_balance DECIMAL(14,2) NOT NULL, counted_balance DECIMAL(14,2) NOT NULL, difference DECIMAL(14,2) NOT NULL, note VARCHAR(255) NULL, created_by INT UNSIGNED NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $pdo->exec('INSERT IGNORE INTO cash_settings(id,opening_balance) VALUES(1,0)');
     }
+
+    ensure_cash_company_schema($pdo);
 
     if ((int)$pdo->query('SELECT COUNT(*) FROM cash_categories')->fetchColumn() === 0) {
         $insert = $pdo->prepare('INSERT INTO cash_categories(name,parent_id,active) VALUES(?,NULL,1)');

@@ -1,0 +1,425 @@
+{
+  "styletto-ix": {
+    "source_page": "https://www.signia-pro.com/de-de/lokal/de-de/bildmaterial-produkte/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/signia-ix/styletto-ix/styletto-ix_black_black-gloss_double_1000x1000.jpg?h=1000&w=1000&rev=decf4d2d6f9f4a4eb9641b997be35f48&hash=0CB8CD118B133E8277773EA60A7381B9",
+    "path": "assets/uploads/stocks/signia-styletto-ix-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 34167,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "active-ix-kit": {
+    "source_page": "https://www.signia-pro.com/en/chargers-and-accessories/charging-solutions/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/accessories/chargers/portable-charger-active_perspective_with-active-ix_led-on_1920x1080.jpg?h=1080&w=1920&rev=8c6c152102504245bbda8162e8e9a23e&hash=B66C038D2777099EEBB7563A6552F7DC",
+    "path": "assets/uploads/stocks/signia-active-ix-kit-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 21579,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "silk-ix-kit": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/integrated-xperience/silk-charge-go-ix/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/accessories/chargers/portable-charger-silk_with-silk-chgo-ix-out_led-on_shadow_1920x1080.jpg?rev=f35b8e9e446e400192a17043f822c5b1&hash=C52AA485260ABBC07A31EB0F3E7C97A2",
+    "path": "assets/uploads/stocks/signia-silk-ix-kit-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 22102,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "insio-ix": {
+    "source_page": "https://www.signia-pro.com/de-de/lokal/de-de/bildmaterial-produkte/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/signia-ix/insio-ix/insio-ix_iic_dark-brown_pair_side_1000x1000.jpg?h=1000&w=1000&rev=7ce09071264d46938662771f99489431&hash=69658EEA93FE990276DBF25EC2CC006F",
+    "path": "assets/uploads/stocks/signia-insio-ix-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 27509,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "pure-bct-ix": {
+    "source_page": "https://www.signia-pro.com/de-de/lokal/de-de/bildmaterial-produkte/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/signia-ix/pure-chargego-ix/pure-charge-go-bct-ix_black_pair_sleeve_1000x1000.jpg?h=1000&w=1000&rev=0c82ca5ce3634f94bbda9cc3971ffb1a&hash=AB18E2987F890EE14D883BE80B134DA2",
+    "path": "assets/uploads/stocks/signia-pure-bct-ix-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 33292,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "pure-ix": {
+    "source_page": "https://www.signia-pro.com/de-de/lokal/de-de/bildmaterial-produkte/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/signia-ix/pure-chargego-ix/pure-charge-go-ix_graphite_next-to-charger_1000x1000.jpg?h=1000&w=1000&rev=a574b74482bd42fdac8c25a184fee4fd&hash=4B74CDF52EB1D6A8A7A08C0EF05EEECA",
+    "path": "assets/uploads/stocks/signia-pure-ix-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 29761,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "pure-312-ax": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/signia-ax/pure-312-ax/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/signia-ax/pure-312-ax/pure-312-ax_silver_1920x1080.jpg?rev=bb30eb65f61a42a6acedbfeaf48dbcf8&hash=71A28FD0C3DBEE06703CBE22BD1474CF",
+    "path": "assets/uploads/stocks/signia-pure-312-ax-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 35953,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "motion-x": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/signia-xperience/motion-x/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/xperience/motion-x/motion_cng_x_pair_silver_1000x1000.jpg?rev=789f3c52e588446cb62823a8f1939ad6&hash=C0563630062AEC8DC63A4C3C66659D7B",
+    "path": "assets/uploads/stocks/signia-motion-x-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 28927,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "motion-p-x": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/signia-xperience/motion-x/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/xperience/motion-p-x/motion_cng_p_x_pair_silver_1000x1000.jpg?rev=e968ee2687cd49078749542c1cc6f781&hash=DCD8B06CA2266ACEAC704311ED775890",
+    "path": "assets/uploads/stocks/signia-motion-p-x-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 30328,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "motion-sp-x": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/signia-xperience/motion-x/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/xperience/motion-sp-x/motion_cng_sp_x_pair_dark_champagne_1000x1000.png?rev=add65f48c5ab4a989dbc77092e9f1b0a&hash=5486AC79E89E057E62D8D6F572C15AA9",
+    "path": "assets/uploads/stocks/signia-motion-sp-x-official.png",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 217165,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "silk-x": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/signia-xperience/silk-x/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/xperience/silk-x---nx/silk-nx_black_pair_1000x1000.jpg?rev=fb7234af661a406aaff72ff23bb8403f&hash=EDF2C09EB3974DC0093DF49DECFFED35",
+    "path": "assets/uploads/stocks/signia-silk-x-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 25337,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "intuis-m-4-family": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/other/intuis-4/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/other-hearing-aids/intuis-4/intuis-4_range_1920x1080.jpg?rev=569f636a0f9f4fa2bca859fa21e5169c&hash=C4D212BA0B349F518CD14C18A1671583",
+    "path": "assets/uploads/stocks/signia-intuis-m-4-family-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 35314,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "intuis-p-4": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/other/intuis-4/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/other-hearing-aids/intuis-4/intuis-p-4_silver.png?rev=0bca6dcf625e4632bbf6bc546a074b96&hash=E284B4C239693FA462C266098B2287A8",
+    "path": "assets/uploads/stocks/signia-intuis-p-4-official.png",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 88016,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "intuis-sp-4": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/other/intuis-4/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/other-hearing-aids/intuis-4/intuis-sp-4_silver.png?rev=405beb951a05448ead5d1cf4075f6533&hash=70DE4FAAED6D234ADFAF80767E3E046E",
+    "path": "assets/uploads/stocks/signia-intuis-sp-4-official.png",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 77455,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "intuis-cic": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/other/intuis/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/other-hearing-aids/intuis-3/intuis-3_cic_1000x1000.jpg?rev=f458cb77061941bdb153c110c8ac71e5&hash=1438C9DD44E7D322D566BD4B328D05F7",
+    "path": "assets/uploads/stocks/signia-intuis-cic-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 16453,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "tv-sound": {
+    "source_page": "https://www.signia-pro.com/en/chargers-and-accessories/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/accessories/tv-sound/tv-sound_soundwave_1920x1080.jpg?h=1080&w=1920&rev=f7729ed3f6b94db18adcbd96c196bcc9&hash=50A8E2128483992F49CCCFD4D15388F9",
+    "path": "assets/uploads/stocks/signia-tv-sound-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 28308,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "streamline-mic": {
+    "source_page": "https://www.signia-pro.com/en/chargers-and-accessories/streamline-mic/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/accessories/streamline-mic/streamline-mic_sideview_1000x1000.jpg?rev=cc41a7b0529d4920bc757674203b5a53&hash=9073D4E6C3C73BF9FED6F23F079AC2B8",
+    "path": "assets/uploads/stocks/signia-streamline-mic-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 38462,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 200,
+      "left": 100,
+      "resized": false
+    }
+  },
+  "charger": {
+    "source_page": "https://www.signia-pro.com/en/chargers-and-accessories/charging-solutions/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/accessories/chargers/desktop-charger-pure_with-pure-chgo-ix_1920x1080.png?h=1080&w=1920&rev=f1b6b10e1a9447b395078bbff90220b0&hash=A910D1014F6F05AF180927C1B9D2C3E4",
+    "path": "assets/uploads/stocks/signia-charger-official.png",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 130492,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "multicharger": {
+    "source_page": "https://www.signia-pro.com/en/chargers-and-accessories/charging-solutions/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/accessories/chargers/multi-charger_stand_45-angle_1920x1080.jpg?h=1080&w=1920&rev=c8268653b12a48dea21484feb1724ed5&hash=ABC4B0B47228BDFE0CCB51F53A076B15",
+    "path": "assets/uploads/stocks/signia-multicharger-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 16241,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "perfectdry-lux": {
+    "source_page": "https://www.mg-development.com/en/our-products/perfect-dry-lux/",
+    "source": "https://www.mg-development.com/wp-content/uploads/2018/08/perfectdry_lux_open-1-1100x1100.png",
+    "path": "assets/uploads/stocks/signia-perfectdry-lux-official.png",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 526598,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 250,
+      "left": 150,
+      "resized": false
+    }
+  },
+  "cros-family": {
+    "source_page": "https://www.signia-pro.com/en/product-portfolio/signia-xperience/cros-x/",
+    "source": "https://cdn.signia-pro.com/-/media/signia/global/images/products/xperience/pure-312-x/pure-312-x_silver_hero_s_1920x1080.jpg?rev=6de306c67f6f4ec8b589db878091f94f&hash=5FEC789F3BBAD1F924FE736EB061FCE8",
+    "path": "assets/uploads/stocks/signia-cros-family-official.jpg",
+    "size": [
+      800,
+      600
+    ],
+    "bytes": 30417,
+    "crop": {
+      "height": 600,
+      "width": 800,
+      "top": 240,
+      "left": 560,
+      "resized": false
+    }
+  },
+  "stock_mapping": {
+    "Styletto 7IX": "assets/uploads/stocks/signia-styletto-ix-official.jpg",
+    "Styletto 3IX": "assets/uploads/stocks/signia-styletto-ix-official.jpg",
+    "Styletto 1IX": "assets/uploads/stocks/signia-styletto-ix-official.jpg",
+    "Active Pro 7IX Kit": "assets/uploads/stocks/signia-active-ix-kit-official.jpg",
+    "Active 1IX Kit": "assets/uploads/stocks/signia-active-ix-kit-official.jpg",
+    "Silk C&G 7IX Kit": "assets/uploads/stocks/signia-silk-ix-kit-official.jpg",
+    "Silk C&G 3IX Kit": "assets/uploads/stocks/signia-silk-ix-kit-official.jpg",
+    "Silk C&G 1IX Kit": "assets/uploads/stocks/signia-silk-ix-kit-official.jpg",
+    "Insio 7IX": "assets/uploads/stocks/signia-insio-ix-official.jpg",
+    "Insio 3IX": "assets/uploads/stocks/signia-insio-ix-official.jpg",
+    "Insio 2IX": "assets/uploads/stocks/signia-insio-ix-official.jpg",
+    "Insio 1IX": "assets/uploads/stocks/signia-insio-ix-official.jpg",
+    "Pure C&G BCT 7IX": "assets/uploads/stocks/signia-pure-bct-ix-official.jpg",
+    "Pure C&G BCT 3IX": "assets/uploads/stocks/signia-pure-bct-ix-official.jpg",
+    "Pure C&G 7IX": "assets/uploads/stocks/signia-pure-ix-official.jpg",
+    "Pure C&G 3IX": "assets/uploads/stocks/signia-pure-ix-official.jpg",
+    "Pure C&G 1IX": "assets/uploads/stocks/signia-pure-ix-official.jpg",
+    "Pure 312 7AX": "assets/uploads/stocks/signia-pure-312-ax-official.jpg",
+    "Pure 312 3AX": "assets/uploads/stocks/signia-pure-312-ax-official.jpg",
+    "Pure 312 2AX": "assets/uploads/stocks/signia-pure-312-ax-official.jpg",
+    "Pure 312 1AX": "assets/uploads/stocks/signia-pure-312-ax-official.jpg",
+    "Motion C&G 7X": "assets/uploads/stocks/signia-motion-x-official.jpg",
+    "Motion C&G P 7X": "assets/uploads/stocks/signia-motion-p-x-official.jpg",
+    "Motion C&G SP 7X": "assets/uploads/stocks/signia-motion-sp-x-official.png",
+    "Motion C&G 3X": "assets/uploads/stocks/signia-motion-x-official.jpg",
+    "Motion C&G P 3X": "assets/uploads/stocks/signia-motion-p-x-official.jpg",
+    "Motion C&G SP 3X": "assets/uploads/stocks/signia-motion-sp-x-official.png",
+    "Motion C&G 1X": "assets/uploads/stocks/signia-motion-x-official.jpg",
+    "Motion C&G P 1X": "assets/uploads/stocks/signia-motion-p-x-official.jpg",
+    "Motion C&G SP 1X": "assets/uploads/stocks/signia-motion-sp-x-official.png",
+    "Silk 7X": "assets/uploads/stocks/signia-silk-x-official.jpg",
+    "Silk 3X": "assets/uploads/stocks/signia-silk-x-official.jpg",
+    "Silk 2X": "assets/uploads/stocks/signia-silk-x-official.jpg",
+    "Silk 1X": "assets/uploads/stocks/signia-silk-x-official.jpg",
+    "Intuis 4.7 M": "assets/uploads/stocks/signia-intuis-m-4-family-official.jpg",
+    "Intuis 4.7 P": "assets/uploads/stocks/signia-intuis-p-4-official.png",
+    "Intuis 4.7 SP": "assets/uploads/stocks/signia-intuis-sp-4-official.png",
+    "Intuis 4.3 M": "assets/uploads/stocks/signia-intuis-m-4-family-official.jpg",
+    "Intuis 4.3 P": "assets/uploads/stocks/signia-intuis-p-4-official.png",
+    "Intuis 4.3 SP": "assets/uploads/stocks/signia-intuis-sp-4-official.png",
+    "Intuis 4.2 M": "assets/uploads/stocks/signia-intuis-m-4-family-official.jpg",
+    "Intuis 4.2 P": "assets/uploads/stocks/signia-intuis-p-4-official.png",
+    "Intuis 4.2 SP": "assets/uploads/stocks/signia-intuis-sp-4-official.png",
+    "Intuis 4.1 M": "assets/uploads/stocks/signia-intuis-m-4-family-official.jpg",
+    "Intuis 4.1 P": "assets/uploads/stocks/signia-intuis-p-4-official.png",
+    "Intuis 4.1 SP": "assets/uploads/stocks/signia-intuis-sp-4-official.png",
+    "Intuis 4.0 M": "assets/uploads/stocks/signia-intuis-m-4-family-official.jpg",
+    "Intuis 4.0 P": "assets/uploads/stocks/signia-intuis-p-4-official.png",
+    "Intuis 4.0 SP": "assets/uploads/stocks/signia-intuis-sp-4-official.png",
+    "Intuis CIC 50/55/65": "assets/uploads/stocks/signia-intuis-cic-official.jpg",
+    "StreamLine TV / TV Sound": "assets/uploads/stocks/signia-tv-sound-official.jpg",
+    "StreamLine Mic": "assets/uploads/stocks/signia-streamline-mic-official.jpg",
+    "Charger (X-AX-IX)": "assets/uploads/stocks/signia-charger-official.png",
+    "Perfectdry Lux": "assets/uploads/stocks/signia-perfectdry-lux-official.png",
+    "Multicharger (P-SP)": "assets/uploads/stocks/signia-multicharger-official.jpg",
+    "CROS/BICROS": "assets/uploads/stocks/signia-cros-family-official.jpg"
+  },
+  "notes": [
+    "Performance tiers share the official model-family product photo.",
+    "Intuis M uses the official Intuis 4 range photo.",
+    "CROS/BICROS uses a representative CROS Pure 312 X image from the official CROS X page.",
+    "Combined StreamLine TV / TV Sound uses TV Sound.",
+    "Intuis CIC 50/55/65 uses the official Intuis 3 custom CIC family photo.",
+    "Charger photo includes hearing aids for illustration; accessories contents remain unchanged."
+  ]
+}

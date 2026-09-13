@@ -7,7 +7,7 @@ async function run({windows=0,dialog=false,visible=true,path='/index.php',same=f
   let reloads=0, mutation, interval;
   const events={}, children=[];
   const document={currentScript:{dataset:{releaseUrl:'/app-release.php'}},visibilityState:visible?'visible':'hidden',
-    querySelector(s){if(s.includes('vox-build'))return {content:'a'.repeat(64)};if(s.includes('vox-version'))return {content:'13096.01'};return dialog?{}:null;},
+    querySelector(s){if(s === '.desktop-clock') return null;if(s.includes('vox-build'))return {content:'a'.repeat(64)};if(s.includes('vox-version'))return {content:'13096.01'};return dialog?{}:null;},
     querySelectorAll(){return Array(windows).fill({});},
     createElement(){return {setAttribute(){},isConnected:false};},
     addEventListener(name,fn){events[name]=fn;},

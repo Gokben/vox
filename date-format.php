@@ -33,7 +33,7 @@ function vox_normalize_dates(array $values): array
             $values[$key] = is_array($value) ? array_map($convert, $value) : $convert($value);
         } elseif (is_array($value)) {
             $values[$key] = vox_normalize_dates($value);
-        } elseif (is_string($value) && $value !== '' && preg_match('/(?:term_schedule(?:_json)?|sales_details|repair_details)$/D', (string)$key)) {
+        } elseif (is_string($value) && $value !== '' && preg_match('/(?:^(?:sales_details|repair_details)$|(?:^|_)term_schedule(?:_json)?$)/D', (string)$key)) {
             $decoded = json_decode($value, true);
             if (!is_array($decoded)) throw new InvalidArgumentException('Tarih planı okunamadı.');
             $values[$key] = json_encode(vox_normalize_dates($decoded), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);

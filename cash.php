@@ -98,6 +98,9 @@ if ((int)$pdo->query('SELECT COUNT(*) FROM cash_categories')->fetchColumn() === 
     foreach (['Maaş', 'Fatura', 'Satış', 'Kira'] as $categoryName) $insertCategory->execute([$categoryName]);
 }
 ensure_cash_schema($pdo);
+$companyAccount = cash_company_account($pdo);
+$cashBankOptions = array_values(array_filter(bank_definitions(), static fn(array $bank): bool => (bool)$bank['active']));
+$counterpartyAccounts = $pdo->query("SELECT id,code,title,short_name FROM current_accounts WHERE code<>'CR-00' ORDER BY title,id")->fetchAll();
 
 // Ünite ziyaretlerinde girilen ödemeler, kasa ekranı açıldığında da kontrol
 // edilerek kasa çıkış hareketi olarak eksiksiz görünür tutulur.
@@ -183,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $bankName = trim((string)($_POST['bank_name'] ?? ''));
             $commissionRate = (float)str_replace(',', '.', (string)($_POST['commission_rate'] ?? '0'));
             $currentAccountId = (int)($_POST['current_account_id'] ?? 0);
+            cash_validate_counterparty($pdo, $currentAccountId);
             $categoryId = (int)($_POST['category_id'] ?? 0);
             $sourceUrl = trim((string)($_POST['source_url'] ?? ''));
             $transactionRegister = $sourceUrl !== '' ? 'pre' : $cashRegister;
@@ -213,6 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $extraBankName = trim((string)($_POST['extra_bank_name'] ?? ''));
                 $extraCommissionRate = (float)str_replace(',', '.', (string)($_POST['extra_commission_rate'] ?? '0'));
                 $extraCurrentAccountId = (int)($_POST['extra_current_account_id'] ?? 0);
+                cash_validate_counterparty($pdo, $extraCurrentAccountId);
                 $extraTermSchedule = null;
                 $extraScheduledAmount = $extraAmount;
                 if ($extraPaymentType === 'term') {
@@ -247,6 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $bankName = trim((string)($_POST['bank_name'] ?? ''));
             $commissionRate = (float)str_replace(',', '.', (string)($_POST['commission_rate'] ?? '0'));
             $currentAccountId = (int)($_POST['current_account_id'] ?? 0);
+            cash_validate_counterparty($pdo, $currentAccountId);
             $termSchedule = null;
             if ($paymentType === 'term') {
                 $termSchedule = [];
@@ -357,7 +363,7 @@ $transactions = array_values(array_filter(array_map(static function (array $tran
 }, $transactions), static fn(array $transaction): bool => $transaction['payment_type'] !== 'term' || (float)$transaction['amount'] > 0));
 foreach ($transactions as &$transaction) {
     $transaction['invoice_no'] = '';
-    $transaction['related_person'] = '';
+    $transaction['related_person'] = trim((string)($transaction['current_account_short_name'] ?: $transaction['current_account_title'] ?? ''));
     $transaction['installment_tooltip'] = '';
     if ($transaction['payment_type'] === 'term') {
         $plan = json_decode((string)($transaction['term_schedule'] ?? ''), true);
@@ -404,7 +410,7 @@ patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
 ?>
 <?php if ($isPreCash): ?><link rel="stylesheet" href="<?=url('assets/classic-pre-cash.css?v=20260824-4')?>"><?php endif; ?>
 <main class="patient-container cash-page">
-  <div class="cash-page-head"><div><h1><?=$isPreCash ? 'Ön Kasa' : 'Kasa'?></h1><p>Gelir, gider, bakiye ve günlük kapanış işlemlerini yönetin.</p></div></div>
+  <div class="cash-page-head"><div><h1><?=$isPreCash ? 'Ön Kasa' : 'Kasa'?></h1><p>İşletme: <?=e($companyAccount['code'].' · '.($companyAccount['short_name'] ?: $companyAccount['title']))?></p></div></div>
   <?php if ($message): ?><div class="cash-notice success"><?=e($message)?></div><?php endif ?>
   <?php if ($error): ?><div class="cash-notice error"><?=e($error)?></div><?php endif ?>
 
@@ -426,10 +432,14 @@ patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
       <form class="cash-form" method="post">
         <input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_transaction">
         <label>İşlem Tarihi<input type="date" name="transaction_date" value="<?=e($_POST['transaction_date'] ?? date('Y-m-d'))?>" required></label>
+        <label>İşletme<input value="<?=e($companyAccount['code'].' · '.($companyAccount['short_name'] ?: $companyAccount['title']))?>" readonly></label>
+        <label>Karşı Taraf (Cari)<select name="current_account_id"><option value="">Seçiniz</option><?php foreach ($counterpartyAccounts as $counterparty): ?><option value="<?=(int)$counterparty['id']?>" <?=(int)($_POST['current_account_id']??0)===(int)$counterparty['id']?'selected':''?>><?=e($counterparty['code'].' · '.($counterparty['short_name'] ?: $counterparty['title']))?></option><?php endforeach ?></select></label>
         <label>İşlem Türü<select name="transaction_type" required><option value="income">Gelir</option><option value="expense">Gider</option></select></label>
         <label>Açıklama<input name="description" maxlength="255" value="<?=e($_POST['description'] ?? '')?>" required></label>
         <label>Tutar<input type="number" name="amount" min="0.01" step="0.01" value="<?=e($_POST['amount'] ?? '')?>" required></label>
         <label>Ödeme Türü<select name="payment_type" required><option value="cash">Nakit</option><option value="eft_transfer">EFT / Havale</option><option value="credit_card">Kredi Kartı</option><option value="mail_order">Mail Order</option><option value="term">Vadeli</option></select></label>
+        <label>Kasa<input value="<?=$isPreCash ? 'Ön Kasa' : 'Ana Kasa'?>" readonly></label>
+        <label>Banka<select name="bank_name"><option value="">Banka kullanılmıyor</option><?php foreach ($cashBankOptions as $bank): ?><option value="<?=e($bank['name'])?>" <?=($_POST['bank_name']??'')===$bank['name']?'selected':''?>><?=e($bank['name'])?></option><?php endforeach ?></select></label>
         <label>Kategori<select name="category_id"><option value="">Kategorisiz</option><?php foreach ($activeCategories as $category): ?><option value="<?=(int)$category['id']?>"><?=e(($category['parent_name'] ? $category['parent_name'] . ' / ' : '') . $category['name'])?></option><?php endforeach ?></select></label>
         <div class="cash-actions"><button>Kaydet</button></div>
       </form>
@@ -438,9 +448,9 @@ patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
       <header><div><h2>Kasa Hareketleri</h2><p><?=count($transactions)?> kayıt<?=$sourceUrlFilter !== '' ? ' · Bu hizmet kartına ait hareketler' : ''?></p></div>
         <form class="opening-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="save_opening"><label>Devreden Kasa<input type="number" step="0.01" name="opening_balance" value="<?=number_format($openingBalance,2,'.','')?>"></label><button>Kaydet</button></form>
       </header>
-      <div class="cash-table-wrap"><table><thead><tr><th>Tarih</th><th>Kasa</th><th>Fatura No</th><th>İlgili</th><th>Ödeme</th><th>Giren</th><th>Çıkan</th></tr></thead><tbody>
+      <div class="cash-table-wrap"><table><thead><tr><th>Tarih</th><th>Kasa</th><th>Fatura No</th><th>İlgili</th><th>Ödeme / Banka</th><th>Giren</th><th>Çıkan</th></tr></thead><tbody>
       <?php foreach ($transactions as $transaction): ?><tr class="<?=!empty($transaction['source_url']) ? 'cash-source-row' : ''?>" data-source-url="<?=e((string)($transaction['source_url'] ?? ''))?>">
-        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=($transaction['cash_register'] ?? 'main') === 'pre' ? 'Ön Kasa' : 'Kasa'?></td><td><span title="<?=e($transaction['description'])?>"><?=e($transaction['invoice_no'] ?: '—')?></span></td><td><?=e($transaction['related_person'] ?: '—')?></td><td><?=e(['cash'=>'Nakit','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?></td>
+        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=($transaction['cash_register'] ?? 'main') === 'pre' ? 'Ön Kasa' : 'Kasa'?></td><td><span title="<?=e($transaction['description'])?>"><?=e($transaction['invoice_no'] ?: '—')?></span></td><td><?=e($transaction['related_person'] ?: '—')?></td><td><?=e(['cash'=>'Nakit','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?><?=!empty($transaction['bank_name']) ? ' · '.e($transaction['bank_name']) : ''?></td>
         <td class="money income"><?=$transaction['transaction_type'] === 'income' ? (!empty($transaction['installment_tooltip']) ? '<span title="'.e($transaction['installment_tooltip']).'">'.cash_money((float)$transaction['amount']).'</span>' : cash_money((float)$transaction['amount'])) : '—'?></td>
         <td class="money expense"><?php if ($transaction['transaction_type'] === 'expense' || ($transaction['transaction_type'] === 'income' && $transaction['payment_type'] === 'mail_order')): ?><?php if ($transaction['payment_type'] === 'mail_order' && !empty($transaction['current_account_code'])): ?><span title="<?=e($transaction['current_account_code'] . ' — ' . ($transaction['current_account_short_name'] ?: $transaction['current_account_title']))?>"><?=cash_money((float)$transaction['amount'])?></span><?php else: ?><?=cash_money((float)$transaction['amount'])?><?php endif ?><?php else: ?>—<?php endif ?></td>
       </tr><?php endforeach ?>

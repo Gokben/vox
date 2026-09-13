@@ -7,7 +7,9 @@
   const label = document.createElement('div');
   label.className = 'vox-version-tools';
   label.textContent = 'Versiyon ' + (version || '—');
-  document.body.append(label);
+  const clock = document.querySelector('.desktop-clock');
+  if (clock) clock.insertAdjacentElement('beforebegin', label);
+  else document.body.append(label);
   const notice = document.createElement('div');
   notice.className = 'vox-release-notice';
   notice.setAttribute('role', 'status');

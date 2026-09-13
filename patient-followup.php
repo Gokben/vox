@@ -1044,7 +1044,7 @@ if (trim((string)$form['related_personnel']) !== '' && (trim((string)$form['cont
 
 // Pasif personel yeni seçimlerde gösterilmez. Ancak hasta kartında ilgili
 // personel olarak daha önce kaydedilmişse, geçmiş kaydı korumak için görünür.
-$activeStaffNames = patient_staff_names();
+$activeStaffNames = active_employee_names();
 $contactPersonOptions = array_values(array_unique($activeStaffNames));
 $registeredPersonnel = preg_split('/\s*,\s*/u', (string)$form['related_personnel'], -1, PREG_SPLIT_NO_EMPTY) ?: [];
 foreach ($registeredPersonnel as $person) {
@@ -2241,21 +2241,24 @@ const initializeSalesScreen=()=>{
   cashSourceForm?.addEventListener('change',event=>{if(event.target.matches('[data-primary-term-amount],[name="term_date[]"],[name="term_paid[]"]'))syncPrimaryTermPlan();},true);
   // Vade planı dinamik üretildiği için, form gönderilmeden önce tüm satırları tekil plan verisine zorla ekle.
   cashSourceForm?.addEventListener('submit',()=>{const old=cashSourceForm.querySelector('[name="term_schedule_json"]');old?.remove();const rows=[...cashSourceForm.querySelectorAll('[data-primary-term-amount]')];if(!rows.length)return;const dates=[...cashSourceForm.querySelectorAll('[name="term_date[]"]')],paid=[...cashSourceForm.querySelectorAll('[name="term_paid[]"]')],plan=rows.map((amount,index)=>({date:dates[index]?.value||'',amount:amount.value||'',paid:!!paid[index]?.checked}));const input=document.createElement('input');input.type='hidden';input.name='term_schedule_json';input.value=JSON.stringify(plan);cashSourceForm.append(input);},true);
-  const formatIncomeMoneyWhileTyping=event=>{
+  const incomeMoneyFields='[name="amount"],[name="extra_amount"],[data-primary-term-amount],[data-term-amount]';
+  const editIncomeMoney=event=>{
     const field=event.target;
-    if(!(field instanceof HTMLInputElement)||!field.matches('[name="amount"],[name="extra_amount"],[data-primary-term-amount],[data-term-amount]'))return;
-    const raw=field.value,caret=field.selectionStart??raw.length;
-    if(raw.trim()==='')return;
-    const amount=parseTurkishMoney(raw);
-    if(amount===null)return;
-    const digitsBeforeCaret=(raw.slice(0,caret).match(/\d/g)||[]).length;
-    const formatted=formatTurkishMoney(amount);
-    field.value=formatted;
-    let nextCaret=0,seenDigits=0;
-    while(nextCaret<formatted.length&&seenDigits<digitsBeforeCaret){if(/\d/.test(formatted[nextCaret]))seenDigits++;nextCaret++;}
-    field.setSelectionRange(nextCaret,nextCaret);
+    if(!(field instanceof HTMLInputElement)||!field.matches(incomeMoneyFields)||field.readOnly||field.disabled)return;
+    if(field.value.trim()==='')return;
+    const amount=parseTurkishMoney(field.value);
+    if(amount!==null)field.value=String(amount).replace('.',',');
   };
-  cashSourceForm?.addEventListener('input',formatIncomeMoneyWhileTyping,true);
+  const formatIncomeMoneyOnBlur=event=>{
+    const field=event.target;
+    if(!(field instanceof HTMLInputElement)||!field.matches(incomeMoneyFields)||field.readOnly||field.disabled)return;
+    if(field.value.trim()==='')return;
+    const amount=parseTurkishMoney(field.value);
+    if(amount!==null)field.value=formatTurkishMoney(amount);
+  };
+  // Keep typed digits untouched; decorate the value only after editing finishes.
+  cashSourceForm?.addEventListener('focus',editIncomeMoney,true);
+  cashSourceForm?.addEventListener('blur',formatIncomeMoneyOnBlur,true);
   restoreDetails();if(!<?=json_encode($savedCashRecord !== [])?>&&paymentSelect)paymentSelect.value='';if(<?=json_encode($savedCashRecord !== [])?>&&paymentSelect){paymentSelect.disabled=true;paymentSelect.title='Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.';}setTimeout(()=>{renderPrimaryTermSchedule();placePrimaryTermTotal();loadSavedCashCards();setTimeout(restoreSavedTermSchedule,60);[80,180,360].forEach(delay=>setTimeout(restoreExtraTermSchedule,delay));},0);syncCashIcon();syncDeviceModels();fillDeviceSerial();syncChargerModels();fillChargerSerial();if(['sales_charger_brand','sales_charger_model','sales_charger_serial'].some(name=>detailFields.find(field=>field.name===name)?.value.trim()))toggleChargerDetails(true);if(detailFields.find(field=>field.name==='sales_consumable_stock_id')?.value){toggleConsumableDetails(true);syncConsumablePrice();}
   const toggleDeviceDetails=show=>{if(deviceDetails)deviceDetails.hidden=!show;};
   const hasDeviceDetails=['sales_brand','sales_model','sales_device_serial'].some(name=>detailFields.find(field=>field.name===name)?.value.trim());

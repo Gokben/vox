@@ -1,6 +1,15 @@
 <?php
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
+// Local edits and ordinary script runs are not releases.
+if (!in_array('--live', $argv, true)) {
+    echo "No release created. Version changes only during an authorized live deployment.\n";
+    exit(0);
+}
+if (PHP_OS_FAMILY === 'Windows' || getenv('APP_ENV') === 'local') {
+    fwrite(STDERR, "Live release publishing is disabled in the local environment.\n");
+    exit(1);
+}
 require __DIR__ . '/app-version.php';
 // Publish only after application files have been copied successfully.
 $files = glob(__DIR__ . '/*.php') ?: [];

@@ -5,11 +5,14 @@ require_login();
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
+require_once __DIR__ . '/cash-bootstrap.php';
+ensure_cash_schema($pdo);
 if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
     $pdo->exec('CREATE TABLE IF NOT EXISTS current_account_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT,current_account_id INTEGER NOT NULL,transaction_date TEXT NOT NULL,movement_kind TEXT NOT NULL,amount NUMERIC NOT NULL,description TEXT NOT NULL,invoice_no TEXT NULL,source_ref TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,UNIQUE(current_account_id,source_ref,movement_kind))');
 } else {
     $pdo->exec('CREATE TABLE IF NOT EXISTS current_account_transactions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,current_account_id INT UNSIGNED NOT NULL,transaction_date DATE NOT NULL,movement_kind VARCHAR(20) NOT NULL,amount DECIMAL(14,2) NOT NULL,description VARCHAR(255) NOT NULL,invoice_no VARCHAR(100) NULL,source_ref VARCHAR(255) NOT NULL,created_at DATETIME DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY current_account_source_kind_unique(current_account_id,source_ref,movement_kind),INDEX current_account_transaction_date_idx(transaction_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 }
+ensure_cash_company_schema($pdo);
 $sgkAccountStatement = $pdo->prepare('SELECT id FROM current_accounts WHERE code=? LIMIT 1');
 $sgkAccountStatement->execute(['CR-08']);
 $sgkAccountId = (int)$sgkAccountStatement->fetchColumn();

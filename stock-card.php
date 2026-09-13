@@ -32,7 +32,12 @@ if (!$hasPowerUsage) $pdo->exec('ALTER TABLE stock_cards ADD COLUMN power_usage 
 $hasProductColor = $sqlite ? (bool)array_filter($pdo->query('PRAGMA table_info(stock_cards)')->fetchAll(), static fn($column) => $column['name'] === 'product_color') : (function() use ($pdo): bool {$query=$pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name="stock_cards" AND column_name="product_color"');$query->execute();return(bool)$query->fetchColumn();})();
 if (!$hasProductColor) $pdo->exec('ALTER TABLE stock_cards ADD COLUMN product_color VARCHAR(50) NULL');
 
-$fields = ['stock_code','stock_name','brand','model','vat_rate','device_type','power_usage','product_color','min_stock','max_stock','stock_type'];
+$hasProductCode = $sqlite
+    ? (bool)array_filter($pdo->query('PRAGMA table_info(stock_cards)')->fetchAll(), static fn($column) => $column['name'] === 'product_code')
+    : (bool)$pdo->query("SHOW COLUMNS FROM stock_cards LIKE 'product_code'")->fetch();
+if (!$hasProductCode) $pdo->exec('ALTER TABLE stock_cards ADD COLUMN product_code VARCHAR(100) NULL');
+
+$fields = ['stock_code','stock_name','brand','model','vat_rate','device_type','power_usage','product_color','product_code','min_stock','max_stock','stock_type'];
 $brands = $pdo->query('SELECT id,name,stock_type FROM brands ORDER BY name')->fetchAll();
 $models = $pdo->query('SELECT MIN(id) AS id,brand_id,name,MAX(stock_type) AS stock_type FROM models GROUP BY brand_id,name ORDER BY name')->fetchAll();
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: 0;
@@ -62,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['max_stock'] = max(0, (int)$form['max_stock']);
     $form['vat_rate'] = in_array($form['vat_rate'], ['0', '10', '20'], true) ? $form['vat_rate'] : '';
     if ($form['stock_code'] === '' || $form['stock_name'] === '') $error = 'Stok kodu ve stok adı zorunludur.';
+    elseif (mb_strlen($form['product_code']) > 100) $error = 'Ürün kodu en fazla 100 karakter olabilir.';
     elseif ($form['vat_rate'] === '') $error = 'KDV oranı yalnız %0, %10 veya %20 olabilir.';
     elseif ($form['max_stock'] && $form['max_stock'] < $form['min_stock']) $error = 'Azami stok miktarı asgari stok miktarından düşük olamaz.';
     else {
@@ -110,7 +116,7 @@ patient_header($editing ? 'Stok Kartı Düzenle' : 'Yeni Stok Kartı', 'stock');
       <label>Stok Kodu *<input name="stock_code" value="<?=e($form['stock_code'])?>" required></label><label>Stok Adı *<input name="stock_name" value="<?=e($form['stock_name'])?>" placeholder="Cihazın tam ticari adı" required></label>
       <label>Marka<select name="brand" id="stock-brand"><option value="">Seçiniz</option><?php foreach ($brands as $brand): ?><option value="<?=e($brand['name'])?>" <?= $form['brand'] === $brand['name'] ? 'selected' : '' ?>><?=e($brand['name'])?></option><?php endforeach ?><?php if ($form['brand'] !== '' && !in_array($form['brand'], array_column($brands, 'name'), true)): ?><option value="<?=e($form['brand'])?>" selected><?=e($form['brand'])?></option><?php endif ?></select></label>
       <label>Model<select name="model" id="stock-model"><option value="">Model seçiniz</option><?php foreach ($models as $model): ?><option value="<?=e($model['name'])?>" data-brand-id="<?=e((string)$model['brand_id'])?>" <?= $form['model'] === $model['name'] ? 'selected' : '' ?>><?=e($model['name'])?></option><?php endforeach ?><?php if ($form['model'] !== '' && !in_array($form['model'], array_column($models, 'name'), true)): ?><option value="<?=e($form['model'])?>" selected><?=e($form['model'])?></option><?php endif ?></select></label><label>KDV Oranı<select name="vat_rate"><option value="0" <?=$form['vat_rate']==='0'?'selected':''?>>%0</option><option value="10" <?=$form['vat_rate']==='10'?'selected':''?>>%10</option><option value="20" <?=$form['vat_rate']==='20'?'selected':''?>>%20</option></select></label>
-      <label>Cihaz Tipi<select name="device_type"><option value="">Seçiniz</option><?php foreach (['Kulak arkası (BTE)','Kanal içi (CIC)','Kanal içi (ITC)','Kanal İçi Alıcı RIC/RIE'] as $type): ?><option <?=$form['device_type'] === $type ? 'selected' : ''?>><?=e($type)?></option><?php endforeach ?></select></label><label>Güç Kullanımı<select name="power_usage"><option value="">Seçiniz</option><?php foreach (['Pilli','Şarjlı'] as $powerUsage): ?><option <?=$form['power_usage'] === $powerUsage ? 'selected' : ''?>><?=e($powerUsage)?></option><?php endforeach ?></select></label><label>Ürün Rengi<select name="product_color"><option value="">Seçiniz</option><?php foreach (['Bej','Siyah','Şampanya'] as $productColor): ?><option <?=$form['product_color'] === $productColor ? 'selected' : ''?>><?=e($productColor)?></option><?php endforeach ?></select></label>
+      <label>Cihaz Tipi<select name="device_type"><option value="">Seçiniz</option><?php foreach (['Kulak arkası (BTE)','Kanal içi (CIC)','Kanal içi (ITC)','Kanal içi (CIC+TC)','Kanal İçi Alıcı RIC/RIE'] as $type): ?><option <?=$form['device_type'] === $type ? 'selected' : ''?>><?=e($type)?></option><?php endforeach ?></select></label><label>Güç Kullanımı<select name="power_usage"><option value="">Seçiniz</option><?php foreach (['Pilli','Şarjlı'] as $powerUsage): ?><option <?=$form['power_usage'] === $powerUsage ? 'selected' : ''?>><?=e($powerUsage)?></option><?php endforeach ?></select></label><label>Ürün Rengi<select name="product_color"><option value="">Seçiniz</option><?php foreach (['Bej','Siyah','Şampanya'] as $productColor): ?><option <?=$form['product_color'] === $productColor ? 'selected' : ''?>><?=e($productColor)?></option><?php endforeach ?></select></label><label>Ürün Kodu<input type="text" name="product_code" maxlength="100" value="<?=e($form['product_code'])?>"></label>
     </div>
     <h2>Finansal ve Depo Bilgileri</h2><div class="stock-grid">
       <label>Kritik / Asgari Stok<input type="number" min="0" name="min_stock" value="<?=e((string)$form['min_stock'])?>"></label><label>Azami Stok<input type="number" min="0" name="max_stock" value="<?=e((string)$form['max_stock'])?>"></label>

@@ -1,0 +1,13 @@
+.vox-price-help-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:24px!important;min-width:24px!important;height:24px!important;padding:0!important;border:1px solid #16766b!important;border-radius:50%!important;background:#16766b!important;color:#fff!important;font:700 16px/1 Arial,sans-serif!important;cursor:pointer;vertical-align:middle;margin-left:7px!important;flex:0 0 24px}
+.vox-price-help-button:focus-visible{outline:2px solid #efb936;outline-offset:3px}
+.vox-price-help-menu-row{display:flex;align-items:center;padding-right:10px}
+.vox-price-help-menu-row>a{flex:1;min-width:0}
+.vox-price-help-dialog{width:min(820px,calc(100vw - 32px));max-height:85vh;padding:0!important;border:1px solid #16766b!important;border-radius:8px;background:#fff!important;color:#163c40;box-shadow:0 15px 60px #0005}
+.vox-price-help-dialog::backdrop{background:#001b2466}
+.vox-price-help-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;background:#145e54;color:white}
+.vox-price-help-dialog>header h2{font-size:17px;margin:0;color:inherit}
+.vox-price-help-dialog>header button{background:transparent!important;border:0!important;color:white!important;font-size:26px!important;width:30px!important;height:30px!important;padding:0!important;cursor:pointer}
+.vox-price-help-content{padding:16px 24px;overflow:auto;max-height:calc(85vh - 60px);font:14px/1.6 Arial,sans-serif}
+.vox-price-help-content h3{font-size:18px;margin:0 0 12px}.vox-price-help-content h4{font-size:16px;margin:20px 0 8px;color:#145e54}.vox-price-help-content ul{padding-left:22px}.vox-price-help-content li{margin:6px 0}.vox-price-help-content table{border-collapse:collapse;width:100%}.vox-price-help-content td,.vox-price-help-content th{border:1px solid #c6d8d5;padding:7px;text-align:left}.vox-price-help-content th{background:#e8f4f1}
+
+.vox-mdi-titlebar>.vox-price-help-button,.page-context>.vox-price-help-button{width:20px!important;min-width:20px!important;max-width:20px!important;height:20px!important;min-height:20px!important;max-height:20px!important;flex:0 0 20px!important;box-sizing:border-box!important;border:1px solid #fff!important;border-radius:50%!important;font-size:14px!important;margin:0 0 0 10px!important;align-self:center;position:relative;z-index:2}

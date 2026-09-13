@@ -33,13 +33,15 @@
       if (!isSaveControl(control) || control.dataset.voxClassicSave === '1') return;
       control.dataset.voxClassicSave = '1';
       control.classList.add('vox-classic-save');
+      // Keep the shared icon button size even on pages with older !important rules.
+      Object.entries({'box-sizing':'border-box','width':'36px','min-width':'36px','max-width':'36px','height':'30px','min-height':'30px','max-height':'30px','padding':'0','flex':'0 0 36px','display':'inline-flex','align-items':'center','justify-content':'center','line-height':'1'}).forEach(([property,value])=>control.style.setProperty(property,value,'important'));
       const form = control.closest('form');
       form?.classList.add('vox-compact-form');
       form?.closest('main')?.classList.add('vox-form-page');
       const label = cleanLabel(labelOf(control));
-      const decorated = `▣ ${label} (F2)`;
-      if (control instanceof HTMLInputElement) control.value = decorated;
-      else control.textContent = decorated;
+      if (!(control instanceof HTMLInputElement)) {
+        control.innerHTML = '<svg class="vox-save-icon" style="width:18px!important;min-width:18px!important;max-width:18px!important;height:18px!important;min-height:18px!important;max-height:18px!important;display:block!important;flex-shrink:0!important" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5 3h12l4 4v14H3V3h2zm2 0v7h10V3M7 21v-8h10v8M14 5v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+      }
       if (!control.getAttribute('aria-label')) control.setAttribute('aria-label',label);
       control.title = `${label} — F2`;
     };

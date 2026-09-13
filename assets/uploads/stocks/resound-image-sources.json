@@ -1,0 +1,56 @@
+{
+  "key-67": {
+    "path": "assets/uploads/stocks/resound-key-67-official.png",
+    "source": "https://pro.resound.com/-/media/partnerportal/resound/products/key/products%20png/rs_ke_mbte_67_thin_tube_blk_web.ashx",
+    "size": [
+      400,
+      400
+    ],
+    "bytes": 54965
+  },
+  "key-77": {
+    "path": "assets/uploads/stocks/resound-key-77-official.png",
+    "source": "https://pro.resound.com/-/media/partnerportal/resound/products/key/products%20png/rs_ke_bte_77_plastic_hook_blk_web.ashx",
+    "size": [
+      400,
+      400
+    ],
+    "bytes": 43476
+  },
+  "key-cic": {
+    "path": "assets/uploads/stocks/resound-key-cic-official.png",
+    "source": "https://pro.resound.com/-/media/partnerportal/resound/products/key/products%20png/rs_ke_cic-w_web.ashx",
+    "size": [
+      400,
+      400
+    ],
+    "bytes": 20614
+  },
+  "enzo-q-88": {
+    "path": "assets/uploads/stocks/resound-enzo-q-88-official.png",
+    "source": "https://pro.resound.com/-/media/partnerportal/resound/images/product-images/enzo-3d/pp_0000s_0001_resound-enzo-bte-88.ashx",
+    "size": [
+      600,
+      600
+    ],
+    "bytes": 20084
+  },
+  "omnia-60": {
+    "path": "assets/uploads/stocks/resound-omnia-60-official.png",
+    "source": "https://pro.resound.com/-/media/partnerportal/resound/products/omnia/full-line-up/renderings/rs_omnia_mini_rie60_rhi_sparkling_silver.ashx",
+    "size": [
+      484,
+      400
+    ],
+    "bytes": 78724
+  },
+  "omnia-61-rechargeable": {
+    "path": "assets/uploads/stocks/resound-omnia-61-rechargeable-official.png",
+    "source": "https://pro.resound.com/-/media/partnerportal/resound/products/omnia/product-images/rs_omnia_rie61_rhi_sparkling_silver_angle1.ashx",
+    "size": [
+      484,
+      400
+    ],
+    "bytes": 79121
+  }
+}

@@ -78,11 +78,14 @@ try {
 }
 
 ensure_patient_passport_schema(db());
+ensure_employee_active_schema();
+ensure_patient_opening_employee_schema(db());
+$openingEmployees = db()->query('SELECT id,full_name FROM employees WHERE active=1 ORDER BY full_name,id')->fetchAll();
 $id = (int)($_GET['id'] ?? 0);
 $returnTo = trim((string)($_POST['return'] ?? $_GET['return'] ?? 'patients.php'));
 if (!preg_match('/^(patients|patient-results)\.php(?:\?.*)?$/', $returnTo)) $returnTo = 'patients.php';
 $isEmbeddedWindow = (string)($_POST['_vox_window'] ?? $_GET['_vox_window'] ?? '') === '1';
-$fields = ['branch_id','record_date','full_name','national_id','passport_no','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_detail','notes'];
+$fields = ['branch_id','record_date','full_name','national_id','passport_no','phone_primary','proximity_relation','phone_secondary','proximity_relation_secondary','birth_date','address','patient_rating','patient_rating_comment','patient_status','social_security','report_status','source_id','source_unit_id','source_account_id','source_detail','source_referral_detail','notes','opening_employee_id'];
 $patient = array_fill_keys($fields, '');
 $patient['patient_status'] = 'active';
 $defaultRecordDate = (string)($_GET['date'] ?? '');
@@ -119,8 +122,13 @@ try {
 $serviceTypeOptions=array_filter($serviceTypeDefinitions, static fn(array $row): bool => (int)$row['active'] === 1);
 $sourceDefinitions = [];
 $sourceUnits = [];
+$sourceAccounts = [];
 try {
     $sourceDefinitions=source_definitions();
+    $hasAccounts = db()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+        ? db()->query("SELECT name FROM sqlite_master WHERE type='table' AND name='current_accounts'")->fetchColumn()
+        : db()->query("SHOW TABLES LIKE 'current_accounts'")->fetchColumn();
+    if ($hasAccounts) $sourceAccounts = db()->query("SELECT id,title,short_name,account_type FROM current_accounts WHERE account_type IN ('institution','customer') ORDER BY title,id")->fetchAll();
     $sourceUnits=db()->query('SELECT id,name,last_name FROM units ORDER BY name,last_name,id')->fetchAll();
 } catch (Throwable $exception) {
     $formSetupErrors[] = 'source-options';
@@ -131,6 +139,7 @@ if ($id) {
     if (!$found) { http_response_code(404); exit('Hasta kaydı bulunamadı.'); }
     $patient=array_merge($patient,$found);
 }
+$savedOpeningEmployeeId = (int)($patient['opening_employee_id'] ?? 0);
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     verify_csrf();
     foreach($fields as $field) {
@@ -144,6 +153,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     if (!in_array($patient['report_status'], array_merge([''], REPORT_STATUSES), true)) {
         $error = 'Rapor alanı geçerli bir seçenek olmalıdır.';
     }
+    $sourceName = '';
     $patient['source_id'] = (int)$patient['source_id'];
     if ($patient['source_id']) {
         $sourceStatement = db()->prepare('SELECT name FROM source_definitions WHERE id=?');
@@ -154,11 +164,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     } else {
         $patient['source_unit_id'] = 0;
     }
+    if (!in_array($sourceName, ['Kurumlar', 'Firmalar'], true)) $patient['source_account_id'] = '';
+    if ($error === '') $error=patient_source_account_error(db(), $sourceName, $patient['source_account_id']);
+    if ($error === '') $error=patient_opening_employee_error(db(), $patient['opening_employee_id'], $savedOpeningEmployeeId);
     if ($error === '') $error=patient_passport_error($patient['passport_no']);
     if ($error === '') $error=patient_identity_validate(db(),$patient['national_id'],'patients',$id,$patient['passport_no']);
     if ($patient['full_name']==='') $error='Ad soyad alanı zorunludur.';
     elseif ($error === '') {
         $values=[]; foreach($fields as $field) $values[$field]=$patient[$field];
+        $values['source_account_id'] = $patient['source_account_id'] === '' ? null : (int)$patient['source_account_id'];
+        $values['opening_employee_id'] = $patient['opening_employee_id'] === '' ? null : (int)$patient['opening_employee_id'];
         if ($id) {
             $set=implode(',',array_map(fn($field)=>$field.'=?',array_keys($values)));
             $stmt=db()->prepare("UPDATE patients SET $set,updated_at=CURRENT_TIMESTAMP WHERE id=?"); $stmt->execute([...array_values($values),$id]);
@@ -223,7 +238,7 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 .classic-patient-form #proximity-row.is-hidden{display:block!important}
 .classic-patient-form #proximity-secondary-row{display:block!important}
 .classic-patient-form .field-address{grid-column:span 2!important}
-.classic-patient-form .field-comment{grid-column:1 / -1!important}
+.classic-patient-form .field-comment{grid-column:span 2!important}
 .classic-patient-form .field-notes{grid-column:1 / -1!important}
 .classic-patient-form .field-notes .merged-input,.classic-patient-form .field-notes textarea{width:100%!important;box-sizing:border-box!important}
 .classic-patient-form .field-address .merged-input textarea{height:39px!important;min-height:39px!important}
@@ -233,7 +248,10 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 .classic-patient-form .patient-rating label.is-selected,.classic-patient-form .patient-rating label:hover{color:#f2a22d!important}
 .classic-patient-form .check-row{height:29px!important;padding:5px 4px!important;gap:18px!important;font-size:11px!important}
 .classic-patient-form .check-row input{width:13px!important;height:13px!important;accent-color:#149447!important}
-.classic-patient-form .source-unit-row[hidden]{display:none!important}
+.classic-patient-form .source-unit-row[hidden],body#vox-app .classic-patient-form .source-referral-row[hidden]{display:none!important}
+body#vox-app .classic-patient-form .source-account-row[hidden]{display:none!important}
+.classic-patient-form .field-source-account{grid-column:1 / 2!important}
+.classic-patient-form .field-source-referral{grid-column:1 / 2!important}
 .classic-patient-form .vuexy-form-actions{order:99!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;display:flex!important;align-items:center!important;gap:7px!important;border:1px solid #79a5d0!important;border-radius:2px!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
 .classic-form-note{margin-right:auto;color:#5b6875;font:11px Tahoma,"Segoe UI",sans-serif}
 .classic-form-note .required-mark{font-weight:700}
@@ -267,8 +285,11 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 <div class="icon-form-row"><label class="icon-form-label">Sosyal Güvence</label><div class="merged-input"><span class="merged-icon">◇</span><input name="social_security" value="<?=e($patient['social_security'])?>"></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Rapor</label><div class="merged-input"><span class="merged-icon">✓</span><select name="report_status"><option value="">Seçiniz</option><?php foreach(REPORT_STATUSES as $reportStatus):?><option value="<?=e($reportStatus)?>" <?=$patient['report_status']===$reportStatus?'selected':''?>><?=e($reportStatus)?></option><?php endforeach?></select></div></div>
 <h3 class="form-section-title">Başvuru ve Açıklamalar</h3>
-<div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach($sourceDefinitions as $source):if(mb_strtolower(trim((string)$source['name']),'UTF-8')==='pazarlama')continue;$isCurrent=(int)$patient['source_id']===(int)$source['id'];if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach(patient_source_options($sourceDefinitions, (int)($patient['source_id'] ?? 0)) as $source):if(mb_strtolower(trim((string)$source['name']),'UTF-8')==='pazarlama')continue;$isCurrent=(int)$patient['source_id']===(int)$source['id'];$legacySource=in_array(trim($source['name']),['Kurumlar & Firmalar','Kurumlar ve Firmalar'],true);if($legacySource&&!$isCurrent)continue;if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$legacySource?'hidden':''?> <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row source-account-row" hidden><label class="icon-form-label" for="source-account">Kurum</label><div class="merged-input"><span class="merged-icon">◉</span><select id="source-account" name="source_account_id"><option value="">Seçiniz</option><?php foreach($sourceAccounts as $account): ?><option data-account-type="<?=e($account['account_type'])?>" value="<?=(int)$account['id']?>" <?=((int)($patient['source_account_id']??0)===(int)$account['id'])?'selected':''?>><?=e(trim((string)($account['short_name']??''))!=='' ? trim((string)$account['short_name']) : $account['title'])?></option><?php endforeach; ?></select></div></div>
+<div class="icon-form-row source-referral-row" hidden><label class="icon-form-label" for="source-referral-detail">Tanıdık / Tavsiye Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><input type="text" id="source-referral-detail" name="source_referral_detail" placeholder="Tanıdık veya tavsiye detayını yazınız" value="<?=e($patient['source_referral_detail']??'')?>"></div></div>
 <div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ad Soyad seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e(trim((string)$unit['name'].' '.(string)($unit['last_name']??'')))?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row"><label class="icon-form-label" for="opening-employee">İlgilenen kişi</label><div class="merged-input"><span class="merged-icon">♙</span><select id="opening-employee" name="opening_employee_id" title="Hasta kartı açılırken hastayla ilgilenen çalışan"><option value="">Çalışan seçiniz</option><?php if (!empty($patient['opening_employee_id']) && !in_array((int)$patient['opening_employee_id'], array_map('intval', array_column($openingEmployees, 'id')), true)): ?><option hidden selected value="<?=(int)$patient['opening_employee_id']?>">Mevcut atama korunuyor</option><?php endif; ?><?php foreach ($openingEmployees as $employee): ?><option value="<?=(int)$employee['id']?>" <?=((int)($patient['opening_employee_id']??0)===(int)$employee['id'])?'selected':''?>><?=e($employee['full_name'])?></option><?php endforeach; ?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><select name="source_detail">
 <option value="">Seçiniz</option>
 <?php $sourceDetailOptions = ['Deneme', 'Test', 'Bilgi', 'Servis']; $currentSourceDetail = (string)($patient['source_detail'] ?? ''); ?>
@@ -308,7 +329,7 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
     form.insertBefore(section,actions);
   };
   makeSection('Temel Bilgiler','♟','classic-basic-grid',[
-    ['full_name','field-name'],['national_id','field-national'],['branch_id','field-branch'],['record_date','field-record-date'],
+    ['full_name','field-name'],['national_id','field-national'],['record_date','field-record-date'],['opening_employee_id','field-opening-employee'],['branch_id','field-branch'],
     ['birth_date','field-birth-date'],['phone_primary','field-phone-primary'],['proximity_relation','field-proximity'],['phone_secondary','field-phone-secondary'],['proximity_relation_secondary','field-secondary-proximity'],
     ['address','field-address'],['patient_rating','field-rating'],['patient_rating_comment','field-comment'],['patient_status','field-status'],
 
@@ -317,7 +338,7 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
     ['social_security','field-social-security'],['report_status','field-report-status']
   ]);
   makeSection('Başvuru ve Açıklamalar','▦','classic-application-grid',[
-    ['source_id','field-source'],['source_detail','field-source-detail'],['source_unit_id','field-source-unit'],['notes','field-notes']
+    ['source_id','field-source'],['source_detail','field-source-detail'],['source_account_id','field-source-account'],['source_referral_detail','field-source-referral'],['source_unit_id','field-source-unit'],['notes','field-notes']
   ]);
   const statusLabel=rowFor('patient_status')?.querySelector('.icon-form-label');
   if(statusLabel)statusLabel.textContent='Hasta Durumu';
@@ -412,6 +433,38 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 })();
 (()=>{const phone=document.getElementById('phone_primary'),toggle=document.getElementById('proximity-toggle'),row=document.getElementById('proximity-row'),relation=document.getElementById('proximity_relation');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else{row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
 (()=>{const phone=document.getElementById('phone_secondary'),toggle=document.getElementById('proximity-secondary-toggle'),row=document.getElementById('proximity-secondary-row'),relation=document.getElementById('proximity_relation_secondary');if(!phone||!toggle||!row||!relation)return;const refresh=()=>{const available=phone.value.trim()!=='';toggle.disabled=!available;if(!available){row.classList.add('is-hidden');relation.value='';toggle.setAttribute('aria-expanded','false');}else{row.classList.remove('is-hidden');toggle.setAttribute('aria-expanded','true');}};toggle.addEventListener('click',()=>{const hidden=row.classList.toggle('is-hidden');toggle.setAttribute('aria-expanded',String(!hidden));if(!hidden)relation.focus()});phone.addEventListener('input',refresh);refresh()})();
+(() => {
+  const source = document.querySelector('select[name="source_id"]');
+  const row = document.querySelector('.source-referral-row');
+  if (!source || !row) return;
+  const refresh = () => {
+    const name = (source.options[source.selectedIndex]?.textContent || '').replace(/\s*\(Pasif\)$/, '').trim().toLocaleLowerCase('tr-TR');
+    row.hidden = !['tanıdık', 'tavsiye'].includes(name);
+    const detailLabel = name === 'tanıdık' ? 'Tanıdık detayı' : 'Tavsiye detayı';
+    row.querySelector('label').textContent = detailLabel;
+    row.querySelector('input').placeholder = detailLabel + ' yazınız';
+  };
+  source.addEventListener('change', refresh);
+  refresh();
+})();
+(() => {
+  const source = document.querySelector('select[name="source_id"]');
+  const row = document.querySelector('.source-account-row');
+  const select = row?.querySelector('select');
+  if (!source || !select) return;
+  const options = [...select.options].slice(1).map(option => option.cloneNode(true));
+  const refresh = () => {
+    const name = (source.selectedOptions[0]?.textContent || '').replace(/\s*\(Pasif\)$/, '').trim();
+    const type = {Kurumlar:'institution', Firmalar:'customer'}[name];
+    const value = select.value;
+    row.hidden = !type;
+    row.querySelector('label').textContent = name === 'Kurumlar' ? 'Kurum' : 'Firma';
+    select.replaceChildren(new Option('Seçiniz', ''), ...options.filter(option => option.dataset.accountType === type).map(option => option.cloneNode(true)));
+    select.value = [...select.options].some(option => option.value === value) ? value : '';
+  };
+  source.addEventListener('change', refresh);
+  refresh();
+})();
 (()=>{const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-unit-row'),units=document.querySelector('select[name="source_unit_id"]');if(!source||!row||!units)return;const refresh=()=>{const label=(source.options[source.selectedIndex]?.textContent||'').trim();const show=/^(kaynak\s*)?ünite$/i.test(label);row.hidden=!show;if(!show)units.value='';};source.addEventListener('change',refresh);refresh()})();
 (()=>{const input=document.getElementById('patient-full-name'),display=document.querySelector('.patient-name-display');if(!input||!display)return;const edit=()=>{input.focus();input.setSelectionRange(input.value.length,input.value.length)};display.addEventListener('click',edit);display.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();edit()}})})();
 </script>

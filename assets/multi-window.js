@@ -117,10 +117,10 @@
         const isCalendar = /\/calendar\.php$/i.test(framePath);
         const isKanban = /\/kanban\.php$/i.test(framePath);
         const isListsMenuPage = /\/(?:hearing-devices|sales|result-list|sgk-list)\.php$/i.test(framePath);
-        const isStockMenuPage = /\/(?:stock-exit|stocks|price-lists|invoice-list)\.php$/i.test(framePath);
+        const isStockMenuPage = /\/(?:stock-exit|stocks|price-lists|stock-prices|invoice-list)\.php$/i.test(framePath);
         const isTechnicalService = /\/technical-service\.php$/i.test(framePath);
         const isPreCash = /\/cash-pre\.php$/i.test(framePath);
-        const isCurrentAccountsPage = /\/(?:current-accounts|current-account-movements|current-account-documents)\.php$/i.test(framePath);
+        const isCurrentAccountsPage = /\/(?:current-accounts|current-account-movements|current-account-documents|company-finance)\.php$/i.test(framePath);
         const isAppointmentForm = /\/appointment-form\.php$/i.test(framePath);
         const isExternalPatientWindow = /\/external-technical-patient\.php$/i.test(framePath);
         const isExternalRepairWindow = /\/external-technical-repair\.php$/i.test(framePath);
@@ -254,7 +254,7 @@
       task.className = 'vox-mdi-task vox-mdi-task-active';
       task.textContent = titleText;
       task.title = titleText;
-      taskbar.insertBefore(task, clock || null);
+      taskbar.insertBefore(task, taskbar.querySelector('.vox-version-tools') || clock || null);
       workspace.append(panel);
 
       const record = {id,key,window:panel,title,frame,task,restoreStyle:null,waitForInitialFit,centerAfterFit:false};
@@ -268,7 +268,20 @@
         const button = event.target.closest('button');
         const action = button?.dataset.mdiAction;
         if (action === 'minimize') minimize(record);
-        if (action === 'close') close(record);
+        if (action === 'close') {
+          let returnedToAccounts = false;
+          try {
+            const frameLocation = new URL(record.frame.contentWindow.location.href);
+            if (frameLocation.pathname.endsWith('/company-finance.php') || (frameLocation.pathname.endsWith('/current-accounts.php') && (frameLocation.searchParams.has('edit') || record.frame.contentDocument.querySelector('.new-account-card[open]')))) {
+              frameLocation.pathname = frameLocation.pathname.replace(/[^/]+$/, 'current-accounts.php');
+              frameLocation.search = '?_vox_window=1';
+              frameLocation.hash = '';
+              record.frame.contentWindow.location.assign(frameLocation.href);
+              returnedToAccounts = true;
+            }
+          } catch (_) {}
+          if (!returnedToAccounts) close(record);
+        }
         if (action === 'maximize') {
           const maximizing = !panel.classList.contains('vox-mdi-maximized');
           const frameDoc = frame.contentDocument;

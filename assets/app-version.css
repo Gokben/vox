@@ -1,3 +1,5 @@
-body#vox-app .vox-version-tools{position:fixed;right:14px;top:10px;bottom:auto;z-index:310;padding:4px 8px;background:#083329;color:#fff;border:1px solid #508573;border-radius:3px;font:12px Tahoma,sans-serif;pointer-events:none}
+body#vox-app .vox-version-tools{position:fixed;right:76px;bottom:5px;z-index:310;padding:2px 8px;color:#fff;background:#083329;font:11px Tahoma,sans-serif;pointer-events:none;white-space:nowrap;flex-shrink:0}
+body#vox-app .desktop-taskbar .vox-version-tools{position:static!important;margin-left:auto!important;background:transparent!important}
+body#vox-app .desktop-taskbar .vox-version-tools + .desktop-clock{margin-left:0!important;flex-shrink:0}
 .vox-release-notice{position:fixed;top:0;left:0;right:0;z-index:100000;padding:12px 18px;border-bottom:1px solid #a87316;background:#fff2cc;color:#513b12;font:13px/1.5 Tahoma,sans-serif;overflow-wrap:anywhere}
 @media print{.vox-version-tools,.vox-release-notice{display:none!important}}
