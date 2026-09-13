@@ -9,6 +9,7 @@ if (!$cashRequestedFromBb && !$preCashRequested) redirect('bb/cash.php');
 if ($cashRequestedFromBb) require_admin();
 else require_login();
 require __DIR__ . '/cash-bootstrap.php';
+require_once __DIR__ . '/cash-payment-records.php';
 require __DIR__ . '/bank-bootstrap.php';
 require __DIR__ . '/patient-layout.php';
 
@@ -177,69 +178,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Devreden kasa güncellendi.';
             $activeTab = 'transactions';
         } elseif ($action === 'save_transaction') {
-            $date = trim((string)($_POST['transaction_date'] ?? ''));
-            $description = trim((string)($_POST['description'] ?? ''));
-            $type = (string)($_POST['transaction_type'] ?? '');
-            $amount = cash_parse_amount((string)($_POST['amount'] ?? '0'));
-            $paymentType = (string)($_POST['payment_type'] ?? '');
-            $installmentCount = max(1, (int)($_POST['installment_count'] ?? 1));
-            $bankName = trim((string)($_POST['bank_name'] ?? ''));
-            $commissionRate = (float)str_replace(',', '.', (string)($_POST['commission_rate'] ?? '0'));
-            $currentAccountId = (int)($_POST['current_account_id'] ?? 0);
-            cash_validate_counterparty($pdo, $currentAccountId);
-            $categoryId = (int)($_POST['category_id'] ?? 0);
             $sourceUrl = trim((string)($_POST['source_url'] ?? ''));
-            $transactionRegister = $sourceUrl !== '' ? 'pre' : $cashRegister;
-            $termSchedule = null;
-            if ($paymentType === 'term') {
-                $termSchedule = [];
-                foreach ((array)($_POST['term_amount'] ?? []) as $index => $termAmount) $termSchedule[] = ['date'=>(string)(($_POST['term_date'] ?? [])[$index] ?? ''),'amount'=>(string)$termAmount,'paid'=>isset(($_POST['term_paid'] ?? [])[$index])];
-                $termSchedule = json_encode($termSchedule, JSON_UNESCAPED_UNICODE);
-            }
-            if ($paymentType === 'term' && trim((string)($_POST['term_schedule_json'] ?? '')) !== '') $termSchedule = (string)$_POST['term_schedule_json'];
-            if ($paymentType === 'term' && $installmentCount > 1 && trim((string)$termSchedule) === '') throw new RuntimeException('Vade planındaki tüm aylık ödeme alanlarını doldurun ve yeniden kaydedin.');
-            $cashRecordedAmount = $paymentType === 'term' ? cash_paid_term_total($termSchedule) : $amount;
-            $extraPaymentPosted = trim((string)($_POST['extra_payment_type'] ?? ''));
-            $primaryValid = $date !== '' && $description !== '' && in_array($type, ['income', 'expense'], true) && $amount > 0 && in_array($paymentType, ['cash', 'eft_transfer', 'credit_card', 'mail_order', 'term'], true);
-            if (!$primaryValid && $extraPaymentPosted === '') throw new RuntimeException('İşlem bilgilerini eksiksiz ve geçerli olarak girin.');
-            if ($primaryValid) {
-                if ($paymentType === 'mail_order' && !$currentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
-                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by,cash_register) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                    ->execute([$date, $description, $type, $cashRecordedAmount, $paymentType, $installmentCount, $bankName ?: null, $commissionRate ?: null, $currentAccountId ?: null, $termSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0), $transactionRegister]);
-            }
-            $extraAmountRaw = trim((string)($_POST['extra_amount'] ?? ''));
-            if ($extraAmountRaw !== '') {
-                $extraDate = $date;
-                $extraDescription = trim((string)($_POST['extra_description'] ?? ''));
-                $extraAmount = cash_parse_amount($extraAmountRaw);
-                $extraPaymentType = (string)($_POST['extra_payment_type'] ?? $paymentType);
-                $extraInstallmentCount = max(1, (int)($_POST['extra_installment_count'] ?? 1));
-                $extraBankName = trim((string)($_POST['extra_bank_name'] ?? ''));
-                $extraCommissionRate = (float)str_replace(',', '.', (string)($_POST['extra_commission_rate'] ?? '0'));
-                $extraCurrentAccountId = (int)($_POST['extra_current_account_id'] ?? 0);
-                cash_validate_counterparty($pdo, $extraCurrentAccountId);
-                $extraTermSchedule = null;
-                $extraScheduledAmount = $extraAmount;
-                if ($extraPaymentType === 'term') {
-                    $extraPlan = [];
-                    $extraScheduledAmount = 0.0;
-                    $extraAmount = 0.0;
-                    foreach ((array)($_POST['extra_term_amount'] ?? []) as $index => $termAmount) {
-                        $isPaid = isset(($_POST['extra_term_paid'] ?? [])[$index]);
-                        $extraPlan[] = ['date'=>(string)(($_POST['extra_term_date'] ?? [])[$index] ?? ''),'amount'=>(string)$termAmount,'paid'=>$isPaid];
-                        $termAmountValue = cash_parse_amount((string)$termAmount);
-                        $extraScheduledAmount += $termAmountValue;
-                        if ($isPaid) $extraAmount += $termAmountValue;
-                    }
-                    $extraTermSchedule = json_encode($extraPlan, JSON_UNESCAPED_UNICODE);
-                }
-                if ($extraDate === '' || $extraDescription === '' || $extraScheduledAmount <= 0 || !in_array($extraPaymentType, ['cash', 'eft_transfer', 'credit_card', 'mail_order', 'term'], true)) {
-                    throw new RuntimeException('İkinci gelir kaydının bilgilerini eksiksiz ve geçerli olarak girin.');
-                }
-                if ($extraPaymentType === 'mail_order' && !$extraCurrentAccountId) throw new RuntimeException('Mail Order için cari hesap seçmelisiniz.');
-                $pdo->prepare('INSERT INTO cash_transactions(transaction_date,description,transaction_type,amount,payment_type,installment_count,bank_name,commission_rate,current_account_id,term_schedule,category_id,source_url,created_by,cash_register) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                    ->execute([$extraDate, $extraDescription, $type, $extraAmount, $extraPaymentType, $extraInstallmentCount, $extraBankName ?: null, $extraCommissionRate ?: null, $extraCurrentAccountId ?: null, $extraTermSchedule, $categoryId ?: null, $sourceUrl ?: null, (int)($_SESSION['user']['id'] ?? 0), $transactionRegister]);
-            }
+            $type = (string)($_POST['transaction_type'] ?? '');
+            $payments = [['record' => cash_payment_posted($_POST)]];
+            if (trim((string)($_POST['extra_payment_type'] ?? '')) !== '') $payments[] = ['record' => cash_payment_posted($_POST, 'extra_')];
+            cash_payment_save_batch($pdo, $payments, $sourceUrl, (int)($_SESSION['user']['id'] ?? 0), $sourceUrl !== '' ? 'pre' : $cashRegister, $type, (int)($_POST['category_id'] ?? 0) ?: null);
             $message = 'Kasa işlemi kaydedildi.';
             $activeTab = 'transactions';
         } elseif ($action === 'update_transaction') {
@@ -450,7 +393,7 @@ patient_header($isPreCash ? 'Ön Kasa' : 'Kasa', 'cash');
       </header>
       <div class="cash-table-wrap"><table><thead><tr><th>Tarih</th><th>Kasa</th><th>Fatura No</th><th>İlgili</th><th>Ödeme / Banka</th><th>Giren</th><th>Çıkan</th></tr></thead><tbody>
       <?php foreach ($transactions as $transaction): ?><tr class="<?=!empty($transaction['source_url']) ? 'cash-source-row' : ''?>" data-source-url="<?=e((string)($transaction['source_url'] ?? ''))?>">
-        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=($transaction['cash_register'] ?? 'main') === 'pre' ? 'Ön Kasa' : 'Kasa'?></td><td><span title="<?=e($transaction['description'])?>"><?=e($transaction['invoice_no'] ?: '—')?></span></td><td><?=e($transaction['related_person'] ?: '—')?></td><td><?=e(['cash'=>'Nakit','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?><?=!empty($transaction['bank_name']) ? ' · '.e($transaction['bank_name']) : ''?></td>
+        <td><?=format_date_tr($transaction['transaction_date'])?></td><td><?=($transaction['cash_register'] ?? 'main') === 'pre' ? 'Ön Kasa' : 'Kasa'?></td><td><span title="<?=e($transaction['description'])?>"><?=e($transaction['invoice_no'] ?: '—')?></span></td><td><?=e($transaction['related_person'] ?: '—')?></td><td><?=e(['cash'=>'Nakit','eft_transfer'=>'EFT / Havale','credit_card'=>'Kredi Kartı','mail_order'=>'Mail Order','term'=>'Vadeli'][$transaction['payment_type']] ?? '—')?><?=!empty($transaction['bank_name']) ? ' · '.e($transaction['bank_name']) : ''?></td>
         <td class="money income"><?=$transaction['transaction_type'] === 'income' ? (!empty($transaction['installment_tooltip']) ? '<span title="'.e($transaction['installment_tooltip']).'">'.cash_money((float)$transaction['amount']).'</span>' : cash_money((float)$transaction['amount'])) : '—'?></td>
         <td class="money expense"><?php if ($transaction['transaction_type'] === 'expense' || ($transaction['transaction_type'] === 'income' && $transaction['payment_type'] === 'mail_order')): ?><?php if ($transaction['payment_type'] === 'mail_order' && !empty($transaction['current_account_code'])): ?><span title="<?=e($transaction['current_account_code'] . ' — ' . ($transaction['current_account_short_name'] ?: $transaction['current_account_title']))?>"><?=cash_money((float)$transaction['amount'])?></span><?php else: ?><?=cash_money((float)$transaction['amount'])?><?php endif ?><?php else: ?>—<?php endif ?></td>
       </tr><?php endforeach ?>

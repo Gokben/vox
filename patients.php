@@ -149,6 +149,28 @@ patient_header('Hasta Kartları');
 echo '<div style="padding:8px 20px"><a href="'.e(url('patient-identity-audit.php')).'">T.C. Kimlik Kontrol Listesi</a></div>';
 ?>
 <style>
+/* Icon dimensions must not depend on the desktop breakpoint. */
+.vox-patient-classic-list .excel-export-button{display:inline-grid;place-items:center;box-sizing:border-box;flex:0 0 29px;width:29px;height:29px;min-width:29px;max-width:29px;border-radius:3px;background:#16883d;color:#fff}
+.vox-patient-classic-list .excel-export-button svg{display:block;width:17px;height:17px;max-width:17px;max-height:17px;fill:none;stroke:currentColor;stroke-width:1.9}
+@media(max-width:900px){
+  body#vox-app .vox-patient-classic-list{box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin:0;padding:6px;background:#dcebf8;color:#17382f;font:11px Tahoma,"Segoe UI",sans-serif}
+  .vox-patient-classic-list .vox-patient-list-card{width:100%;min-width:0;box-sizing:border-box;overflow:hidden;border:1px solid #aebfb8;background:#fff}
+  .vox-patient-classic-list .vox-patient-list-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:7px;width:100%;box-sizing:border-box;min-height:40px;margin:0;padding:5px 7px;border-bottom:1px solid #aebfb8;background:#e7f2ed}
+  .vox-patient-classic-list .vox-patient-list-length,.vox-patient-classic-list .vox-patient-list-search{display:flex;align-items:center;gap:5px;margin:0;white-space:nowrap}
+  .vox-patient-classic-list .vox-patient-new-button{display:inline-flex;align-items:center;height:29px;padding:0 9px;border:1px solid #19782b;border-radius:3px;background:linear-gradient(#66d36f,#12842b);color:#fff;font-weight:bold;text-decoration:none}
+  .vox-patient-classic-list .vox-patient-list-toolbar select,.vox-patient-classic-list .vox-patient-list-toolbar input:not([type=hidden]){box-sizing:border-box;max-width:100%;height:27px;min-height:27px;padding:2px 5px;border:1px solid #8daece;border-radius:2px;background:#fff;color:#26384a;font:11px Tahoma,"Segoe UI",sans-serif}
+  .vox-patient-classic-list .year-select{width:160px}
+  .vox-patient-classic-list .vox-patient-list-search{margin-left:auto}
+  .vox-patient-classic-list .vox-patient-list-search input{width:180px}
+  .vox-patient-classic-list .vox-patient-list-scroll{width:100%;max-width:100%;max-height:calc(100dvh - 150px);overflow:auto;overscroll-behavior:contain}
+  .vox-patient-classic-list .vox-patient-table{width:max-content;min-width:100%;border-collapse:collapse;font:11px Tahoma,"Segoe UI",sans-serif}
+  .vox-patient-classic-list .vox-patient-table th,.vox-patient-classic-list .vox-patient-table td{box-sizing:border-box;max-width:240px;padding:5px 7px;border:1px solid #cbd9d5;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vox-patient-classic-list .vox-patient-table th{position:sticky;top:0;z-index:1;background:linear-gradient(#fff,#dce6e2);font-weight:bold}
+  .vox-patient-classic-list .vox-patient-table tbody tr:nth-child(even){background:#f5faf8}
+  .vox-patient-classic-list .vox-patient-list-actions{display:flex;align-items:center}
+  .vox-patient-classic-list .vox-patient-list-actions form{margin:0}
+}
+
 .date-sort-link{display:inline-flex;align-items:center;gap:6px;color:inherit;text-decoration:none}.date-sort-link:hover{color:#16883d}.date-sort-icon{font-size:14px;line-height:1;color:#20a447}
 body .vox-patient-list-actions{gap:6px!important}body .vox-patient-list-actions>a,body .vox-patient-list-actions>form>button{display:grid!important;place-items:center!important;box-sizing:border-box!important;margin:0!important;padding:0!important;width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;max-width:32px!important;max-height:32px!important}body .vox-patient-list-actions>form{display:block!important;margin:0!important}body .vox-patient-list-actions .vox-icon-delete{margin-left:0!important}body .vox-patient-list-actions>a[href*="patient-followup.php?id="]{box-sizing:border-box!important;flex:0 0 32px!important;width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;max-width:32px!important;max-height:32px!important;border:1px solid #f3a64a!important;background:#f3a64a!important;color:#fff!important}body .vox-patient-list-actions>a[href*="patient-followup.php?id="] .ti{width:16px!important;height:16px!important;font-size:16px!important}body .vox-patient-list-actions>a[href*="patient-followup.php?id="]:hover{background:#df8f2b!important;color:#fff!important}
 body .vox-patient-list-actions .patient-info-action{border:1px solid #6f42c1!important;color:#fff!important;background:#6f42c1!important}body .vox-patient-list-actions .patient-info-action:hover{background:#59359d!important;border-color:#59359d!important;color:#fff!important}
