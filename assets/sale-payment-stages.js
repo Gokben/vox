@@ -188,7 +188,20 @@
       show('commission_rate',type==='credit_card');
       const accountLabel=section.querySelector(`[name="${prefix}current_account_id"]`)?.closest('label');
       const caption=[...(accountLabel?.childNodes||[])].find(n=>n.nodeType===Node.TEXT_NODE);
-      if(caption&&caption.nodeValue!=='Cari Hesap')caption.nodeValue='Cari Hesap';
+      const account=section.querySelector(`[name="${prefix}current_account_id"]`);
+      const accountTitle=type==='eft_transfer'?'Ödemenin Geldiği İşletme Hesabı':'Cari Hesap';
+      if(caption&&caption.nodeValue!==accountTitle)caption.nodeValue=accountTitle;
+      if(account){
+        [...account.options].forEach(option=>{
+          const owner=/^CR-00(?:\s|$)/.test(option.textContent.trim());
+          const allowed=type==='eft_transfer'?owner:(!owner||!option.value);
+          option.hidden=!allowed;option.disabled=!allowed;
+        });
+        if(type==='eft_transfer'){
+          const owner=[...account.options].find(option=>/^CR-00(?:\s|$)/.test(option.textContent.trim()));
+          if(owner)account.value=owner.value;
+        }else if(account.selectedOptions[0]?.disabled)account.value='';
+      }
       section.querySelector('[data-company-payment-account]')?.remove();
     });
     syncPaymentTabs(form);

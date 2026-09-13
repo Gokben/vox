@@ -36,3 +36,10 @@ check($posted['transaction_date']==='2026-09-18' && $posted['amount']===199.50,'
 $plan=json_decode($posted['term_schedule'],true);
 check($plan[1]['amount']==='199,50','Installment amount compatible with cash reports');
 echo "PASS: independent dates, daily cash totals, five payment types, installments, precision and atomic rollback\n";
+
+$eft=cash_payment_record(array_replace($base,['payment_type'=>'eft_transfer','current_account_id'=>11,'bank_name'=>'Test Bank']));
+cash_payment_save_batch($pdo,[['record'=>$eft]],'/eft-owner-test',1);
+$saved=$pdo->query("SELECT * FROM cash_transactions WHERE source_url='/eft-owner-test'")->fetch();
+check($saved['current_account_id']===null && $saved['bank_name']==='Test Bank','Receiving company is not saved as counterparty');
+check($saved['transaction_date']==='2026-09-13' && (float)$saved['amount']===1250.50,'EFT cash date and amount preserved');
+echo "PASS: EFT receiving business account normalization\n";
