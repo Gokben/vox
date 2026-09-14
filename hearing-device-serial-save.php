@@ -11,9 +11,11 @@ try {
     $movementId = filter_input(INPUT_POST, 'movement_id', FILTER_VALIDATE_INT);
     $serialIndex = filter_input(INPUT_POST, 'serial_index', FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
     $serialNo = trim((string)($_POST['serial_no'] ?? ''));
+    $stockType = trim((string)($_POST['stock_type'] ?? 'İşitme Cihazı'));
+    if (!in_array($stockType, ['İşitme Cihazı', 'Şarj Cihazı'], true)) throw new RuntimeException('Geçersiz stok tipi.');
     if (!$movementId || $serialIndex === false) throw new RuntimeException('Seri numarası kaydı bulunamadı.');
     $statement = db()->prepare("SELECT m.serial_numbers FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE m.id=? AND m.movement_type='Giriş' AND s.stock_type=?");
-    $statement->execute([$movementId, 'İşitme Cihazı']);
+    $statement->execute([$movementId, $stockType]);
     $storedSerials = $statement->fetchColumn();
     if ($storedSerials === false) throw new RuntimeException('Stok girişi bulunamadı.');
     $serials = json_decode((string)$storedSerials, true);

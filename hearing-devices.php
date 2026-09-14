@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+$deviceListStockType = defined('DEVICE_LIST_STOCK_TYPE') ? (string)DEVICE_LIST_STOCK_TYPE : 'İşitme Cihazı';
+$deviceListTitle = defined('DEVICE_LIST_TITLE') ? (string)DEVICE_LIST_TITLE : 'İşitme Cihazları';
+$deviceListDescription = defined('DEVICE_LIST_DESCRIPTION') ? (string)DEVICE_LIST_DESCRIPTION : 'Stokta bulunan işitme cihazlarını seri numaralarıyla görüntüleyin.';
+$deviceListEmpty = defined('DEVICE_LIST_EMPTY') ? (string)DEVICE_LIST_EMPTY : 'Stokta seri numarasıyla izlenen işitme cihazı bulunamadı.';
+$deviceListFooterLabel = defined('DEVICE_LIST_FOOTER_LABEL') ? (string)DEVICE_LIST_FOOTER_LABEL : 'seri numarası listeleniyor.';
+
 require __DIR__ . '/config.php';
 require_login();
 require __DIR__ . '/patient-layout.php';
@@ -21,11 +27,11 @@ try {
         $pdo->exec('ALTER TABLE stock_movements ADD COLUMN current_account_id ' . ($isSqlite ? 'INTEGER NULL' : 'INT UNSIGNED NULL'));
     }
     $hearingBrandsStatement = $pdo->prepare("SELECT DISTINCT brand FROM stock_cards WHERE stock_type=? AND brand IS NOT NULL AND brand<>'' ORDER BY brand");
-    $hearingBrandsStatement->execute(['İşitme Cihazı']);
+    $hearingBrandsStatement->execute([$deviceListStockType]);
     $hearingBrands = $hearingBrandsStatement->fetchAll(PDO::FETCH_COLUMN);
     if ($selectedBrand !== '' && !in_array($selectedBrand, $hearingBrands, true)) $selectedBrand = '';
     $hearingModelsSql = "SELECT DISTINCT model FROM stock_cards WHERE stock_type=? AND model IS NOT NULL AND model<>''";
-    $hearingModelsParams = ['İşitme Cihazı'];
+    $hearingModelsParams = [$deviceListStockType];
     if ($selectedBrand !== '') { $hearingModelsSql .= ' AND brand=?'; $hearingModelsParams[] = $selectedBrand; }
     $hearingModelsSql .= ' ORDER BY model';
     $hearingModelsStatement = $pdo->prepare($hearingModelsSql);
@@ -33,12 +39,12 @@ try {
     $hearingModels = $hearingModelsStatement->fetchAll(PDO::FETCH_COLUMN);
     $hearingYearsSql = $isSqlite ? "SELECT DISTINCT strftime('%Y',m.movement_date) AS year_value FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE s.stock_type=? AND m.movement_date IS NOT NULL ORDER BY year_value DESC" : "SELECT DISTINCT YEAR(m.movement_date) AS year_value FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE s.stock_type=? AND m.movement_date IS NOT NULL ORDER BY year_value DESC";
     $hearingYearsStatement = $pdo->prepare($hearingYearsSql);
-    $hearingYearsStatement->execute(['İşitme Cihazı']);
+    $hearingYearsStatement->execute([$deviceListStockType]);
     $hearingYears = array_values(array_map('strval', array_filter($hearingYearsStatement->fetchAll(PDO::FETCH_COLUMN), static fn($year): bool => preg_match('/^\d{4}$/', (string)$year) === 1)));
     if ($selectedModel !== '' && !in_array($selectedModel, $hearingModels, true)) $selectedModel = '';
     if ($selectedYear !== '' && !in_array($selectedYear, $hearingYears, true)) $selectedYear = '';
     $where = ['s.stock_type=?'];
-    $params = ['İşitme Cihazı'];
+    $params = [$deviceListStockType];
     if ($selectedBrand !== '') { $where[] = 's.brand=?'; $params[] = $selectedBrand; }
     if ($selectedModel !== '') { $where[] = 's.model=?'; $params[] = $selectedModel; }
     if ($selectedYear !== '') { $where[] = $isSqlite ? "strftime('%Y',m.movement_date)=?" : 'YEAR(m.movement_date)=?'; $params[] = $selectedYear; }
@@ -46,7 +52,7 @@ try {
     $statement->execute($params);
     $movementRows = $statement->fetchAll();
 } catch (Throwable $exception) {
-    error_log('hearing-devices.php query: ' . $exception->getMessage());
+    error_log(basename((string)($_SERVER['SCRIPT_NAME'] ?? 'hearing-devices.php')) . ' query: ' . $exception->getMessage());
     $movementRows = [];
     $hearingBrands = [];
     $hearingModels = [];
@@ -104,16 +110,18 @@ foreach ($deviceGroups as $device) {
     }
 }
 
-patient_header('İşitme Cihazları', 'stock');
+patient_header($deviceListTitle, 'stock');
 ?>
 <link rel="stylesheet" href="<?=url('assets/classic-menu-lists.css?v=20260823-2')?>">
 <style>
 .hearing-devices-page{max-width:1500px;margin:0 auto;padding:96px 20px 48px}.hearing-devices-card{overflow:hidden;border:1px solid var(--line);border-radius:9px;background:var(--card);box-shadow:0 .25rem 1.125rem rgba(47,43,61,.1)}.hearing-devices-head{padding:22px 24px;border-bottom:1px solid var(--line)}.hearing-devices-head h1{margin:0 0 5px;font-size:21px}.hearing-devices-head p{margin:0;color:var(--muted)}.hearing-devices-tools{display:flex;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line)}.hearing-devices-tools input{width:min(420px,100%);height:39px;padding:0 12px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);color:var(--text);font:inherit}.hearing-devices-scroll{overflow:auto}.hearing-devices-table{width:100%;min-width:1000px;border-collapse:collapse}.hearing-devices-table th,.hearing-devices-table td{padding:14px 18px;border-bottom:1px solid var(--line);text-align:left}.hearing-devices-table th{font-size:12px;text-transform:uppercase}.hearing-devices-table td{font-size:13px;color:var(--muted)}.serial-number{font-weight:700;color:#dc3545!important}.hearing-devices-empty{text-align:center!important;padding:38px!important}.hearing-devices-foot{padding:15px 24px;color:var(--muted)}@media(max-width:560px){.hearing-devices-page{padding:92px 14px 30px}.hearing-devices-tools input{width:100%}}
 </style>
-<main class="hearing-devices-page"><section class="hearing-devices-card"><header class="hearing-devices-head"><h1>İşitme Cihazları</h1><p>Stokta bulunan işitme cihazlarını seri numaralarıyla görüntüleyin.</p></header><div class="hearing-devices-tools"><input id="hearing-devices-search" type="search" placeholder="Stok kodu, cihaz adı, marka, model veya seri no ara" autocomplete="off"></div><div class="hearing-devices-scroll"><table class="hearing-devices-table"><thead><tr><th>Stok Kodu</th><th>Cihaz Adı</th><th>Marka</th><th>Model</th><th>Seri No</th><th>Giriş Tarihi</th><th>Fatura No</th><th>Stok Miktarı</th></tr></thead><tbody><?php foreach ($devices as $device): ?><tr><td><?=e($device['stock_code'])?></td><td><?=e($device['stock_name'])?></td><td><?=e($device['brand'])?></td><td><?=e($device['model'])?></td><td class="serial-number"><?=e($device['serial_no'] ?: 'Seri no girilmedi')?></td><td><?=e(format_date_tr($device['movement_date']))?></td><td><?=e($device['invoice_no'] ?: '—')?></td><td><?=e((string)$device['stock_quantity'])?></td></tr><?php endforeach; ?><?php if (!$devices): ?><tr><td class="hearing-devices-empty" colspan="8">Stokta seri numarasıyla izlenen işitme cihazı bulunamadı.</td></tr><?php endif; ?></tbody></table></div><footer class="hearing-devices-foot"><?=count($devices)?> seri numarası listeleniyor.</footer></section></main>
+<main class="hearing-devices-page"><section class="hearing-devices-card"><header class="hearing-devices-head"><h1><?=e($deviceListTitle)?></h1><p><?=e($deviceListDescription)?></p></header><div class="hearing-devices-tools"><input id="hearing-devices-search" type="search" placeholder="Stok kodu, cihaz adı, marka, model veya seri no ara" autocomplete="off"></div><div class="hearing-devices-scroll"><table class="hearing-devices-table"><thead><tr><th>Stok Kodu</th><th>Cihaz Adı</th><th>Marka</th><th>Model</th><th>Seri No</th><th>Giriş Tarihi</th><th>Fatura No</th><th>Stok Miktarı</th></tr></thead><tbody><?php foreach ($devices as $device): ?><tr><td><?=e($device['stock_code'])?></td><td><?=e($device['stock_name'])?></td><td><?=e($device['brand'])?></td><td><?=e($device['model'])?></td><td class="serial-number"><?=e($device['serial_no'] ?: 'Seri no girilmedi')?></td><td><?=e(format_date_tr($device['movement_date']))?></td><td><?=e($device['invoice_no'] ?: '—')?></td><td><?=e((string)$device['stock_quantity'])?></td></tr><?php endforeach; ?><?php if (!$devices): ?><tr><td class="hearing-devices-empty" colspan="8"><?=e($deviceListEmpty)?></td></tr><?php endif; ?></tbody></table></div><footer class="hearing-devices-foot"><?=count($devices)?> <?=e($deviceListFooterLabel)?></footer></section></main>
 <style>.hearing-devices-head{position:relative;padding-right:150px}.hearing-devices-save{position:absolute;right:24px;top:50%;display:inline-flex;align-items:center;gap:7px;height:39px;padding:0 14px;transform:translateY(-50%);border:0;border-radius:6px;background:#20a447;color:#fff;font:inherit;font-weight:700;cursor:pointer}.hearing-devices-save:hover{background:#16883d}.hearing-devices-tools select{width:190px;height:39px;padding:0 11px;border:1px solid #d5d3de;border-radius:6px;background:var(--card);color:var(--text);font:inherit}.serial-number input{width:100%;min-width:145px;height:34px;padding:0 9px;border:1px solid #d5d3de;border-radius:5px;background:var(--card);color:#dc3545;font:inherit;font-weight:700}.serial-number input:focus{outline:2px solid #bfe9ca;border-color:#20a447}.serial-number input.serial-saving{opacity:.65}.serial-number input.serial-error{border-color:#dc3545;background:#fff0f0}@media(max-width:560px){.hearing-devices-head{padding-right:24px;padding-bottom:78px}.hearing-devices-save{top:auto;bottom:20px;transform:none;left:24px;right:24px;justify-content:center}.hearing-devices-tools{flex-direction:column;align-items:stretch}.hearing-devices-tools select{width:100%}}</style>
 <script>
 const hearingDevicesSearch = document.getElementById('hearing-devices-search');
+const deviceListStockType = <?=json_encode($deviceListStockType, JSON_UNESCAPED_UNICODE)?>;
+const deviceListTitle = <?=json_encode($deviceListTitle, JSON_UNESCAPED_UNICODE)?>;
 const hearingDeviceBrands = <?=json_encode(array_values($hearingBrands), JSON_UNESCAPED_UNICODE)?>;
 const hearingDeviceModels = <?=json_encode(array_values($hearingModels), JSON_UNESCAPED_UNICODE)?>;
 const hearingDeviceYears = <?=json_encode(array_values($hearingYears), JSON_UNESCAPED_UNICODE)?>;
@@ -122,11 +130,11 @@ const hearingDeviceCurrentModel = <?=json_encode($selectedModel, JSON_UNESCAPED_
 const hearingDeviceCurrentYear = <?=json_encode($selectedYear, JSON_UNESCAPED_UNICODE)?>;
 if (hearingDevicesSearch) {
   const brandSelect = document.createElement('select');
-  brandSelect.setAttribute('aria-label', 'İşitme cihazı markası');
+  brandSelect.setAttribute('aria-label', deviceListTitle + ' markası');
   brandSelect.innerHTML = '<option value="">Marka seçiniz</option>' + hearingDeviceBrands.map(brand => '<option></option>').join('');
   [...brandSelect.options].forEach((option, index) => { if (index) { option.value = hearingDeviceBrands[index - 1]; option.textContent = hearingDeviceBrands[index - 1]; } option.selected = option.value === hearingDeviceCurrentBrand; });
   const modelSelect = document.createElement('select');
-  modelSelect.setAttribute('aria-label', 'İşitme cihazı modeli');
+  modelSelect.setAttribute('aria-label', deviceListTitle + ' modeli');
   modelSelect.innerHTML = '<option value="">Model seçiniz</option>' + hearingDeviceModels.map(model => '<option></option>').join('');
   [...modelSelect.options].forEach((option, index) => { if (index) { option.value = hearingDeviceModels[index - 1]; option.textContent = hearingDeviceModels[index - 1]; } option.selected = option.value === hearingDeviceCurrentModel; });
   modelSelect.disabled = !brandSelect.value;
@@ -168,7 +176,7 @@ document.querySelectorAll('.hearing-devices-table tbody tr').forEach((row, index
     if (event.target.closest('input,button,a,label,select')) return;
     if (device.current_account_id && device.invoice_no) window.location.href = <?=json_encode(url('current-account-movements.php?id='))?> + encodeURIComponent(device.current_account_id) + '&invoice=' + encodeURIComponent(device.invoice_no);
   });
-  if (device.stock_type !== 'İşitme Cihazı') return;
+  if (device.stock_type !== deviceListStockType) return;
   const input = document.createElement('input');
   input.type = 'text';
   input.maxLength = 190;
@@ -183,7 +191,7 @@ document.querySelectorAll('.hearing-devices-table tbody tr').forEach((row, index
     if (serialNo === savedValue) return;
     input.classList.remove('serial-error');
     input.classList.add('serial-saving');
-    const body = new URLSearchParams({csrf: serialCsrf, movement_id: String(device.movement_id), serial_index: String(device.serial_index), serial_no: serialNo});
+    const body = new URLSearchParams({csrf: serialCsrf, stock_type: deviceListStockType, movement_id: String(device.movement_id), serial_index: String(device.serial_index), serial_no: serialNo});
     try {
       const response = await fetch(serialSaveUrl, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body});
       const result = await response.json();

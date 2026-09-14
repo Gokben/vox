@@ -194,7 +194,10 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   const sgkListLink = document.createElement('a');
   sgkListLink.href = <?= json_encode(url('sgk-list.php')) ?>;
   sgkListLink.textContent = 'SGK Listesi';
-  const listPages = ['result-list.php', 'patient-results.php', 'hearing-devices.php', 'sales.php', 'sgk-list.php'];
+  const chargerDevicesLink = document.createElement('a');
+  chargerDevicesLink.href = <?= json_encode(url('charger-devices.php')) ?>;
+  chargerDevicesLink.textContent = 'Şarj Cihazları';
+  const listPages = ['result-list.php', 'patient-results.php', 'hearing-devices.php', 'charger-devices.php', 'sales.php', 'sgk-list.php'];
   const shouldOpenListsMenu = listPages.includes(location.pathname.split('/').pop()) || sessionStorage.getItem('vox.listsMenuOpen') === '1';
   if (shouldOpenListsMenu) {
     reportGroup.classList.add('open');
@@ -202,9 +205,10 @@ if (reportMenuLink && followUpMenuLink && salesMenuLink) {
   if (listPages.includes(location.pathname.split('/').pop())) reportMenuLink.classList.add('active');
   if (location.pathname.endsWith('/result-list.php') || location.pathname.endsWith('/patient-results.php')) resultListLink.classList.add('active');
   if (location.pathname.endsWith('/hearing-devices.php')) { resultListLink.classList.remove('active'); followUpMenuLink.classList.add('active'); }
+  if (location.pathname.endsWith('/charger-devices.php')) { resultListLink.classList.remove('active'); chargerDevicesLink.classList.add('active'); }
   if (location.pathname.endsWith('/sales.php')) { resultListLink.classList.remove('active'); salesMenuLink.classList.add('active'); }
   if (location.pathname.endsWith('/sgk-list.php')) { resultListLink.classList.remove('active'); sgkListLink.classList.add('active'); }
-  reportSubmenu.append(followUpMenuLink, salesMenuLink, resultListLink, sgkListLink);
+  reportSubmenu.append(followUpMenuLink, chargerDevicesLink, salesMenuLink, resultListLink, sgkListLink);
   const activeReportLink = [...reportSubmenu.querySelectorAll('a')].find(link => {
     try { return new URL(link.href, location.href).pathname === location.pathname; }
     catch (_) { return false; }

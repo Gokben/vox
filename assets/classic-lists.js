@@ -29,7 +29,7 @@
       'appointment-list.php','anamnesis-questions.php','admin.php','banks.php','branches.php','brands.php',
       'cash-categories.php','cash.php','company-patients.php','complaints.php',
       'company-finance.php','current-account-documents.php','current-account-movements.php','current-accounts.php','daily-events-list.php',
-      'employees.php','hearing-devices.php','invoice-list.php','invoice-list-v2.php','invoice-list-v3.php','models.php',
+      'employees.php','hearing-devices.php','charger-devices.php','invoice-list.php','invoice-list-v2.php','invoice-list-v3.php','models.php',
       'patient-results.php','patients.php','price-lists.php','result-list.php','sales.php','service-names.php',
       'service-types.php','sgk-list.php','social-securities.php','sources.php','stock-movements.php','stock-prices.php',
       'stock-exit.php','stocks.php','technical-service.php','unit-patients.php','unit-visits.php','units-card.php','units-card-v2.php'
@@ -124,6 +124,12 @@
         savedWidths = JSON.parse(localStorage.getItem(widthStorageKey) || '[]');
       } catch (_) {}
 
+      // Preserve existing patient column choices when adding the service-name column.
+      if (file === 'patients.php' && headers.length === 18) {
+        if (Array.isArray(saved) && saved.length === 17) { saved.splice(13,0,true); try { localStorage.setItem(storageKey,JSON.stringify(saved)); } catch (_) {} }
+        if (Array.isArray(savedWidths) && savedWidths.length === 17) { savedWidths.splice(13,0,130); try { localStorage.setItem(widthStorageKey,JSON.stringify(savedWidths)); } catch (_) {} }
+      }
+
       const setColumnVisible = (index, visible) => {
         [...table.rows].forEach(row => {
           const cell = row.cells[index];
@@ -138,9 +144,9 @@
         headers.forEach((header,index) => {
           const width = Number(savedWidths[index]);
           if (!Number.isFinite(width) || width < 45) return;
-          header.style.width = width + 'px';
-          header.style.minWidth = width + 'px';
-          header.style.maxWidth = width + 'px';
+          header.style.setProperty('width',width + 'px','important');
+          header.style.setProperty('min-width',width + 'px','important');
+          header.style.setProperty('max-width',width + 'px','important');
         });
         const total = savedWidths.reduce((sum,width) => sum + (Number(width) || 0), 0);
         if (total > 0) table.style.setProperty('width',Math.max(scrollHost?.clientWidth || 0,total) + 'px','important');
