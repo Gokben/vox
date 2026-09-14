@@ -115,6 +115,15 @@ foreach ($movementRows as $movement) {
 }
 $devices = [];
 foreach ($deviceGroups as $device) {
+    if ($includeSoldDevices) {
+        // Older exits may have no serial number: still count them as out of stock.
+        $unassignedExits = max(0, count($device['charger_rows']) - $device['stock_quantity'] - count(array_filter($device['charger_rows'], static fn(array $row): bool => $row['sold'])));
+        foreach ($device['charger_rows'] as &$chargerRow) {
+            if ($unassignedExits > 0 && !$chargerRow['sold']) { $chargerRow['sold'] = true; $unassignedExits--; }
+        }
+        unset($chargerRow);
+    }
+
     for ($index = 0; $index < ($includeSoldDevices ? count($device['charger_rows']) : $device['stock_quantity']); $index++) {
         $entry = $device['entries'][0] ?? ['id' => 0, 'current_account_id' => 0, 'serials' => [], 'movement_date' => $device['movement_date'], 'invoice_no' => $device['invoice_no']];
         $serial = $device['serials'][$index] ?? ['serial_no' => '', 'movement_id' => $entry['id'], 'serial_index' => count($entry['serials']) + $index - count($device['serials']), 'current_account_id' => $entry['current_account_id'], 'movement_date' => $entry['movement_date'], 'invoice_no' => $entry['invoice_no']];

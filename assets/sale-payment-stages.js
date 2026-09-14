@@ -112,6 +112,7 @@
     const invalid=[...form.querySelectorAll('.vox-date-editor')].find(input=>input.getClientRects().length&&(!input.value||!input.validity.valid));
     if(invalid){invalid.reportValidity();invalid.focus();return;}
     const payments=readRecords(form);
+    if(payments.some(payment=>!allTypes.some(([type])=>type===payment.payment_type))){alert('Her gelir kaydı için ödeme şekli seçiniz.');return;}
     const total=payments.reduce((sum,p)=>sum+(p.payment_type==='term'?p.term_schedule.reduce((n,row)=>n+money(row.amount),0):money(p.amount)),0);
     const saleTotal=money(document.querySelector('#sales-details-modal [name="sales_payment_amount"]')?.value);
     if(saleTotal>0&&Math.abs(total-saleTotal)>0.009){alert('Dört ödeme kaydının toplamı satış tutarına eşit olmalıdır. Satış tutarı: '+format(saleTotal)+' ₺');return;}
