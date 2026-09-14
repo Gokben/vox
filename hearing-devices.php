@@ -243,15 +243,19 @@ if (hearingDevicesHeader) {
   const saveButton = document.createElement('button');
   saveButton.type = 'button';
   saveButton.className = 'hearing-devices-save';
-  saveButton.innerHTML = '<i class="icon-base ti tabler-device-floppy"></i> Kaydet';
+  saveButton.style.cssText = 'width:32px!important;min-width:32px!important;padding:0!important';
+  const saveIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10V3M7 21v-8h10v8M14 3v3"/></svg>';
+  saveButton.setAttribute('aria-label', 'Kaydet');
+  saveButton.title = 'Kaydet';
+  saveButton.innerHTML = saveIcon;
   hearingDevicesHeader.append(saveButton);
   saveButton.addEventListener('click', async () => {
     const inputs = [...document.querySelectorAll('.serial-number input')];
     saveButton.disabled = true;
-    saveButton.textContent = 'Kaydediliyor…';
+    saveButton.title = 'Kaydediliyor…';
     await Promise.all(inputs.map(input => input.saveSerialNumber?.()));
-    saveButton.innerHTML = '<i class="icon-base ti tabler-check"></i> Kaydedildi';
-    setTimeout(() => { saveButton.disabled = false; saveButton.innerHTML = '<i class="icon-base ti tabler-device-floppy"></i> Kaydet'; }, 1200);
+    saveButton.title = 'Kaydedildi';
+    setTimeout(() => { saveButton.disabled = false; saveButton.innerHTML = saveIcon; saveButton.title = 'Kaydet'; }, 1200);
   });
 }
 </script>
