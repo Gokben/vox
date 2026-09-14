@@ -106,13 +106,42 @@
       return data;
     });
   }
+  function incomeTotals(payments) {
+    return payments.reduce((totals,payment)=>{
+      if(payment.payment_type==='term'){
+        for(const row of payment.term_schedule||[]){
+          const amount=money(row.amount);
+          if(row.paid)totals.paid+=amount;else totals.balance+=amount;
+        }
+      }else totals.paid+=money(payment.amount);
+      return totals;
+    },{paid:0,balance:0});
+  }
+  function syncIncomeTotal(form){
+    const header=form.querySelector('header');if(!header)return;
+    let summary=header.querySelector('[data-income-header-total]');
+    if(!summary){summary=document.createElement('span');summary.dataset.incomeHeaderTotal='1';header.append(summary);}
+    const totals=incomeTotals(readRecords(form));
+    const text='Ödenen: '+format(totals.paid)+' ₺'+(totals.balance>0?' · Bakiye: '+format(totals.balance)+' ₺':'');
+    if(summary.textContent!==text)summary.textContent=text;
+    if(!summary.dataset.aggregateStyled){summary.dataset.aggregateStyled='1';summary.style.cssText='margin-left:auto;color:#e6525d;font-size:13px;font-weight:700;white-space:nowrap';}
+  }
   let saving=false;
   async function save(form) {
     if(saving)return;
     const invalid=[...form.querySelectorAll('.vox-date-editor')].find(input=>input.getClientRects().length&&(!input.value||!input.validity.valid));
     if(invalid){invalid.reportValidity();invalid.focus();return;}
     const payments=readRecords(form);
-    if(payments.some(payment=>!allTypes.some(([type])=>type===payment.payment_type))){alert('Her gelir kaydı için ödeme şekli seçiniz.');return;}
+    const missingPaymentIndex=payments.findIndex(payment=>!allTypes.some(([type])=>type===payment.payment_type));
+    if(missingPaymentIndex>=0){
+      form.dataset.activePayment=String(missingPaymentIndex);
+      syncPaymentTabs(form);
+      const section=sections(form)[missingPaymentIndex];
+      const prefix=missingPaymentIndex===0?'':missingPaymentIndex===1?'extra_':'payment'+(missingPaymentIndex+1)+'_';
+      alert((missingPaymentIndex+1)+'. gelir kaydında ödeme şekli seçilmemiş. Lütfen bu kaydın ödeme şeklini seçiniz.');
+      section?.querySelector(`[name="${prefix}payment_type"]`)?.focus();
+      return;
+    }
     const total=payments.reduce((sum,p)=>sum+(p.payment_type==='term'?p.term_schedule.reduce((n,row)=>n+money(row.amount),0):money(p.amount)),0);
     const saleTotal=money(document.querySelector('#sales-details-modal [name="sales_payment_amount"]')?.value);
     if(saleTotal>0&&Math.abs(total-saleTotal)>0.009){alert('Dört ödeme kaydının toplamı satış tutarına eşit olmalıdır. Satış tutarı: '+format(saleTotal)+' ₺');return;}
@@ -190,28 +219,28 @@
       const accountLabel=section.querySelector(`[name="${prefix}current_account_id"]`)?.closest('label');
       const caption=[...(accountLabel?.childNodes||[])].find(n=>n.nodeType===Node.TEXT_NODE);
       const account=section.querySelector(`[name="${prefix}current_account_id"]`);
-      const accountTitle=type==='eft_transfer'?'Ödemenin Geldiği İşletme Hesabı':'Cari Hesap';
+      const accountTitle=type==='eft_transfer'?'Ödemenin Geldiği Cari Hesap':'Cari Hesap';
       if(caption&&caption.nodeValue!==accountTitle)caption.nodeValue=accountTitle;
       if(account){
         [...account.options].forEach(option=>{
-          const owner=/^CR-00(?:\s|$)/.test(option.textContent.trim());
-          const allowed=type==='eft_transfer'?owner:(!owner||!option.value);
+          const owner=option.value!=='' && (option.value===settings.ownerAccountId || /^CR-00(?:\s|$)/.test(option.textContent.trim()));
+          const allowed=!owner;
           if(option.hidden!==!allowed)option.hidden=!allowed;
           if(option.disabled!==!allowed)option.disabled=!allowed;
         });
-        if(type==='eft_transfer'){
-          const owner=[...account.options].find(option=>/^CR-00(?:\s|$)/.test(option.textContent.trim()));
-          if(owner&&account.value!==owner.value)account.value=owner.value;
-        }else if(account.selectedOptions[0]?.disabled)account.value='';
+        if(account.selectedOptions[0]?.disabled)account.value='';
       }
       section.querySelector('[data-company-payment-account]')?.remove();
     });
     syncPaymentTabs(form);
+    syncIncomeTotal(form);
   }
   const initialized=new WeakSet();
   const initialize=()=>{
     const form=document.querySelector(formSelector);if(!form||!isSale()||initialized.has(form))return;
     initialized.add(form);
+    form.dataset.aggregateIncomeTotal='1';
+    form.addEventListener('input',()=>syncIncomeTotal(form));
     const restore=()=>{
       if(records().length>1&&!form.querySelector('[data-extra-income]'))return;
       while(sections(form).length<Math.min(4,records().length))createStage(form,records()[sections(form).length]);
