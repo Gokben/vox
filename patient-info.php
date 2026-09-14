@@ -35,6 +35,9 @@ if (!empty($sale['sales_sale_date']) && !empty($sale['sales_model'])) {
     $singleHearingDevicePrice = (float)$singleListPriceQuery->fetchColumn();
 }
 $singleHearingDevicePriceText = $singleHearingDevicePrice > 0 ? number_format($singleHearingDevicePrice, 2, ',', '.') . ' ₺' : '—';
+$hearingDeviceQuantity = trim((string)($sale['sales_device_2_model'] ?? '')) !== '' ? 2 : (trim((string)($sale['sales_model'] ?? '')) !== '' ? 1 : 0);
+$quantityListTotal = $hearingDeviceQuantity * $singleHearingDevicePrice;
+$quantityListTotalText = $hearingDeviceQuantity > 0 && $singleHearingDevicePrice > 0 ? number_format($quantityListTotal, 2, ',', '.') . ' ₺' : '—';
 $socialSecurity = trim((string)($patient['social_security'] ?? ''));
 $socialSecuritySupport = $moneyNumber($sale['sales_device_sgk'] ?? 0);
 if (trim((string)($sale['sales_device_2_model'] ?? '')) !== '') $socialSecuritySupport += $moneyNumber($sale['sales_device_2_sgk'] ?? 0);
@@ -76,8 +79,8 @@ if ($discountIsSummary) {
         $discountAmountText = number_format($discountTotal, 2, ',', '.') . ' ₺';
     }
 }
-// The combined summary describes the discount already included in device net prices.
-$pureDeviceTotal = $discountIsSummary ? $sgkExcludingTotal : max(0, $sgkExcludingTotal - $discountTotal);
+// Salt Cihaz = Kalan Fiyat (adet × liste fiyatı) − iskonto tutarı.
+$pureDeviceTotal = $quantityListTotal - $discountTotal;
 $pureDeviceTotalText = $pureDeviceTotal > 0 ? number_format($pureDeviceTotal, 2, ',', '.') . ' ₺' : '—';
 $grandTotal = $pureDeviceTotal + $socialSecuritySupport;
 $grandTotalText = $grandTotal > 0 ? number_format($grandTotal, 2, ',', '.') . ' ₺' : '—';
@@ -90,7 +93,7 @@ patient_header('Hasta Bilgi Formu');
     <div><i class="ti tabler-id"></i><label><?=!empty($patient['passport_no'])?'Pasaport No':'T.C. Kimlik No'?></label><strong><?=e((string)(($patient['passport_no']??'')?:$patient['national_id']))?:'—'?></strong></div><div><i class="ti tabler-calendar"></i><label>Doğum Tarihi</label><strong><?=e(format_date_tr((string)$patient['birth_date']))?:'—'?></strong></div>
     <div><i class="ti tabler-phone"></i><label>Telefon</label><strong><?=e((string)$patient['phone_primary'])?:'—'?></strong></div><div><i class="ti tabler-map-pin"></i><label>Adres</label><strong><?=e((string)$patient['address'])?:'—'?></strong></div>
   </div></section>
-  <section class="info-section"><h2>Satış Bilgisi</h2><div class="sales-summary"><div class="sales-head"><span>KALEM</span><span>AÇIKLAMA</span><span>TUTAR</span></div><div><span>Cihaz Modeli / Fiyat</span><span><?=e(trim(($sale['sales_brand'] ?? '').' '.($sale['sales_model'] ?? ''))?:'—')?></span><strong><?=e($singleHearingDevicePriceText)?></strong></div><div><span>Adet</span><span><?=((trim((string)($sale['sales_device_2_model'] ?? '')) !== '') ? '2' : (trim((string)($sale['sales_model'] ?? '')) !== '' ? '1' : '—'))?></span><strong><?=e($hearingDeviceTotalText)?></strong></div><div><span>SGK</span><span><?=e((string)($sale['sales_device_sgk'] ?? '—'))?></span><strong><?=e((string)($sale['sales_device_sgk'] ?? '—'))?></strong></div><div><span>Kalan Fiyat</span><span>Satış Tutarı</span><strong><?=e((string)($sale['sales_payment_amount'] ?? $sale['sales_device_net_price'] ?? '—'))?></strong></div><div><span>İskonto</span><span><?=e($discountDescription)?></span><strong><?=e($discountAmountText)?></strong></div></div></section>
+  <section class="info-section"><h2>Satış Bilgisi</h2><div class="sales-summary"><div class="sales-head"><span>KALEM</span><span>AÇIKLAMA</span><span>TUTAR</span></div><div><span>Cihaz Modeli / Fiyat</span><span><?=e(trim(($sale['sales_brand'] ?? '').' '.($sale['sales_model'] ?? ''))?:'—')?></span><strong><?=e($singleHearingDevicePriceText)?></strong></div><div><span>Adet</span><span><?=e((string)($hearingDeviceQuantity ?: '—'))?></span><strong><?=e($quantityListTotalText)?></strong></div><div><span>SGK</span><span><?=e((string)($sale['sales_device_sgk'] ?? '—'))?></span><strong><?=e((string)($sale['sales_device_sgk'] ?? '—'))?></strong></div><div><span>Kalan Fiyat</span><span>Satış Tutarı</span><strong><?=e($quantityListTotalText)?></strong></div><div><span>İskonto</span><span><?=e($discountDescription)?></span><strong><?=e($discountAmountText)?></strong></div></div></section>
   <div class="sales-total-summary"><span>Satış Cihazı</span><strong><?=e($hearingDeviceTotalText)?></strong><span>Rapor</span><strong><?=e((string)($patient['report_info'] ?? '—'))?></strong><span>Toplam</span><strong><?=e($hearingDeviceTotalText)?></strong></div>
   <section class="info-section"><h2>Cihaz Teslim Bilgisi</h2><div class="horizontal-form"><div><i class="ti tabler-device-hearing-aid"></i><label>Cihaz Bilgisi</label><strong><?=e((string)($latest['service_name'] ?? ''))?:'—'?></strong></div><div><i class="ti tabler-calendar-event"></i><label>İşlem Tarihi</label><strong><?=e(format_date_tr((string)($latest['service_date'] ?? '')))?:'—'?></strong></div></div></section>
   <section class="info-section delivery-section"><div class="delivery-table"><div class="delivery-head"><strong>CİHAZ TESLİM FORMU</strong><strong>TESLİM TARİHİ</strong><strong><?=e(format_date_tr((string)($sale['sales_sale_date'] ?? '')))?:'—'?></strong></div><div><span>CİHAZ MODELİ</span><span><?=e(trim(($sale['sales_brand'] ?? '').' '.($sale['sales_model'] ?? ''))?:'—')?></span><span></span></div><div><span>CİHAZ SERİ NO</span><span><?=e((string)($sale['sales_device_serial'] ?? '—'))?></span><span><?=e((string)($sale['sales_device_2_serial'] ?? ''))?></span></div><div><span>RECEIVER (HOPARLÖR)</span><span><?=e((string)($sale['sales_receiver'] ?? '—'))?></span><span><?=e((string)($sale['sales_device_2_receiver'] ?? ''))?></span></div><div><span>DOME - KALIP</span><span><?=e((string)($sale['sales_dome'] ?? '—'))?></span><span><?=e((string)($sale['sales_device_2_dome'] ?? ''))?></span></div><?php if (trim((string)($sale['sales_charger_model'] ?? '')) !== ''): ?><div><span>CHARGER</span><span style="grid-column:2 / -1"><?=e(trim(($sale['sales_charger_brand'] ?? '').' '.($sale['sales_charger_model'] ?? '')))?></span></div><div><span>CHARGER SERİ NO</span><span style="grid-column:2 / -1"><?=e(trim((string)($sale['sales_charger_serial'] ?? '')) ?: '—')?></span></div><?php endif; ?><?php foreach ($deliveryConsumables as $consumableIndex => $consumable): ?><div><span><?=e(($consumableIndex + 1) . '. SARF MALZEME')?></span><span><?=e((string)($deliveryConsumableNames[$consumable['stock_id']] ?? '—'))?></span><span><?=e((string)$consumable['quantity'])?> Adet</span></div><?php endforeach; ?></div></section>
@@ -159,7 +162,7 @@ patient_header('Hasta Bilgi Formu');
   if (sgkExcludingRow) {
     const cells = sgkExcludingRow.children;
     cells[1].textContent = 'SGK (Hariç)';
-    cells[2].textContent = <?= json_encode($sgkExcludingTotalText, JSON_UNESCAPED_UNICODE) ?>;
+    cells[2].textContent = <?= json_encode($quantityListTotalText, JSON_UNESCAPED_UNICODE) ?>;
   }
 
   const salesTotal = document.querySelector('.sales-total-summary');
