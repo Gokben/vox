@@ -23,7 +23,7 @@ function current_movement_sold_device_quantity(array $salesDetails): int {
 $id=filter_input(INPUT_GET,'id',FILTER_VALIDATE_INT)?:0;$pdo=db();$q=$pdo->prepare('SELECT * FROM current_accounts WHERE id=?');$q->execute([$id]);$account=$q->fetch();if(!$account){http_response_code(404);exit('Cari kart bulunamadı.');}if($account['code']==='CR-00'){if(!in_array($_SERVER['REQUEST_METHOD']??'GET',['GET','HEAD'],true)){http_response_code(405);header('Allow: GET, HEAD');exit('Bu ekran yalnızca görüntüleme içindir.');}redirect('company-finance.php'.(isset($_GET['_vox_window'])?'?_vox_window=1':''));}$rows=[];try{$q=$pdo->prepare('SELECT m.*,s.stock_code,s.stock_name FROM stock_movements m JOIN stock_cards s ON s.id=m.stock_id WHERE m.current_account_id=? ORDER BY m.movement_date DESC,m.id DESC');$q->execute([$id]);$rows=$q->fetchAll();}catch(Throwable $e){}patient_header('Cari Hareketleri','cash');
 $mailOrderRows = [];
 try {
-    $mailOrderStatement = $pdo->prepare("SELECT id,transaction_date,description,amount,source_url FROM cash_transactions WHERE current_account_id=? AND transaction_type='income' AND payment_type='mail_order' ORDER BY transaction_date DESC,id DESC");
+    $mailOrderStatement = $pdo->prepare("SELECT id,transaction_date,description,amount,source_url,payment_type FROM cash_transactions WHERE current_account_id=? AND transaction_type='income' AND payment_type IN ('mail_order','eft_transfer') ORDER BY transaction_date DESC,id DESC");
     $mailOrderStatement->execute([$id]);
     $mailOrderRows = $mailOrderStatement->fetchAll();
 } catch (Throwable $e) {}
@@ -221,7 +221,7 @@ foreach ($sgkRows as $sgkRow) $accountBalance += $sgkRow['movement_kind'] === 'd
       <?php foreach ($mailOrderRows as $mailOrder): ?>
         <tr class="mail-order-outgoing">
           <td><?=e(format_date_tr($mailOrder['transaction_date']))?></td><td>Çıkış</td><td><span class="mail-order-invoice" title="<?=e($mailOrder['description'])?>"><?=e($mailOrder['invoice_no'] ?: '—')?></span></td><td>—</td>
-          <td><?=e(number_format((float)$mailOrder['amount'], 2, ',', '.'))?> TL</td><td><?=e(number_format((float)$mailOrder['amount'], 2, ',', '.'))?> TL</td><td>—</td><td>—</td><td>—</td><td>Mail Order</td><td>—</td>
+          <td><?=e(number_format((float)$mailOrder['amount'], 2, ',', '.'))?> TL</td><td><?=e(number_format((float)$mailOrder['amount'], 2, ',', '.'))?> TL</td><td>—</td><td>—</td><td>—</td><td><?=e($mailOrder['payment_type'] === 'eft_transfer' ? 'EFT / Havale' : 'Mail Order')?></td><td>—</td>
         </tr>
       <?php endforeach; ?>
       <?php foreach ($groupedRows as $index => $row): ?>

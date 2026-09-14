@@ -144,7 +144,7 @@
     if(!summary.dataset.aggregateStyled){summary.dataset.aggregateStyled='1';summary.style.cssText='margin-left:auto;color:#e6525d;font-size:13px;font-weight:700;white-space:nowrap';}
   }
   let saving=false;
-  async function save(form) {
+  async function save(form, closeAfterSave = false) {
     if(saving)return;
     const invalid=[...form.querySelectorAll('.vox-date-editor')].find(input=>input.getClientRects().length&&(!input.value||!input.validity.valid));
     if(invalid){invalid.reportValidity();invalid.focus();return;}
@@ -171,9 +171,22 @@
       syncSalePaymentSummary(form);
       sections(form).forEach((section,i)=>section.dataset.recordId=String(result.records[i]?.id||''));
       const id=form.querySelector('[name="id"]');if(id)id.value=result.records[0]?.id||'';
-      alert('Ödeme kayıtları kaydedildi.');
+      if(closeAfterSave){
+        const modal=form.parentElement;
+        modal.hidden=true;
+        modal.style.display='none';
+      }else alert('Ödeme kayıtları kaydedildi.');
     }catch(error){alert(error.message);}finally{saving=false;}
   }
+  // Capture X before the legacy close listener can discard the form.
+  window.addEventListener('click',event=>{
+    const close=event.target.closest(formSelector+' header [data-cash-close]');
+    if(!close||!isSale())return;
+    event.preventDefault();event.stopImmediatePropagation();
+    if(saving)return;
+    if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return;
+    save(close.closest('form'),true);
+  },true);
   // Register before the legacy two-payment listeners so every save uses all stages.
   window.addEventListener('click',event=>{
     const button=event.target.closest(formSelector+' footer button');if(!button||!isSale())return;
