@@ -73,7 +73,7 @@ if ($driver === 'sqlite') {
         description VARCHAR(255) NOT NULL,
         transaction_type ENUM('income','expense') NOT NULL,
         amount DECIMAL(14,2) NOT NULL,
-        payment_type ENUM('cash','credit_card','mail_order','term') NOT NULL,
+        payment_type ENUM('cash','credit_card','mail_order','term','eft_transfer') NOT NULL,
         category_id INT UNSIGNED NULL,
         source_url VARCHAR(255) NULL,
         created_by INT UNSIGNED NULL,

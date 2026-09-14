@@ -2,6 +2,25 @@
 declare(strict_types=1);
 require_once __DIR__ . '/cash-company.php';
 
+
+// Append missing enum values without resetting the column on every page load.
+function ensure_cash_payment_type_schema(PDO $pdo): void
+{
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') return;
+    $column = $pdo->query("SHOW COLUMNS FROM cash_transactions LIKE 'payment_type'")->fetch(PDO::FETCH_ASSOC);
+    $type = (string)($column['Type'] ?? '');
+    if (!str_starts_with(strtolower($type), 'enum(')) return;
+    $missing = [];
+    foreach (['cash', 'credit_card', 'mail_order', 'term', 'eft_transfer'] as $value) {
+        $quoted = $pdo->quote($value);
+        if (!str_contains($type, $quoted)) $missing[] = $quoted;
+    }
+    if (!$missing) return;
+    // Keep existing values and their enum positions, including legacy rows.
+    $expanded = substr($type, 0, -1) . ',' . implode(',', $missing) . ')';
+    $pdo->exec('ALTER TABLE cash_transactions MODIFY payment_type ' . $expanded . ' NOT NULL');
+}
+
 function ensure_cash_schema(PDO $pdo): void
 {
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -27,7 +46,7 @@ function ensure_cash_schema(PDO $pdo): void
         $column = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cash_categories' AND column_name='parent_id'");
         $column->execute();
         if (!$column->fetchColumn()) $pdo->exec('ALTER TABLE cash_categories ADD COLUMN parent_id INT UNSIGNED NULL AFTER name');
-        $pdo->exec("CREATE TABLE IF NOT EXISTS cash_transactions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, transaction_date DATE NOT NULL, description VARCHAR(255) NOT NULL, transaction_type ENUM('income','expense') NOT NULL, amount DECIMAL(14,2) NOT NULL, payment_type ENUM('cash','credit_card','mail_order','term') NOT NULL, installment_count INT UNSIGNED NOT NULL DEFAULT 1, category_id INT UNSIGNED NULL, source_url VARCHAR(255) NULL, created_by INT UNSIGNED NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX cash_transaction_date_idx(transaction_date), CONSTRAINT cash_transaction_category_fk FOREIGN KEY(category_id) REFERENCES cash_categories(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS cash_transactions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, transaction_date DATE NOT NULL, description VARCHAR(255) NOT NULL, transaction_type ENUM('income','expense') NOT NULL, amount DECIMAL(14,2) NOT NULL, payment_type ENUM('cash','credit_card','mail_order','term','eft_transfer') NOT NULL, installment_count INT UNSIGNED NOT NULL DEFAULT 1, category_id INT UNSIGNED NULL, source_url VARCHAR(255) NULL, created_by INT UNSIGNED NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX cash_transaction_date_idx(transaction_date), CONSTRAINT cash_transaction_category_fk FOREIGN KEY(category_id) REFERENCES cash_categories(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $sourceColumn = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cash_transactions' AND column_name='source_url'");
         $sourceColumn->execute();
         if (!$sourceColumn->fetchColumn()) $pdo->exec('ALTER TABLE cash_transactions ADD COLUMN source_url VARCHAR(255) NULL AFTER category_id');
@@ -49,7 +68,7 @@ function ensure_cash_schema(PDO $pdo): void
         $registerColumn = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cash_transactions' AND column_name='cash_register'");
         $registerColumn->execute();
         if (!$registerColumn->fetchColumn()) $pdo->exec("ALTER TABLE cash_transactions ADD COLUMN cash_register VARCHAR(20) NOT NULL DEFAULT 'main' AFTER term_schedule");
-        $pdo->exec("ALTER TABLE cash_transactions MODIFY payment_type ENUM('cash','credit_card','mail_order','term') NOT NULL");
+        ensure_cash_payment_type_schema($pdo);
         $pdo->exec("CREATE TABLE IF NOT EXISTS cash_closings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, closing_date DATE NOT NULL UNIQUE, expected_balance DECIMAL(14,2) NOT NULL, counted_balance DECIMAL(14,2) NOT NULL, difference DECIMAL(14,2) NOT NULL, note VARCHAR(255) NULL, created_by INT UNSIGNED NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $pdo->exec('INSERT IGNORE INTO cash_settings(id,opening_balance) VALUES(1,0)');
     }

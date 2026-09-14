@@ -108,6 +108,13 @@ function cash_payment_save_batch(PDO $pdo, array $payments, string $source, int 
                 $record += ['transaction_type' => $type, 'source_url' => $source ?: null, 'created_by' => $userId, 'cash_register' => $register, 'category_id' => $category];
                 $sql = 'INSERT INTO cash_transactions (' . implode(',', array_keys($record)) . ') VALUES (' . implode(',', array_fill(0, count($record), '?')) . ')';
                 $pdo->prepare($sql)->execute(array_values($record));
+                $id = (int)$pdo->lastInsertId();
+            }
+            // Non-strict MySQL can silently replace unsupported enum values with ''.
+            $savedType = $pdo->prepare('SELECT payment_type FROM cash_transactions WHERE id=?');
+            $savedType->execute([$id]);
+            if ($savedType->fetchColumn() !== $record['payment_type']) {
+                throw new RuntimeException('Ödeme şekli veritabanına kaydedilemedi. Kayıtlar değiştirilmedi.');
             }
         }
         $pdo->commit();
