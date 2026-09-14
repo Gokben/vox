@@ -117,7 +117,24 @@
       return totals;
     },{paid:0,balance:0});
   }
+  function paymentTypeSummary(payments){
+    const labels=new Map(allTypes);
+    return [...new Set(payments.map(payment=>labels.get(payment.payment_type)).filter(Boolean))].join(', ');
+  }
+  function syncSalePaymentSummary(form){
+    const field=document.querySelector('#sales-details-modal [name="sales_payment_type"]');
+    if(!field||!records().length)return;
+    const payments=form.dataset.paymentOpened==='1'?readRecords(form):records();
+    const summary=paymentTypeSummary(payments);
+    if(!summary)return;
+    let option=[...field.options].find(item=>item.value===summary);
+    if(!option){option=new Option(summary,summary);option.dataset.paymentSummary='1';field.add(option);}
+    if(field.value!==summary)field.value=summary;
+    field.disabled=true;
+    field.title='Gelir kayıtlarındaki farklı ödeme şekilleri';
+  }
   function syncIncomeTotal(form){
+    syncSalePaymentSummary(form);
     const header=form.querySelector('header');if(!header)return;
     let summary=header.querySelector('[data-income-header-total]');
     if(!summary){summary=document.createElement('span');summary.dataset.incomeHeaderTotal='1';header.append(summary);}
@@ -151,6 +168,7 @@
       const response=await fetch(endpoint,{method:'POST',body:data,credentials:'same-origin'});
       const result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Ödemeler kaydedilemedi.');
       window.__savedCashRecords=result.records;
+      syncSalePaymentSummary(form);
       sections(form).forEach((section,i)=>section.dataset.recordId=String(result.records[i]?.id||''));
       const id=form.querySelector('[name="id"]');if(id)id.value=result.records[0]?.id||'';
       alert('Ödeme kayıtları kaydedildi.');
@@ -224,7 +242,7 @@
       if(account){
         [...account.options].forEach(option=>{
           const owner=option.value!=='' && (option.value===settings.ownerAccountId || /^CR-00(?:\s|$)/.test(option.textContent.trim()));
-          const allowed=!owner;
+          const allowed=type==='eft_transfer'||!owner;
           if(option.hidden!==!allowed)option.hidden=!allowed;
           if(option.disabled!==!allowed)option.disabled=!allowed;
         });

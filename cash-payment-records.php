@@ -74,13 +74,14 @@ function cash_payment_save_batch(PDO $pdo, array $payments, string $source, int 
     if (!in_array($type, ['income','expense'], true)) throw new RuntimeException('Geçersiz kasa işlem tipi.');
     foreach ($payments as &$payment) {
         $record = &$payment['record'];
-        // CR-00 is the receiving business, not an EFT counterparty.
         if (($record['payment_type'] ?? '') === 'eft_transfer' && !empty($record['current_account_id'])) {
-            $owner = $pdo->prepare("SELECT id FROM current_accounts WHERE id=? AND code='CR-00'");
-            $owner->execute([(int)$record['current_account_id']]);
-            if ($owner->fetchColumn()) $record['current_account_id'] = null;
+            // EFT may be received through the business account or another current account.
+            $account = $pdo->prepare('SELECT id FROM current_accounts WHERE id=?');
+            $account->execute([(int)$record['current_account_id']]);
+            if (!$account->fetchColumn()) throw new RuntimeException('Geçerli bir cari hesap seçin.');
+        } else {
+            cash_validate_counterparty($pdo, (int)($record['current_account_id'] ?? 0));
         }
-        cash_validate_counterparty($pdo, (int)($record['current_account_id'] ?? 0));
         unset($record);
     }
     unset($payment);
