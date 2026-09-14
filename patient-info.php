@@ -28,7 +28,12 @@ $moneyNumber = static function ($value): float {
 $hearingDeviceTotal = $moneyNumber($sale['sales_device_net_price'] ?? 0);
 if (trim((string)($sale['sales_device_2_model'] ?? '')) !== '') $hearingDeviceTotal += $moneyNumber($sale['sales_device_2_net_price'] ?? 0);
 $hearingDeviceTotalText = $hearingDeviceTotal > 0 ? number_format($hearingDeviceTotal, 2, ',', '.') . ' ₺' : '—';
-$singleHearingDevicePrice = $moneyNumber($sale['sales_device_net_price'] ?? 0);
+$singleHearingDevicePrice = 0.0;
+if (!empty($sale['sales_sale_date']) && !empty($sale['sales_model'])) {
+    $singleListPriceQuery = $pdo->prepare("SELECT i.list_price FROM stock_cards s JOIN stock_price_list_items i ON i.stock_id=s.id JOIN stock_price_lists l ON l.id=i.price_list_id WHERE s.brand=? AND s.model=? AND s.stock_type='İşitme Cihazı' AND l.valid_from<=? AND l.valid_until>=? ORDER BY l.valid_from DESC,l.id DESC,s.id ASC LIMIT 1");
+    $singleListPriceQuery->execute([$sale['sales_brand'] ?? '', $sale['sales_model'], $sale['sales_sale_date'], $sale['sales_sale_date']]);
+    $singleHearingDevicePrice = (float)$singleListPriceQuery->fetchColumn();
+}
 $singleHearingDevicePriceText = $singleHearingDevicePrice > 0 ? number_format($singleHearingDevicePrice, 2, ',', '.') . ' ₺' : '—';
 $socialSecurity = trim((string)($patient['social_security'] ?? ''));
 $socialSecuritySupport = $moneyNumber($sale['sales_device_sgk'] ?? 0);
@@ -37,6 +42,25 @@ $socialSecuritySupportText = $socialSecuritySupport > 0 ? number_format($socialS
 $sgkExcludingTotal = max(0, $hearingDeviceTotal - $socialSecuritySupport);
 $sgkExcludingTotalText = $sgkExcludingTotal > 0 ? number_format($sgkExcludingTotal, 2, ',', '.') . ' ₺' : '—';
 $discountRaw = trim((string)($sale['sales_total_discount_rate'] ?? $sale['sales_device_discount_rate'] ?? ''));
+// Older cards may display a calculated discount without storing its summary.
+if ($discountRaw === '' && trim((string)($sale['sales_sale_date'] ?? '')) !== '') {
+    $priceQuery = $pdo->prepare("SELECT i.list_price FROM stock_cards s JOIN stock_price_list_items i ON i.stock_id=s.id JOIN stock_price_lists l ON l.id=i.price_list_id WHERE s.brand=? AND s.model=? AND s.stock_type='İşitme Cihazı' AND l.valid_from<=? AND l.valid_until>=? ORDER BY l.valid_from DESC,l.id DESC,s.id ASC LIMIT 1");
+    $listTotal = 0.0;
+    $completePrices = true;
+    $deviceCount = 0;
+    foreach ([['sales_brand','sales_model'], ['sales_device_2_brand','sales_device_2_model']] as [$brandKey,$modelKey]) {
+        if (trim((string)($sale[$modelKey] ?? '')) === '') continue;
+        ++$deviceCount;
+        $priceQuery->execute([$sale[$brandKey] ?? '',$sale[$modelKey],$sale['sales_sale_date'],$sale['sales_sale_date']]);
+        $price = $priceQuery->fetchColumn();
+        if ($price === false) { $completePrices = false; break; }
+        $listTotal += (float)$price;
+    }
+    if ($completePrices && $deviceCount > 0 && $listTotal > 0) {
+        $difference = $listTotal - $socialSecuritySupport - $hearingDeviceTotal;
+        $discountRaw = '%' . number_format($difference / $listTotal * 100, 2, ',', '.') . ' - ' . number_format($difference, 2, ',', '.') . ' ₺';
+    }
+}
 $discountDescription = '—';
 $discountAmountText = '—';
 $discountIsSummary = preg_match('/^%\s*(-?[0-9.,]+)\s*[-–]\s*(-?[0-9.,]+)\s*(?:₺|TL)?$/u', $discountRaw, $discountParts) === 1;
