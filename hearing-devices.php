@@ -11,6 +11,8 @@ require __DIR__ . '/config.php';
 require_login();
 require __DIR__ . '/patient-layout.php';
 
+$includeSoldDevices = $deviceListStockType === 'Şarj Cihazı';
+$soldSerials = [];
 $pdo = db();
 $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 $selectedBrand = trim((string)($_GET['brand'] ?? ''));
@@ -48,7 +50,19 @@ try {
     if ($selectedBrand !== '') { $where[] = 's.brand=?'; $params[] = $selectedBrand; }
     if ($selectedModel !== '') { $where[] = 's.model=?'; $params[] = $selectedModel; }
     if ($selectedYear !== '') { $where[] = $isSqlite ? "strftime('%Y',m.movement_date)=?" : 'YEAR(m.movement_date)=?'; $params[] = $selectedYear; }
-    $statement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.brand,s.model,s.stock_type,m.id AS movement_id,m.current_account_id,m.movement_date,m.invoice_no,m.serial_numbers,q.stock_quantity FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>0 LEFT JOIN stock_movements m ON m.stock_id=s.id AND m.movement_type='Giriş' WHERE " . implode(' AND ', $where) . " ORDER BY s.brand,s.model,s.stock_name,m.movement_date,m.id");
+    if ($includeSoldDevices) {
+        $exits = $pdo->prepare("SELECT m.stock_id,m.serial_numbers FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE s.stock_type=? AND m.movement_type='Çıkış'");
+        $exits->execute([$deviceListStockType]);
+        foreach ($exits->fetchAll() as $exit) {
+            $exitSerials = json_decode((string)$exit['serial_numbers'], true);
+            foreach (is_array($exitSerials) ? $exitSerials : [] as $serial) {
+                $serial = trim((string)$serial);
+                if ($serial !== '') $soldSerials[(int)$exit['stock_id']][$serial] = true;
+            }
+        }
+    }
+    $quantityCondition = $includeSoldDevices ? '' : ' AND q.stock_quantity>0';
+    $statement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.brand,s.model,s.stock_type,m.id AS movement_id,m.quantity AS entry_quantity,m.current_account_id,m.movement_date,m.invoice_no,m.serial_numbers,q.stock_quantity FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id" . $quantityCondition . " LEFT JOIN stock_movements m ON m.stock_id=s.id AND m.movement_type='Giriş' WHERE " . implode(' AND ', $where) . " ORDER BY s.brand,s.model,s.stock_name,m.movement_date,m.id");
     $statement->execute($params);
     $movementRows = $statement->fetchAll();
 } catch (Throwable $exception) {
@@ -73,6 +87,7 @@ foreach ($movementRows as $movement) {
             'stock_quantity' => max(0, (int)$movement['stock_quantity']),
             'serials' => [],
             'entries' => [],
+            'charger_rows' => [],
             'movement_date' => (string)$movement['movement_date'],
             'invoice_no' => (string)$movement['invoice_no'],
         ];
@@ -82,6 +97,17 @@ foreach ($movementRows as $movement) {
     $serials = array_values(array_map(static fn($serial): string => trim((string)$serial), $serials));
     $movementId = (int)($movement['movement_id'] ?? 0);
     $deviceGroups[$stockId]['entries'][] = ['id' => $movementId, 'current_account_id' => (int)($movement['current_account_id'] ?? 0), 'serials' => $serials, 'movement_date' => (string)$movement['movement_date'], 'invoice_no' => (string)$movement['invoice_no']];
+    if ($includeSoldDevices && $movementId > 0) {
+        for ($serialIndex = 0; $serialIndex < max((int)$movement['entry_quantity'], count($serials)); $serialIndex++) {
+            $serial = $serials[$serialIndex] ?? '';
+            $deviceGroups[$stockId]['charger_rows'][] = [
+                'serial_no' => $serial, 'movement_id' => $movementId, 'serial_index' => $serialIndex,
+                'current_account_id' => (int)($movement['current_account_id'] ?? 0),
+                'movement_date' => (string)$movement['movement_date'], 'invoice_no' => (string)$movement['invoice_no'],
+                'sold' => isset($soldSerials[$stockId][$serial]),
+            ];
+        }
+    }
     foreach ($serials as $serialIndex => $serial) {
         $serial = trim((string)$serial);
         if ($serial !== '') $deviceGroups[$stockId]['serials'][] = ['serial_no' => $serial, 'movement_id' => $movementId, 'serial_index' => $serialIndex, 'current_account_id' => (int)($movement['current_account_id'] ?? 0), 'movement_date' => (string)$movement['movement_date'], 'invoice_no' => (string)$movement['invoice_no']];
@@ -89,9 +115,10 @@ foreach ($movementRows as $movement) {
 }
 $devices = [];
 foreach ($deviceGroups as $device) {
-    for ($index = 0; $index < $device['stock_quantity']; $index++) {
+    for ($index = 0; $index < ($includeSoldDevices ? count($device['charger_rows']) : $device['stock_quantity']); $index++) {
         $entry = $device['entries'][0] ?? ['id' => 0, 'current_account_id' => 0, 'serials' => [], 'movement_date' => $device['movement_date'], 'invoice_no' => $device['invoice_no']];
         $serial = $device['serials'][$index] ?? ['serial_no' => '', 'movement_id' => $entry['id'], 'serial_index' => count($entry['serials']) + $index - count($device['serials']), 'current_account_id' => $entry['current_account_id'], 'movement_date' => $entry['movement_date'], 'invoice_no' => $entry['invoice_no']];
+        if ($includeSoldDevices) $serial = $device['charger_rows'][$index];
         $devices[] = [
             'stock_id' => $device['stock_id'],
             'stock_type' => $device['stock_type'],
@@ -105,7 +132,8 @@ foreach ($deviceGroups as $device) {
             'current_account_id' => (int)$serial['current_account_id'],
             'movement_date' => $serial['movement_date'],
             'invoice_no' => $serial['invoice_no'],
-            'stock_quantity' => 1,
+            'stock_quantity' => !empty($serial['sold']) ? 0 : 1,
+            'sold' => !empty($serial['sold']),
         ];
     }
 }
@@ -182,7 +210,8 @@ document.querySelectorAll('.hearing-devices-table tbody tr').forEach((row, index
   input.maxLength = 190;
   input.placeholder = 'Seri no giriniz';
   input.value = device.serial_no || '';
-  input.title = 'Seri numarasını düzenleyin';
+  input.disabled = false;
+  input.title = device.sold ? 'Satıldı — seri numarasını düzenleyin' : 'Seri numarasını düzenleyin';
   cell.textContent = '';
   cell.append(input);
   let savedValue = input.value;

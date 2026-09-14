@@ -21,13 +21,43 @@ try {
     $serials = json_decode((string)$storedSerials, true);
     if (!is_array($serials)) $serials = [];
     while (count($serials) <= $serialIndex) $serials[] = '';
+    $oldSerial = trim((string)$serials[$serialIndex]);
     $serials[$serialIndex] = $serialNo;
     $normalized = array_values(array_map(static fn($value): string => trim((string)$value), $serials));
     $nonEmpty = array_values(array_filter($normalized, static fn(string $value): bool => $value !== ''));
     if (count($nonEmpty) !== count(array_unique($nonEmpty))) throw new RuntimeException('Aynı stok girişinde seri numarası tekrar edemez.');
+    $pdo = db();
+    $pdo->beginTransaction();
+    if ($stockType === 'Şarj Cihazı' && $oldSerial !== '' && $oldSerial !== $serialNo) {
+        $exits = $pdo->prepare("SELECT * FROM stock_movements WHERE stock_id=(SELECT stock_id FROM stock_movements WHERE id=?) AND movement_type='Çıkış'");
+        $exits->execute([$movementId]);
+        foreach ($exits->fetchAll(PDO::FETCH_ASSOC) as $exit) {
+            $exitSerials = json_decode((string)$exit['serial_numbers'], true);
+            if (!is_array($exitSerials)) continue;
+            $changed = false;
+            foreach ($exitSerials as &$value) {
+                if (trim((string)$value) === $oldSerial) { $value = $serialNo; $changed = true; }
+            }
+            unset($value);
+            if (!$changed) continue;
+            if ($serialNo === '') throw new RuntimeException('Satılmış cihazın seri numarası boş bırakılamaz.');
+            $pdo->prepare('UPDATE stock_movements SET serial_numbers=? WHERE id=?')->execute([json_encode($exitSerials, JSON_UNESCAPED_UNICODE), $exit['id']]);
+            if (!empty($exit['service_id'])) {
+                $service = $pdo->prepare('SELECT sales_details FROM patient_services WHERE id=?');
+                $service->execute([$exit['service_id']]);
+                $details = json_decode((string)$service->fetchColumn(), true);
+                if (is_array($details) && trim((string)($details['sales_charger_serial'] ?? '')) === $oldSerial) {
+                    $details['sales_charger_serial'] = $serialNo;
+                    $pdo->prepare('UPDATE patient_services SET sales_details=? WHERE id=?')->execute([json_encode($details, JSON_UNESCAPED_UNICODE), $exit['service_id']]);
+                }
+            }
+        }
+    }
     db()->prepare('UPDATE stock_movements SET serial_numbers=? WHERE id=?')->execute([json_encode($normalized, JSON_UNESCAPED_UNICODE), $movementId]);
+    $pdo->commit();
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     http_response_code(422);
     echo json_encode(['ok' => false, 'message' => $exception->getMessage()], JSON_UNESCAPED_UNICODE);
 }
