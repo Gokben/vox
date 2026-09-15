@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require __DIR__ . '/config.php';
 require __DIR__ . '/source-bootstrap.php';
-require_login();
+require_unit_field_access();
 ensure_patient_source_schema();
 require __DIR__ . '/patient-layout.php';
 

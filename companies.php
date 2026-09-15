@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/config.php';
-require_login();
+require_unit_field_access();
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db();

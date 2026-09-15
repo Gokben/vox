@@ -103,6 +103,7 @@ function require_login(): void {
     $_SESSION['last_activity'] = $now;
     current_role();
 }
+function require_unit_field_access(): void { require_login(); if (current_role() === ROLE_AUDIOMETRIST) { http_response_code(403); exit('Bu sayfaya erişim yetkiniz yok.'); } }
 function is_admin(): bool { return current_role() === ROLE_COMPANY_MANAGER; }
 function ensure_role_schema(): void { static $done = false; if ($done) return; $done = true; $pdo = db(); $pdo->exec("UPDATE users SET role = 'company_manager' WHERE role = 'Admin'"); $pdo->exec("UPDATE users SET role = 'secretary' WHERE role = 'User' OR role IS NULL OR role = ''"); if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $pdo->exec("ALTER TABLE users MODIFY role ENUM('company_manager','audiometrist','secretary','accounting') NOT NULL DEFAULT 'secretary'"); }
 function ensure_branch_schema(): void {

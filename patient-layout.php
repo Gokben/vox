@@ -150,6 +150,10 @@ standaloneUnitsMenuLink.removeAttribute('aria-haspopup');
 standaloneUnitsMenuLink.removeAttribute('aria-expanded');
 unitsGroup.replaceWith(standaloneUnitsMenuLink);
 standaloneUnitsMenuLink.after(companiesMenuLink);
+<?php if (current_role() === ROLE_AUDIOMETRIST): ?>
+standaloneUnitsMenuLink.remove();
+companiesMenuLink.remove();
+<?php endif; ?>
 if (location.pathname.endsWith('/units.php')) standaloneUnitsMenuLink.classList.add('active');
 if (location.pathname.endsWith('/companies.php')) standaloneUnitsMenuLink.classList.remove('active');
 const setupMenuLink = document.querySelector('.patient-nav a[href*="brands.php"]');
