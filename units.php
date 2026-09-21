@@ -12,7 +12,7 @@ $pdo->exec($sqlite
     : 'CREATE TABLE IF NOT EXISTS units (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(190) NOT NULL, description TEXT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
 $extraColumns = [
-    'record_date TEXT NULL', 'company_id INTEGER NULL', 'company_name VARCHAR(190) NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
+    'record_date TEXT NULL', 'company_id INTEGER NULL', 'company_name VARCHAR(190) NULL', 'region TEXT NULL', 'unit_no VARCHAR(50) NULL', 'last_name VARCHAR(150) NULL', 'birth_date TEXT NULL', 'age INTEGER NULL',
     'marriage_date TEXT NULL', 'title VARCHAR(150) NULL', 'branch VARCHAR(150) NULL', 'rating INTEGER NULL',
     'email VARCHAR(190) NULL', 'phone1 VARCHAR(50) NULL', 'phone2 VARCHAR(50) NULL', 'gender VARCHAR(20) NULL',
     'special_day TEXT NULL', 'action_name VARCHAR(150) NULL', 'action_date TEXT NULL', 'city VARCHAR(100) NULL',
@@ -52,7 +52,25 @@ try {
     error_log('units.php code migration: ' . $exception->getMessage());
 }
 
-$fields = ['record_date', 'company_name', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'branch', 'rating', 'email', 'phone1', 'phone2', 'gender', 'special_day', 'action_name', 'action_date', 'city', 'district', 'related_cards', 'address', 'note'];
+function unit_parse_date(string $value): ?DateTimeImmutable {
+    if ($value === '') return null;
+    if (!preg_match('/^[0-9]{2}\.[0-9]{2}\.[0-9]{4}$/D', $value)) {
+        throw new RuntimeException('Tarih gg.aa.yyyy biçiminde olmalıdır.');
+    }
+    [$day, $month, $year] = array_map('intval', explode('.', $value));
+    if (!checkdate($month, $day, $year)) throw new RuntimeException('Geçerli bir tarih giriniz (gg.aa.yyyy).');
+    return DateTimeImmutable::createFromFormat('!d.m.Y', $value);
+}
+
+function unit_display_date(string $value): string {
+    if (in_array($value, ['0000-00-00', '00.00.0000'], true)) return '';
+    if (preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/D', $value)) {
+        return substr($value, 8, 2) . '.' . substr($value, 5, 2) . '.' . substr($value, 0, 4);
+    }
+    return $value;
+}
+
+$fields = ['record_date', 'company_name', 'region', 'unit_no', 'name', 'last_name', 'birth_date', 'age', 'marriage_date', 'title', 'rating', 'email', 'phone1', 'special_day', 'city', 'district', 'related_cards', 'note'];
 $editId = (int)($_GET['edit'] ?? 0);
 $showForm = $editId > 0 || isset($_GET['new']);
 $unit = array_fill_keys($fields, '');
@@ -91,12 +109,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $unit[$field] = trim((string)($_POST[$field] ?? ''));
         }
+        $saveValues = $unit;
+        foreach (['record_date', 'birth_date', 'special_day'] as $dateField) {
+            $parsed = unit_parse_date($unit[$dateField]);
+            $saveValues[$dateField] = $parsed ? $parsed->format('Y-m-d') : '';
+        }
+        $birth = unit_parse_date($unit['birth_date']);
+        $today = new DateTimeImmutable('today');
+        if ($birth && $birth > $today) throw new RuntimeException('Doğum tarihi gelecekte olamaz.');
+        $unit['age'] = $birth ? $birth->diff($today)->y : null;
+        $saveValues['age'] = $unit['age'];
         $unit['rating'] = max(0, min(5, (int)$unit['rating']));
+        $saveValues['rating'] = $unit['rating'];
         if ($unit['name'] === '') throw new RuntimeException('Ad alanı zorunludur.');
 
         if ($action === 'update') {
             $set = implode(',', array_map(static fn(string $field): string => $field . '=?', $fields));
-            $pdo->prepare('UPDATE units SET ' . $set . ' WHERE id=?')->execute([...array_map(static fn(string $field): mixed => $unit[$field], $fields), $id]);
+            $pdo->prepare('UPDATE units SET ' . $set . ' WHERE id=?')->execute([...array_map(static fn(string $field): mixed => $saveValues[$field], $fields), $id]);
             redirect('units.php?saved=1');
         }
         $existingCodes = $pdo->query("SELECT code FROM units WHERE code LIKE 'VOX-%'")->fetchAll(PDO::FETCH_COLUMN);
@@ -112,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $check->execute([$code]);
         } while ($check->fetchColumn());
         $columns = array_merge(['code'], $fields);
-        $pdo->prepare('INSERT INTO units (' . implode(',', $columns) . ') VALUES (' . implode(',', array_fill(0, count($columns), '?')) . ')')->execute([$code, ...array_map(static fn(string $field): mixed => $unit[$field], $fields)]);
+        $pdo->prepare('INSERT INTO units (' . implode(',', $columns) . ') VALUES (' . implode(',', array_fill(0, count($columns), '?')) . ')')->execute([$code, ...array_map(static fn(string $field): mixed => $saveValues[$field], $fields)]);
         redirect('units.php?saved=1');
     } catch (RuntimeException $exception) {
         $error = $exception->getMessage();
@@ -157,47 +186,60 @@ body .unit-form-page .vuexy-icon-form{display:block!important;width:100%!importa
   .unit-related-card-option input{position:static!important;flex:0 0 auto!important;width:16px!important;height:16px!important;min-height:16px!important;margin:0!important;opacity:1!important;visibility:visible!important}
   .unit-related-cards-help{display:block;flex:0 0 calc(100% - 150px);margin:5px 0 0 150px;color:var(--muted);font-size:12px}
 </style>
-<?php if ($showForm): ?><main class="patient-container unit-form-page"><section class="vuexy-form-card" data-static-form><header class="vuexy-form-header"><h2><?=$editId ? 'Ünite Düzenle' : 'Yeni Ünite Kaydı'?></h2><a class="cancel-link" href="<?=e(url('units.php'))?>">Listeye dön</a></header><?php if($error):?><div class="form-alert"><?=e($error)?></div><?php endif?><form class="vuexy-icon-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="<?=$editId?'update':'save'?>"><?php if($editId):?><input type="hidden" name="id" value="<?=$editId?>"><?php endif?>
-<h3 class="form-section-title">Temel Bilgiler</h3>
-<?php function unit_field(string $label, string $name, array $unit, string $icon, string $type='text', bool $required=false): void { ?><div class="unit-edit-row"><label class="unit-edit-label" for="unit_<?=e($name)?>"><?=e($label)?><?=$required?' <span class="required-mark">*</span>':''?></label><div class="unit-edit-control"><span class="merged-icon" aria-hidden="true"><i class="icon-base ti <?=e($icon)?>"></i></span><input id="unit_<?=e($name)?>" type="<?=e($type)?>" name="<?=e($name)?>" value="<?=e((string)$unit[$name])?>" <?=$required?'required':''?><?=$name==='code_display'?' readonly':''?>></div></div><?php } ?>
+<?php if ($showForm): ?><main class="patient-container unit-form-page"><section class="vuexy-form-card" data-static-form><?php if($error):?><div class="form-alert"><?=e($error)?></div><?php endif?><form class="vuexy-icon-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="<?=$editId?'update':'save'?>"><?php if($editId):?><input type="hidden" name="id" value="<?=$editId?>"><?php endif?>
+
+<?php function unit_field(string $label, string $name, array $unit, string $icon, string $type='text', bool $required=false): void { $isDate = $type === 'date'; $value = (string)($unit[$name] ?? ''); if ($isDate) $value = unit_display_date($value); ?><div class="unit-edit-row"><label class="unit-edit-label" for="unit_<?=e($name)?>"><?=e($label)?><?=$required?' <span class="required-mark">*</span>':''?></label><div class="unit-edit-control"><span class="merged-icon" aria-hidden="true"><i class="icon-base ti <?=e($icon)?>"></i></span><input id="unit_<?=e($name)?>" type="<?=e($isDate ? 'text' : $type)?>" <?= $isDate ? 'data-unit-date placeholder="gg.aa.yyyy" inputmode="numeric" maxlength="10" pattern="[0-9]{2}\.[0-9]{2}\.[0-9]{4}"' : '' ?> name="<?=e($name)?>" value="<?=e($value)?>" <?=$required?'required':''?><?=in_array($name, ['code_display', 'age'], true)?' readonly':''?>></div></div><?php } ?>
 <?php unit_field('Kayıt No', 'code_display', ['code_display'=>$editId ? $unit['code'] : 'Otomatik oluşturulur'], 'tabler-hash', 'text'); ?>
-<?php unit_field('Kayıt Tarihi', 'record_date', $unit, 'tabler-calendar', 'date'); unit_field('Ad', 'name', $unit, 'tabler-user', 'text', true); unit_field('Soyad', 'last_name', $unit, 'tabler-user', 'text'); unit_field('Doğum Tarihi', 'birth_date', $unit, 'tabler-cake', 'date'); unit_field('Yaş', 'age', $unit, 'tabler-123', 'number'); unit_field('Ünvan', 'title', $unit, 'tabler-id-badge', 'text'); unit_field('Branş', 'branch', $unit, 'tabler-stethoscope', 'text'); unit_field('Telefon 1', 'phone1', $unit, 'tabler-phone', 'tel'); unit_field('Telefon 2', 'phone2', $unit, 'tabler-phone', 'tel'); ?>
-<div class="unit-edit-row"><label class="unit-edit-label" for="unit_gender">Cinsiyet</label><div class="unit-edit-control"><span class="merged-icon"><i class="icon-base ti tabler-gender-bigender"></i></span><select id="unit_gender" name="gender"><option value="">Seçiniz</option><option value="Erkek" <?=$unit['gender']==='Erkek'?'selected':''?>>Erkek</option><option value="Kadın" <?=$unit['gender']==='Kadın'?'selected':''?>>Kadın</option></select></div></div>
+<?php unit_field('Ad', 'name', $unit, 'tabler-user', 'text', true); unit_field('Soyad', 'last_name', $unit, 'tabler-user', 'text'); unit_field('Kayıt Tarihi', 'record_date', $unit, 'tabler-calendar', 'date'); unit_field('Firma', 'company_name', $unit, 'tabler-building-community'); unit_field('Bölge', 'region', $unit, 'tabler-map-pin'); unit_field('Doğum Tarihi', 'birth_date', $unit, 'tabler-cake', 'date'); unit_field('Yaş', 'age', $unit, 'tabler-123', 'number'); unit_field('Ünvan', 'title', $unit, 'tabler-id-badge', 'text'); unit_field('Telefon 1', 'phone1', $unit, 'tabler-phone', 'tel'); ?>
+
 <div class="unit-edit-row"><span class="unit-edit-label">Değerlendirme</span><div class="unit-rating" role="radiogroup" aria-label="Değerlendirme"><?php for($star=1;$star<=5;$star++):?><input id="rating_<?=$star?>" type="radio" name="rating" value="<?=$star?>" <?=((int)$unit['rating']===$star)?'checked':''?>><label class="<?=((int)$unit['rating'] >= $star)?'is-selected':''?>" for="rating_<?=$star?>">★</label><?php endfor;?></div></div>
-<h3 class="form-section-title">İletişim ve Takip</h3>
-<?php unit_field('Özel Gün', 'special_day', $unit, 'tabler-calendar-heart', 'date'); unit_field('Aksiyon', 'action_name', $unit, 'tabler-bolt', 'text'); unit_field('Aksiyon Tarihi', 'action_date', $unit, 'tabler-calendar-event', 'date'); ?>
-<div class="unit-edit-row"><span class="unit-edit-label">İlişkili Kartlar</span><div class="unit-related-card-options" role="group" aria-label="İlişkili kartlar"><?php foreach($units as $relatedUnit): if((int)$relatedUnit['id'] === $editId) continue; $relatedLabel=trim((string)$relatedUnit['name'].' '.(string)($relatedUnit['last_name'] ?? '')) ?: (string)$relatedUnit['code']; ?><label class="unit-related-card-option"><input type="checkbox" name="related_cards[]" value="<?=(int)$relatedUnit['id']?>" <?=in_array((int)$relatedUnit['id'], $selectedRelatedCards, true)?'checked':''?>><span><?=e($relatedLabel)?></span></label><?php endforeach?></div><small class="unit-related-cards-help">Birden fazla kart seçebilirsiniz.</small></div>
-<div class="unit-edit-row"><label class="unit-edit-label" for="unit_address">Adres</label><div class="unit-edit-control"><span class="merged-icon"><i class="icon-base ti tabler-map-pin"></i></span><textarea id="unit_address" name="address"><?=e((string)$unit['address'])?></textarea></div></div><div class="unit-edit-row"><label class="unit-edit-label" for="unit_note">Not</label><div class="unit-edit-control"><span class="merged-icon"><i class="icon-base ti tabler-notes"></i></span><textarea id="unit_note" name="note"><?=e((string)$unit['note'])?></textarea></div></div>
+
+<?php unit_field('Özel Gün', 'special_day', $unit, 'tabler-calendar-heart', 'date'); ?>
+<div class="unit-edit-row"><span class="unit-edit-label">İlişkili Kartlar</span><input type="search" id="unit-related-search" placeholder="Ad, soyad veya kayıt no ile kart ara" aria-label="İlişkili kart ara" autocomplete="off"><div class="unit-related-card-options" role="group" aria-label="İlişkili kartlar"><?php foreach($units as $relatedUnit): if((int)$relatedUnit['id'] === $editId) continue; $relatedLabel=trim((string)$relatedUnit['name'].' '.(string)($relatedUnit['last_name'] ?? '')) ?: (string)$relatedUnit['code']; ?><label class="unit-related-card-option" data-search="<?=e($relatedLabel . ' ' . (string)$relatedUnit['code'])?>" <?=in_array((int)$relatedUnit['id'], $selectedRelatedCards, true)?'':'hidden'?>><input type="checkbox" name="related_cards[]" value="<?=(int)$relatedUnit['id']?>" <?=in_array((int)$relatedUnit['id'], $selectedRelatedCards, true)?'checked':''?>><span><?=e($relatedLabel)?></span></label><?php endforeach?></div><small class="unit-related-cards-help">Kart eklemek için arama yapın. Seçilen kartı kaldırmak için işaretini kaldırın.</small></div>
+<div class="unit-edit-row"><label class="unit-edit-label" for="unit_note">Not</label><div class="unit-edit-control"><span class="merged-icon"><i class="icon-base ti tabler-notes"></i></span><textarea id="unit_note" name="note"><?=e((string)$unit['note'])?></textarea></div></div>
 <div class="vuexy-form-actions"><button class="button">Kaydet</button><a class="cancel-link" href="<?=e(url('units.php'))?>">İptal</a></div></form></section></main><?php endif; ?>
 <?php if (!$showForm): ?><main class="patient-container unit-list-page"><section class="unit-list"><div class="unit-list-toolbar"><h2>Ünite Listesi</h2><a class="button" href="<?=e(url('units.php?new=1'))?>">+ Yeni Ünite</a></div><table><thead><tr><th>KAYIT NO</th><th>ÜNİTE NO</th><th>AD SOYAD</th><th>TELEFON</th><th>İŞLEMLER</th></tr></thead><tbody><?php foreach($units as $row):?><tr><td><?=e($row['code'])?></td><td><?=e($row['unit_no']??'')?></td><td><?=e(trim($row['name'].' '.($row['last_name']??'')))?></td><td><?=e($row['phone1']??'')?></td><td><div class="unit-actions"><a href="<?=e(url('units.php?edit='.(int)$row['id']))?>" title="Düzenle"><i class="icon-base ti tabler-edit"></i></a><form method="post" onsubmit="return confirm('Bu ünite silinsin mi?')"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=(int)$row['id']?>"><button title="Sil"><i class="icon-base ti tabler-trash"></i></button></form></div></td></tr><?php endforeach;if(!$units):?><tr><td colspan="5" class="empty">Henüz ünite bulunmuyor.</td></tr><?php endif?></tbody></table></section></main><?php endif; ?>
 <script>
-(() => {
-  const recordDate = document.querySelector('input[name="record_date"]');
-  if (!recordDate || document.querySelector('#unit_company_name')) return;
-  const row = document.createElement('div');
-  row.className = 'unit-edit-row';
-  const label = document.createElement('label');
-  label.className = 'unit-edit-label';
-  label.htmlFor = 'unit_company_name';
-  label.textContent = 'Firma';
-  const control = document.createElement('div');
-  control.className = 'unit-edit-control';
-  control.innerHTML = '<span class="merged-icon" aria-hidden="true"><i class="icon-base ti tabler-building-community"></i></span>';
-  const input = document.createElement('input');
-  input.id = 'unit_company_name';
-  input.name = 'company_name';
-  input.type = 'text';
-  input.value = <?=json_encode((string)($unit['company_name'] ?? ''))?>;
-  input.placeholder = 'Firma adı giriniz';
-  control.append(input);
-  row.append(label, control);
-  recordDate.closest('.unit-edit-row')?.after(row);
-})();
+
 document.querySelectorAll('.unit-rating input').forEach(input=>input.addEventListener('change',()=>document.querySelectorAll('.unit-rating label').forEach((label,index)=>label.classList.toggle('is-selected',index<Number(input.value)))));
 document.querySelectorAll('.unit-list tbody tr').forEach(row=>{const editLink=row.querySelector('.unit-actions a[href*="edit="]');if(!editLink)return;row.dataset.editUrl=editLink.href;row.addEventListener('dblclick',event=>{if(event.target.closest('a,button,form,input'))return;window.location.href=row.dataset.editUrl;});});
 document.querySelectorAll('.unit-actions').forEach(actions=>{if(actions.querySelector('.unit-visit-action'))return;const editLink=actions.querySelector('a[href*="edit="]'),match=editLink?.href.match(/[?&]edit=(\d+)/);if(!match)return;const visit=document.createElement('a');visit.href=<?=json_encode(url('unit-visits.php'))?>+'?unit_id='+match[1];visit.className='unit-visit-action';visit.title='Ziyaret';visit.setAttribute('aria-label','Ziyaret');visit.innerHTML='<i class="icon-base ti tabler-map-pin"></i>';actions.prepend(visit);});
 document.querySelectorAll('.unit-actions').forEach(actions=>{if(actions.querySelector('.unit-patients-action'))return;const editLink=actions.querySelector('a[href*="edit="]'),match=editLink?.href.match(/[?&]edit=(\d+)/);if(!match)return;const patients=document.createElement('a');patients.href=<?=json_encode(url('unit-patients.php'))?>+'?unit_id='+match[1];patients.className='unit-patients-action';patients.title='Hastalar';patients.setAttribute('aria-label','Hastalar');patients.innerHTML='<i class="icon-base ti tabler-users"></i>';actions.prepend(patients);});
 (()=>{const format=value=>{let digits=value.replace(/\D/g,'');if(digits.length===10&&digits.startsWith('5'))digits='0'+digits;return [digits.slice(0,4),digits.slice(4,7),digits.slice(7,9),digits.slice(9,11)].filter(Boolean).join(' ')};document.querySelectorAll('input[name="phone1"],input[name="phone2"]').forEach(input=>{input.value=format(input.value);input.addEventListener('input',()=>input.value=format(input.value));});})();
-(()=>{const birthDate=document.querySelector('input[name="birth_date"]'),age=document.querySelector('input[name="age"]');if(!birthDate||!age)return;age.readOnly=true;const updateAge=()=>{if(!birthDate.value){age.value='';return;}const birth=new Date(birthDate.value+'T00:00:00'),today=new Date();if(Number.isNaN(birth.getTime())||birth>today){age.value='';return;}let years=today.getFullYear()-birth.getFullYear();const beforeBirthday=today.getMonth()<birth.getMonth()||(today.getMonth()===birth.getMonth()&&today.getDate()<birth.getDate());age.value=String(years-(beforeBirthday?1:0));};birthDate.addEventListener('input',updateAge);birthDate.addEventListener('change',updateAge);updateAge();})();
+(() => {
+  const fields = [...document.querySelectorAll('[data-unit-date]')];
+  const birth = document.querySelector('input[name="birth_date"]');
+  const age = document.querySelector('input[name="age"]');
+  const parse = value => {
+    if (!/^[0-9]{2}\.[0-9]{2}\.[0-9]{4}$/.test(value)) return null;
+    const [day, month, year] = value.split('.').map(Number);
+    const date = new Date(0); date.setHours(0,0,0,0); date.setFullYear(year, month - 1, day);
+    return year > 0 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+  };
+  const update = () => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    fields.forEach(field => {
+      const date = parse(field.value);
+      field.setCustomValidity(field.value && !date ? 'Geçerli bir tarih giriniz (gg.aa.yyyy).' : field === birth && date > today ? 'Doğum tarihi gelecekte olamaz.' : '');
+    });
+    if (!birth || !age) return;
+    const date = parse(birth.value);
+    age.value = date && date <= today ? String(today.getFullYear() - date.getFullYear() - (today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate()) ? 1 : 0)) : '';
+  };
+  fields.forEach(field => { field.addEventListener('input', update); field.addEventListener('change', update); });
+  update();
+})();
 </script>
 <?php patient_footer(); ?>
+
+<style>.unit-related-card-option[hidden]{display:none!important}#unit-related-search{box-sizing:border-box;width:100%;margin-bottom:6px}.unit-form-page .unit-related-card-options:empty{display:none}</style>
+<script>
+(()=>{
+ const search=document.getElementById('unit-related-search');if(!search)return;
+ const options=[...document.querySelectorAll('.unit-related-card-option')];
+ const filter=()=>{const query=search.value.trim().toLocaleLowerCase('tr-TR');options.forEach(option=>{option.hidden=!option.querySelector('input').checked&&(!query||!option.dataset.search.toLocaleLowerCase('tr-TR').includes(query));});};
+ search.addEventListener('input',filter);
+ options.forEach(option=>option.querySelector('input').addEventListener('change',()=>{search.value='';filter();}));
+ filter();
+})();
+</script>
