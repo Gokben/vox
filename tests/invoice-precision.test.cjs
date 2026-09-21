@@ -14,3 +14,9 @@ for(let i=0;i<3;i++){a.discount.onblur();assert.equal(a.purchaseTotal.value,'4.2
 assert.equal(row(8,31500,'55').purchaseTotal.value,'113.400,00');
 assert.equal(row(2,19500,'40').purchaseTotal.value,'23.400,00');
 console.log('PASS: proportional discount, focus changes, and prior whole-percent invoices');
+
+const bicore=row(2,22800,"52,592705"),kit=row(1,86000,"52,592705");
+assert.equal(bicore.purchaseTotal.value,"21.617,73");assert.equal(kit.purchaseTotal.value,"40.770,27");
+for(let i=0;i<3;i++){kit.discount.onblur();assert.equal(kit.purchaseTotal.value,"40.770,27");}
+assert.equal(bicore.num(bicore.purchaseTotal.value)+kit.num(kit.purchaseTotal.value)+27000,89388);
+console.log("PASS: Bicore and Styletto allocation totals exactly 89388 including chargers and VAT");
