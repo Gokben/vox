@@ -57,6 +57,8 @@
   }
   body#vox-app .vox-mdi-controls button:hover{background:linear-gradient(#69aa96,#1a6653)!important}
   body#vox-app .vox-mdi-controls [data-mdi-action="close"]:hover{background:linear-gradient(#ed8a76,#a82f21)!important}
+  body#vox-app .vox-mdi-loading-state{display:none;position:absolute;z-index:2;top:31px;right:0;bottom:0;left:0;align-items:center;justify-content:center;background:#edf5fd;color:#164c68;font:700 14px Tahoma,"Segoe UI",sans-serif;pointer-events:none}
+  body#vox-app .vox-mdi-window.vox-mdi-loading .vox-mdi-loading-state{display:flex}
   body#vox-app .vox-mdi-frame{display:block;width:100%;height:calc(100% - 31px);border:0;background:#f6efe1}
   body#vox-app .vox-mdi-resizer{position:absolute;z-index:4;right:0;bottom:0;width:17px;height:17px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 0 43%,rgba(11,70,56,.45) 44% 51%,transparent 52% 61%,rgba(11,70,56,.75) 62% 70%,transparent 71%)}
   body#vox-app .vox-mdi-maximized .vox-mdi-resizer{display:none}

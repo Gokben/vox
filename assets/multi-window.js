@@ -233,7 +233,7 @@
       const id = ++sequence;
       const titleText = safeTitle(rawTitle);
       const panel = document.createElement('section');
-      panel.className = 'vox-mdi-window vox-mdi-active';
+      panel.className = 'vox-mdi-window vox-mdi-active vox-mdi-loading';
       let initialPath = '';
       try { initialPath = new URL(rawUrl, location.href).pathname; } catch (_) {}
       const waitForInitialFit = /\/appointment-form\.php$/i.test(initialPath);
@@ -242,12 +242,11 @@
       const offset = (id - 1) % 7;
       panel.style.left = (8 + offset * 2.1) + 'vw';
       panel.style.top = (5 + offset * 2.5) + 'vh';
-      panel.innerHTML = '<div class="vox-mdi-titlebar"><span class="vox-mdi-title"></span></div><div class="vox-mdi-controls"><button type="button" data-mdi-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-mdi-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" data-mdi-action="close" title="Kapat" aria-label="Kapat">×</button></div><iframe class="vox-mdi-frame" title=""></iframe><span class="vox-mdi-resizer" title="Pencere boyutunu değiştir"></span>';
+      panel.innerHTML = '<div class="vox-mdi-titlebar"><span class="vox-mdi-title"></span></div><div class="vox-mdi-controls"><button type="button" data-mdi-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-mdi-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" data-mdi-action="close" title="Kapat" aria-label="Kapat">×</button></div><div class="vox-mdi-loading-state" role="status">Yükleniyor…</div><iframe class="vox-mdi-frame" title=""></iframe><span class="vox-mdi-resizer" title="Pencere boyutunu değiştir"></span>';
       const title = panel.querySelector('.vox-mdi-title');
       const frame = panel.querySelector('.vox-mdi-frame');
       title.textContent = titleText;
       frame.title = titleText;
-      frame.src = windowUrl(rawUrl).href;
 
       const task = document.createElement('button');
       task.type = 'button';
@@ -259,12 +258,13 @@
 
       const record = {id,key,window:panel,title,frame,task,restoreStyle:null,waitForInitialFit,centerAfterFit:false};
       records.set(key,record);
-      frame.addEventListener('load', () => prepareFrame(record));
+      frame.addEventListener('load', () => { panel.classList.remove('vox-mdi-loading'); prepareFrame(record); });
+      frame.src = windowUrl(rawUrl).href;
       if (waitForInitialFit) setTimeout(() => panel.classList.remove('vox-mdi-sizing'), 1200);
       panel.addEventListener('pointerdown', () => setActive(record));
       task.addEventListener('click', () => panel.classList.contains('vox-mdi-minimized') ? restore(record) : (panel.classList.contains('vox-mdi-active') ? minimize(record) : setActive(record)));
 
-      panel.querySelector('.vox-mdi-controls').addEventListener('click', event => {
+      panel.addEventListener('click', event => {
         const button = event.target.closest('button');
         const action = button?.dataset.mdiAction;
         if (action === 'minimize') minimize(record);
@@ -306,7 +306,7 @@
       let interaction = null;
       const titlebar = panel.querySelector('.vox-mdi-titlebar');
       titlebar.addEventListener('pointerdown', event => {
-        if (panel.classList.contains('vox-mdi-maximized')) return;
+        if (event.target.closest('button') || panel.classList.contains('vox-mdi-maximized')) return;
         const rect = panel.getBoundingClientRect();
         interaction = {mode:'move',x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
         titlebar.setPointerCapture(event.pointerId);
@@ -321,7 +321,7 @@
       });
       const stopMove = () => { interaction=null; document.body.classList.remove('vox-mdi-dragging'); };
       titlebar.addEventListener('pointerup',stopMove); titlebar.addEventListener('pointercancel',stopMove);
-      titlebar.addEventListener('dblclick',() => panel.querySelector('[data-mdi-action="maximize"]')?.click());
+      titlebar.addEventListener('dblclick',event => { if (!event.target.closest('button')) panel.querySelector('[data-mdi-action="maximize"]')?.click(); });
 
       const resizer = panel.querySelector('.vox-mdi-resizer');
       resizer.addEventListener('pointerdown', event => {

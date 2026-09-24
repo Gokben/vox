@@ -295,6 +295,15 @@ $branchNamesById = [];
 foreach ($branches as $branch) $branchNamesById[(int)$branch['id']] = (string)$branch['name'];
 $serviceLocations = array_filter(service_type_definitions(), static fn(array $location): bool => (int)$location['active'] === 1);
 $serviceNames = array_filter(service_name_definitions(), static fn(array $name): bool => (int)$name['active'] === 1);
+$needsStockCatalog = $_SERVER['REQUEST_METHOD'] === 'POST'
+    || isset($_GET['new'])
+    || (int)($_GET['edit'] ?? 0) > 0
+    || isset($_GET['open_sales_details'])
+    || isset($_GET['sales_window'])
+    || isset($_GET['open_income_record'])
+    || isset($_GET['charger_stock_options']);
+$stockCards = $stockPriceItems = $hearingDeviceStocks = $chargerDeviceStocks = $salesExitSerials = [];
+if ($needsStockCatalog) {
 $pdo->exec($sqlite
     ? 'CREATE TABLE IF NOT EXISTS stock_price_lists (id INTEGER PRIMARY KEY AUTOINCREMENT, brand VARCHAR(190) NOT NULL, valid_from DATE NOT NULL, valid_until DATE NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)'
     : 'CREATE TABLE IF NOT EXISTS stock_price_lists (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, brand VARCHAR(190) NOT NULL, valid_from DATE NOT NULL, valid_until DATE NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
@@ -309,7 +318,7 @@ if (!in_array('service_id', $stockMovementColumns, true)) {
 }
 $stockCards = $pdo->query('SELECT id,stock_code,stock_name,brand,model,stock_type FROM stock_cards ORDER BY stock_name,stock_code')->fetchAll();
 $stockPriceItems = $pdo->query('SELECT i.stock_id,i.list_price,l.valid_from,l.valid_until,l.id AS price_list_id FROM stock_price_list_items i INNER JOIN stock_price_lists l ON l.id=i.price_list_id ORDER BY l.valid_from DESC,l.id DESC')->fetchAll();
-$hearingDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price,(SELECT m.serial_numbers FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.movement_date DESC,m.id DESC LIMIT 1) AS serial_numbers FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type=? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]')) ORDER BY s.brand,s.model,s.id");
+$hearingDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type=? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]')) ORDER BY s.brand,s.model,s.id");
 $hearingDeviceStatement->execute(['İşitme Cihazı']);
 $hearingDeviceStocks = $hearingDeviceStatement->fetchAll();
 $chargerEditStatement = $pdo->prepare('SELECT id,record_no FROM patient_services WHERE id=? AND patient_id=?');
@@ -317,7 +326,7 @@ $chargerEditStatement->execute([(int)($_GET['edit'] ?? 0), $id]);
 $chargerEditService = $chargerEditStatement->fetch() ?: [];
 $chargerEditId = (int)($chargerEditService['id'] ?? 0);
 $chargerEditDescription = $chargerEditId > 0 ? 'Hizmet kartı satışı: ' . (string)$chargerEditService['record_no'] : '';
-$chargerDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price,(SELECT m.serial_numbers FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.movement_date DESC,m.id DESC LIMIT 1) AS serial_numbers FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND (q.stock_quantity>=1 OR (? > 0 AND EXISTS (SELECT 1 FROM stock_movements own_exit WHERE own_exit.stock_id=s.id AND own_exit.movement_type='Çıkış' AND (own_exit.service_id=? OR own_exit.description=?)))) WHERE s.stock_type=? ORDER BY s.brand,s.model,s.id");
+$chargerDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND (q.stock_quantity>=1 OR (? > 0 AND EXISTS (SELECT 1 FROM stock_movements own_exit WHERE own_exit.stock_id=s.id AND own_exit.movement_type='Çıkış' AND (own_exit.service_id=? OR own_exit.description=?)))) WHERE s.stock_type=? ORDER BY s.brand,s.model,s.id");
 $chargerDeviceStatement->execute([$chargerEditId, $chargerEditId, $chargerEditDescription, 'Şarj Cihazı']);
 $chargerDeviceStocks = $chargerDeviceStatement->fetchAll();
 $salesExitSerialStatement = $pdo->query("SELECT s.id,s.stock_type,s.brand,s.model,m.invoice_no,m.serial_numbers FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE m.movement_type='Çıkış' AND COALESCE(m.invoice_no,'')<>'' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.id DESC");
@@ -347,6 +356,7 @@ foreach ($hearingDeviceStocks as &$deviceStock) $deviceStock['serial_numbers'] =
 unset($deviceStock);
 foreach ($chargerDeviceStocks as &$deviceStock) $deviceStock['serial_numbers'] = json_encode($availableSerials[(int)$deviceStock['id']] ?? [], JSON_UNESCAPED_UNICODE);
 unset($deviceStock);
+}
 if (isset($_GET['charger_stock_options'])) {
     header('Cache-Control: no-store');
     header('Content-Type: application/json; charset=utf-8');
@@ -354,9 +364,12 @@ if (isset($_GET['charger_stock_options'])) {
     exit;
 }
 
-$consumableStatement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type IN (?,?) ORDER BY s.stock_type,s.stock_name,s.stock_code");
-$consumableStatement->execute(['Sarf Malzeme','Pil']);
-$consumableStocks = $consumableStatement->fetchAll();
+$consumableStocks = [];
+if ($needsStockCatalog) {
+    $consumableStatement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type IN (?,?) ORDER BY s.stock_type,s.stock_name,s.stock_code");
+    $consumableStatement->execute(['Sarf Malzeme','Pil']);
+    $consumableStocks = $consumableStatement->fetchAll();
+}
 $serviceActions = array_filter(service_action_definitions(), static fn(array $action): bool => (int)$action['active'] === 1);
 $repairIssueDefinitions = array_filter(complaint_definitions(), static fn(array $issue): bool => (int)$issue['active'] === 1);
 $openIncomeRecord = isset($_GET['open_income_record']);
@@ -1672,7 +1685,7 @@ document.addEventListener('click',event=>{
 <script>(()=>{document.querySelector('[name="repair_target"]')?.closest('label')?.remove();const technicianLabel=document.querySelector('[name="repair_technician"]')?.closest('label');if(!technicianLabel)return;technicianLabel.setAttribute('aria-label','Teknik Servis');[...technicianLabel.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).forEach(node=>node.remove());technicianLabel.prepend(document.createTextNode('Teknik Servis'));})();</script>
 <?php if($showForm): ?>
 <div id="sales-stock-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-close></div><section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-stock-title"><header><h2 id="sales-stock-title">Satış Stoğu Seç</h2><button type="button" class="repair-close" data-sales-close aria-label="Kapat">×</button></header><div class="repair-body"><input id="sales-stock-search" type="search" placeholder="Stok kodu, adı, marka veya model ara" autocomplete="off"><div id="sales-stock-list"><?php foreach($stockCards as $stock): $label=trim((string)$stock['stock_code'].' — '.(string)$stock['stock_name']); ?><button type="button" class="sales-stock-item" data-id="<?=(int)$stock['id']?>" data-label="<?=e($label)?>" data-search="<?=e(mb_strtolower($label.' '.(string)$stock['brand'].' '.(string)$stock['model'], 'UTF-8'))?>"><?=e($label)?></button><?php endforeach; if(!$stockCards): ?><p>Stok kartı bulunamadı.</p><?php endif; ?></div></div><footer><button type="button" class="repair-cancel" data-sales-close>İptal</button></footer></section></div>
-<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true" data-sales-locked="<?=$salesDetailsLocked?'1':'0'?>"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="false" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Kartı - <?=e($patient['full_name'])?></h2><span class="sales-window-controls"><button type="button" data-sales-window-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-sales-window-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></span></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>EFT / Havale</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Toplam Tutar<input inputmode="decimal" name="sales_payment_amount" autocomplete="off"></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><?php if($serviceNameLocked): ?><button type="button" id="sales-lock-toggle" class="button" data-admin="<?=$canManageSalesLock?'1':'0'?>" title="<?=$salesDetailsLocked?'Satış kilidini aç':'Satış bilgilerini kilitle'?>" aria-label="Satış kilidi"><i class="ti <?=$salesDetailsLocked?'tabler-lock':'tabler-lock-open'?>"></i></button><?php endif; ?><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer><span class="sales-window-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span></section></div>
+<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true" data-sales-locked="<?=$salesDetailsLocked?'1':'0'?>"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="false" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Kartı - <?=e($patient['full_name'])?></h2><span class="sales-window-controls"><button type="button" data-sales-window-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-sales-window-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></span></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>EFT / Havale</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Salt cihaz<input inputmode="decimal" name="sales_payment_amount" autocomplete="off"></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><?php if($serviceNameLocked): ?><button type="button" id="sales-lock-toggle" class="button" data-admin="<?=$canManageSalesLock?'1':'0'?>" title="<?=$salesDetailsLocked?'Satış kilidini aç':'Satış bilgilerini kilitle'?>" aria-label="Satış kilidi"><i class="ti <?=$salesDetailsLocked?'tabler-lock':'tabler-lock-open'?>"></i></button><?php endif; ?><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer><span class="sales-window-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span></section></div>
 <?php if ($salesWindow): ?>
 <style>
 main.services-page{display:none!important}
@@ -2128,8 +2141,8 @@ const initializeSalesScreen=()=>{
   const fillSerialOptions=(select,stocks)=>{if(!(select instanceof HTMLSelectElement))return;const current=select.dataset.value||select.value||'',serials=[...new Set(stocks.flatMap(stock=>{try{const values=JSON.parse(stock.serial_numbers||'[]');return Array.isArray(values)?values.map(value=>String(value).trim()).filter(Boolean):[];}catch(_){return [];}}))];if(current&&!serials.includes(current))serials.push(current);select.dataset.serialOptions=JSON.stringify(serials);select.replaceChildren(new Option(serials.length?'Seri no seçiniz':'Seri numarası bulunamadı',''));serials.forEach(serial=>select.add(new Option(serial,serial)));select.value=serials.includes(current)?current:'';delete select.dataset.value;select.disabled=!serials.length;hideSelectedSerials();};
   detailsModal?.addEventListener('change',event=>{if(event.target instanceof HTMLSelectElement&&/^sales_device(?:_[2-4])?_serial$/.test(event.target.name))hideSelectedSerials();});
   const deviceListPriceInput=(()=>{const serialLabel=deviceSerialInput?.closest('label');if(!serialLabel||detailsModal?.querySelector('[data-list-price-for="sales_device_serial"]'))return null;const label=document.createElement('label'),input=document.createElement('input');label.append('Liste Fiyatı');input.type='text';input.readOnly=true;input.className='sales-list-price';input.dataset.listPriceFor='sales_device_serial';label.append(input);serialLabel.after(label);return input;})();
-  const totalSgkInput=(()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]'),totalLabel=totalField?.closest('label');if(!totalField||!totalLabel||detailsModal?.querySelector('#sales_total_sgk'))return null;const label=document.createElement('label'),input=document.createElement('input');label.append('Toplam SGK');input.id='sales_total_sgk';input.type='text';input.readOnly=true;input.className='sales-total-sgk';label.append(input);totalLabel.before(label);return input;})();
-  const totalDiscountInput=(()=>{const totalSgkLabel=detailsModal?.querySelector('#sales_total_sgk')?.closest('label');if(!totalSgkLabel||detailsModal?.querySelector('[name="sales_total_discount_rate"]'))return null;const label=document.createElement('label'),input=document.createElement('input');label.append('Toplam İskonto % - TL');input.name='sales_total_discount_rate';input.readOnly=true;input.title='İskonto / (Liste fiyatı − SGK)';input.inputMode='decimal';input.autocomplete='off';label.append(input);totalSgkLabel.after(label);label.hidden=true;return input;})();
+  const totalSgkInput=(()=>{const totalField=detailsModal?.querySelector('[name="sales_payment_amount"]'),totalLabel=totalField?.closest('label');if(!totalField||!totalLabel||detailsModal?.querySelector('#sales_total_sgk'))return null;const label=document.createElement('label'),input=document.createElement('input');label.className='sales-total-sgk-hidden';label.hidden=true;label.append('Toplam SGK');input.id='sales_total_sgk';input.type='text';input.readOnly=true;input.className='sales-total-sgk';label.append(input);totalLabel.before(label);return input;})();
+  const totalDiscountInput=(()=>{const totalSgkLabel=detailsModal?.querySelector('#sales_total_sgk')?.closest('label');if(!totalSgkLabel||detailsModal?.querySelector('[name="sales_total_discount_rate"]'))return null;const label=document.createElement('label'),input=document.createElement('input');label.append('İskonto % - TL');input.name='sales_total_discount_rate';input.readOnly=true;input.title='İskonto / (Liste fiyatı − SGK)';input.inputMode='decimal';input.autocomplete='off';label.append(input);totalSgkLabel.after(label);label.hidden=true;return input;})();
   const formatSgkMoneyFields=()=>detailsModal?.querySelectorAll('[name$="_sgk"]').forEach(field=>{const amount=parseTurkishMoney(field.value);if(amount!==null&&amount>0)field.value=formatTurkishMoney(amount);});
   detailsModal?.addEventListener('focusout',event=>{const field=event.target;if(!(field instanceof HTMLInputElement)||!field.name.endsWith('_sgk'))return;const amount=parseTurkishMoney(field.value);if(amount!==null&&amount>0)field.value=formatTurkishMoney(amount);});
   const hasSecondHearingDevice=()=>!!detailsModal?.querySelector('#hearing-device-details-2:not([hidden])');
@@ -2167,6 +2180,15 @@ const initializeSalesScreen=()=>{
   });
   totalDiscountInput?.addEventListener('blur',()=>updateTotalAmount());
   const editableTotalField=detailsModal?.querySelector('[name="sales_payment_amount"]');
+  const totalAmountLabel=editableTotalField?.closest('label');
+  const totalAmountHome=document.createComment('sales-total-amount-home');
+  totalAmountLabel?.before(totalAmountHome);
+  const totalDiscountLabel=totalDiscountInput?.closest('label');
+  const totalDiscountHome=document.createComment('sales-total-discount-home');
+  totalDiscountLabel?.before(totalDiscountHome);
+  const paymentTypeLabel=detailsModal?.querySelector('[name="sales_payment_type"]')?.closest('label');
+  const paymentTypeHome=document.createComment('sales-payment-type-home');
+  paymentTypeLabel?.before(paymentTypeHome);
   editableTotalField?.addEventListener('change',()=>{
     if(detailsModal?.dataset.salesLocked==='1')return;
     const requested=parseTurkishMoney(editableTotalField.value);
@@ -2627,8 +2649,10 @@ const initializeSalesScreen=()=>{
   const makeSameModelField=(caption,editable=false)=>{const label=document.createElement('label'),input=document.createElement('input');label.className='sales-same-model-field';label.append(caption);input.type='text';input.readOnly=!editable;if(editable)input.inputMode='decimal';label.append(input);deviceDetails?.append(label);return input;};
   const sameQuantity=makeSameModelField('Adet');sameQuantity.value='2';
   const sameListTotal=makeSameModelField('Liste Fiyatı (2 Adet)');sameListTotal.closest('label')?.classList.add('sales-same-model-list-price');
-  const sameSgkTotal=makeSameModelField('SGK Toplamı',true);
-  const sameNetTotal=makeSameModelField('Net Fiyat Toplamı');
+  const sameSgkTotal=makeSameModelField('SGK Rapor',true);sameSgkTotal.id='sales-same-sgk-total';
+  const sameNetTotal=makeSameModelField('Rapor Hariç');sameNetTotal.id='sales-same-net-total';
+  const sameRealSaleTotal=makeSameModelField('Gerçek satış');sameRealSaleTotal.id='sales-real-sale-total';sameRealSaleTotal.title='SGK Rapor + Salt cihaz';
+  const sameModelSummary=document.createElement('div');sameModelSummary.className='sales-same-model-summary';deviceDetails?.append(sameModelSummary);
   const sameSerialLabels=()=>({first:deviceSerialInput?.closest('label'),second:detailsModal?.querySelector('[name="sales_device_2_serial"]')?.closest('label')});
   const placeSerialSideToggle=(label,fieldName,inSerialLabel)=>{
     if(!label)return;
@@ -2650,10 +2674,16 @@ const initializeSalesScreen=()=>{
     const sgk=['sales_device_sgk','sales_device_2_sgk'].reduce((sum,name)=>sum+(parseTurkishMoney(detailsModal?.querySelector(`[name="${name}"]`)?.value)||0),0);
     const netBeforeDiscount=Math.max(0,unitList*2-sgk);
     sameListTotal.value=unitList?formatTurkishMoney(unitList*2):'';
+    const unitPriceHint=unitList?'1 adet liste fiyatı: '+formatTurkishMoney(unitList):'';
+    sameListTotal.title=unitPriceHint;
+    sameListTotal.closest('label').title=unitPriceHint;
     if(document.activeElement!==sameSgkTotal)sameSgkTotal.value=formatTurkishMoney(sgk);
     sameNetTotal.value=formatTurkishMoney(netBeforeDiscount);
+    const saltDevice=parseTurkishMoney(editableTotalField?.value)||0;
+    sameRealSaleTotal.value=formatTurkishMoney((Math.round(sgk*100)+Math.round(saltDevice*100))/100);
     sameSgkTotal.readOnly=detailsModal?.dataset.salesLocked==='1';
   };
+  editableTotalField?.addEventListener('input',()=>{if(detailsModal?.dataset.hearingPair==='same')refreshSameModelSummary();});
   const syncSameModel=()=>{
     if(detailsModal.dataset.hearingPair!=='same')return;
     const second=detailsModal?.querySelector('#hearing-device-details-2');if(!second)return;
@@ -2696,7 +2726,8 @@ const initializeSalesScreen=()=>{
     if(same&&labels.first&&labels.second){labels.first.after(labels.second);placeSerialSideToggle(labels.first,'sales_device_side',true);placeSerialSideToggle(labels.second,'sales_device_2_side',true);detailsModal.querySelectorAll('.sales-hearing-side-toggle').forEach(toggle=>toggle.dispatchEvent(new Event('hearing-side-sync')));syncSameModel();}
     if(!same&&labels.first&&labels.second){placeSerialSideToggle(labels.first,'sales_device_side',false);placeSerialSideToggle(labels.second,'sales_device_2_side',false);second?.querySelector('[name="sales_device_2_model"]')?.closest('label')?.after(labels.second);}
     deviceDetails?.querySelector('.sales-product-section-heading')?.firstChild&&(deviceDetails.querySelector('.sales-product-section-heading').firstChild.nodeValue=same?'İşitme Cihazı':'İşitme Cihazı 1');
-    const modelLabel=modelSelect?.closest('label');if(same&&modelLabel){modelLabel.after(sameQuantity.closest('label'));labels.second?.after(sameListTotal.closest('label'));sameListTotal.closest('label')?.after(sameSgkTotal.closest('label'),sameNetTotal.closest('label'));}
+    const cashLink=detailsModal.querySelector('[aria-label="Kasa"]');
+    const modelLabel=modelSelect?.closest('label');if(same&&modelLabel){modelLabel.after(sameQuantity.closest('label'));labels.second?.after(sameListTotal.closest('label'));sameListTotal.closest('label')?.after(sameModelSummary);[sameSgkTotal.closest('label'),sameNetTotal.closest('label'),totalDiscountLabel,totalAmountLabel,sameRealSaleTotal.closest('label'),paymentTypeLabel,cashLink].filter(Boolean).forEach(label=>sameModelSummary.append(label));}else if(!same){if(totalDiscountLabel)totalDiscountHome.after(totalDiscountLabel);if(totalAmountLabel)totalAmountHome.after(totalAmountLabel);if(paymentTypeLabel){paymentTypeHome.after(paymentTypeLabel);if(cashLink)paymentTypeLabel.after(cashLink);}}
     if(switchingSameModelCard)showSameModelCardFields(same);
     detailsModal.querySelectorAll('[data-hearing-pair]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.hearingPair===detailsModal.dataset.hearingPair)));
     arrangeProductSections();updateDeviceAddButton();updateTotalAmount();if(!initial)persistDetails();
@@ -3676,6 +3707,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-window-controls button:hover{background:rgba(255,255,255,.3)!important}
 #sales-details-modal .sales-window-controls .repair-close{font-size:18px!important;line-height:16px!important}
 #sales-details-modal .sales-details-dialog>.repair-body{display:grid!important;flex:1 1 auto!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;align-content:start!important;gap:5px 8px!important;box-sizing:border-box!important;min-height:0!important;margin:0!important;padding:4px!important;background:#dcebf8!important;overflow:auto!important}
+#sales-details-modal .sales-details-dialog>.repair-body>label.sales-total-sgk-hidden{display:none!important}
 #sales-details-modal .classic-sales-section-title{grid-column:1/-1!important;height:23px!important;margin:0!important;padding:3px 9px!important;border:1px solid #79a5d0!important;background:linear-gradient(#f8fcff,#cfe4f8)!important;color:#124c82!important;font:700 13px/17px Tahoma,"Segoe UI",sans-serif!important}
 #sales-details-modal .classic-sales-section-title i{display:inline-block;width:17px;margin-right:4px;color:#1769a8!important;text-align:center;font-style:normal!important}
 #sales-details-modal .classic-sales-section-title[data-sales-section="products"]{position:relative!important;display:flex!important;align-items:center!important;gap:0!important}
@@ -3683,6 +3715,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-section-ear-pair{display:inline-flex!important;align-items:center;justify-content:center;gap:5px;box-sizing:border-box;min-width:43px!important;height:21px!important;min-height:21px!important;max-height:21px!important;margin:0!important;padding:1px 4px!important;border:1px solid transparent;border-radius:3px;background:transparent;cursor:pointer}
 #sales-details-modal .sales-section-ear-pair[aria-pressed="true"]{border-color:#6e9bc1;background:#e7f4ff;box-shadow:inset 0 0 0 1px #fff}
 #sales-details-modal .sales-section-ear-pair:hover{border-color:#8bb1d0}
+#sales-details-modal .sales-section-ear-pair:disabled{opacity:1!important;cursor:not-allowed!important}
 #sales-details-modal .sales-section-ear-pair:focus-visible{outline:2px solid #2476b9;outline-offset:1px}
 #sales-details-modal .sales-section-ear-pair .ti{width:16px!important;margin:0!important;font-size:16px;line-height:1;color:#159447!important}
 #sales-details-modal .sales-section-ear-pair .sales-ear-left{transform:scaleX(-1)}
@@ -3695,6 +3728,18 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-field{display:flex!important;flex-direction:column;gap:5px}
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-list-price{line-height:16px!important}
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-field input{width:100%;box-sizing:border-box}
+#sales-details-modal #hearing-device-details .sales-same-model-summary{display:none!important}
+#sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-summary{display:grid!important;grid-column:1/-1!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px 8px!important;min-width:0!important}
+#sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-summary>label{display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;padding:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has(#sales-same-sgk-total){grid-column:1!important;grid-row:1!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has(#sales-same-net-total){grid-column:2!important;grid-row:1!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has([name="sales_total_discount_rate"]){grid-column:3!important;grid-row:1!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has([name="sales_payment_amount"]){grid-column:1!important;grid-row:2!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has(#sales-real-sale-total){grid-column:2!important;grid-row:2!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has([name="sales_payment_type"]){grid-column:3!important;grid-row:2!important;display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;padding:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label:has([name="sales_payment_type"]) select{width:calc(100% - 34px)!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>[aria-label="Kasa"]{grid-column:3!important;grid-row:2!important;justify-self:end!important;align-self:end!important;top:0!important;width:26px!important;min-width:26px!important;max-width:26px!important;height:23px!important;min-height:23px!important;max-height:23px!important;margin:0!important}
+#sales-details-modal #hearing-device-details .sales-same-model-summary>label input{width:100%!important;box-sizing:border-box!important}
 #sales-details-modal .sales-product-actions{grid-column:1/-1!important;display:flex!important;align-items:center!important;gap:7px!important;margin:0!important;padding:3px 7px!important;border-right:1px solid #79a5d0!important;border-left:1px solid #79a5d0!important;background:#edf5fd!important}
 #sales-details-modal .sales-product-actions .button{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:110px!important;height:27px!important;min-height:27px!important;margin:0!important;padding:0 10px!important;border:1px solid #0f7b4d!important;border-radius:3px!important;background:linear-gradient(#2bb474,#138655)!important;color:#fff!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px rgba(255,255,255,.4)!important}
 #sales-details-modal .sales-device-details,
@@ -3750,14 +3795,11 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       if(actions&&!productTitle){productTitle=document.createElement('div');productTitle.className='classic-sales-section-title';productTitle.dataset.salesSection='products';productTitle.innerHTML='<i aria-hidden="true">▪</i>Ürün Bilgileri';}
       if(productTitle&&!productTitle.querySelector('.sales-section-ear-pairs')){
         const ears=document.createElement('span');ears.className='sales-section-ear-pairs';ears.setAttribute('role','group');ears.setAttribute('aria-label','İşitme cihazı eşleşmesi');
-        ears.innerHTML='<button type="button" class="sales-section-ear-pair" data-hearing-pair="same" aria-label="Aynı marka ve modelden iki işitme cihazı" title="Aynı marka ve modelden 2 cihaz"><i class="icon-base ti tabler-ear" aria-hidden="true"></i><i class="icon-base ti tabler-ear sales-ear-left" aria-hidden="true"></i></button><button type="button" class="sales-section-ear-pair" data-hearing-pair="separate" aria-label="İki farklı model işitme cihazı" title="İki farklı model"><i class="icon-base ti tabler-ear" aria-hidden="true"></i><i class="icon-base ti tabler-ear sales-ear-left sales-ear-red" aria-hidden="true"></i></button>';
+        ears.innerHTML='<button type="button" class="sales-section-ear-pair" data-hearing-pair="same" aria-label="Aynı marka ve modelden iki işitme cihazı" title="Aynı marka ve modelden 2 cihaz"><i class="icon-base ti tabler-ear" aria-hidden="true"></i><i class="icon-base ti tabler-ear sales-ear-left" aria-hidden="true"></i></button><button type="button" class="sales-section-ear-pair" data-hearing-pair="separate" aria-label="İki farklı model işitme cihazı" title="İki farklı model ekranı şimdilik kapalı" aria-disabled="true" disabled><i class="icon-base ti tabler-ear" aria-hidden="true"></i><i class="icon-base ti tabler-ear sales-ear-left sales-ear-red" aria-hidden="true"></i></button>';
         productTitle.append(ears);
       }
       productTitle?.querySelectorAll('[data-hearing-pair]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.hearingPair===(modal.dataset.hearingPair||'separate'))));
       if(actions&&productTitle&&actions.nextElementSibling!==productTitle)actions.after(productTitle);
-      let transactionTitle=body.querySelector('[data-sales-section="transaction"]');
-      const saleDate=body.querySelector('[name="sales_sale_date"]')?.closest('label');
-      if(saleDate&&!transactionTitle){transactionTitle=document.createElement('div');transactionTitle.className='classic-sales-section-title';transactionTitle.dataset.salesSection='transaction';transactionTitle.innerHTML='<i aria-hidden="true">▦</i>Satış ve Garanti Bilgileri';saleDate.before(transactionTitle);}
     };
     [0,100,350,800,1400].forEach(delay=>setTimeout(decorateSections,delay));
     new MutationObserver(decorateSections).observe(body,{childList:true,subtree:false});
@@ -3886,6 +3928,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-product-child-content>.sales-device-details,
 #sales-details-modal .sales-product-child-content>#charger-device-details,
 #sales-details-modal .sales-product-child-content>#consumable-details{position:relative!important;display:grid!important;width:100%!important;margin:0 0 4px!important;border:1px solid #79a5d0!important}
+#sales-details-modal #hearing-device-details{border:0!important}
 #sales-details-modal .sales-product-child-resizer{position:absolute!important;z-index:4!important;right:0!important;bottom:0!important;width:15px!important;height:15px!important;cursor:nwse-resize!important;background:linear-gradient(135deg,transparent 0 45%,#6d8fa9 46% 52%,transparent 53% 62%,#6d8fa9 63% 69%,transparent 70%)!important}
 #sales-details-modal .sales-product-child-window.is-minimized{height:29px!important;min-height:29px!important;max-height:29px!important}
 #sales-details-modal .sales-product-child-window.is-minimized .sales-product-child-content,
@@ -4029,8 +4072,7 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-device-details.sales-product-inline-inactive,
 #sales-details-modal #consumable-details.sales-product-inline-inactive,
 #sales-details-modal #charger-device-details.sales-product-inline-inactive{display:none!important}
-#sales-details-modal .repair-body>.sales-transaction-tab-hidden,
-#sales-details-modal .classic-sales-section-title.sales-transaction-tab-hidden{display:none!important}
+#sales-details-modal .repair-body>.sales-transaction-tab-hidden{display:none!important}
 #sales-details-modal .sales-details-dialog>footer{position:relative!important}
 #sales-details-modal #sales-add-second-hearing{position:absolute!important;left:50%!important;top:5px!important;transform:translateX(-50%)!important;display:grid!important;place-items:center!important;box-sizing:border-box!important;width:29px!important;min-width:29px!important;max-width:29px!important;height:29px!important;min-height:29px!important;max-height:29px!important;margin:0!important;padding:0!important;border:1px solid #19782b!important;border-radius:3px!important;background:linear-gradient(#66d36f,#1d9b35 55%,#12842b)!important;color:#fff!important;font:700 20px/27px Tahoma,"Segoe UI",sans-serif!important;text-shadow:1px 1px #176726!important;cursor:pointer!important}
 #sales-details-modal #sales-add-second-hearing:disabled{border-color:#84958d!important;background:linear-gradient(#cad2ce,#9facA6)!important;color:#eef1ef!important;text-shadow:none!important;cursor:not-allowed!important;opacity:.8!important}
@@ -4058,7 +4100,6 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       arranging=true;
       const actions=body.querySelector('.sales-product-actions');
       const productTitle=body.querySelector('[data-sales-section="products"]');
-      const transactionTitle=body.querySelector('[data-sales-section="transaction"]');
       if(!actions||!productTitle){arranging=false;return;}
       if(actions.nextElementSibling!==productTitle)actions.after(productTitle);
       const groups=definitions.map(definition=>({definition,sections:[...body.querySelectorAll(definition.selector)]}));
@@ -4067,12 +4108,11 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
       if(!activeKey)activeKey=savedKey||available[0]||'hearing';
       let anchor=productTitle;
       groups.forEach(group=>group.sections.forEach(section=>{if(anchor.nextElementSibling!==section)anchor.after(section);anchor=section;}));
-      if(transactionTitle&&anchor.nextElementSibling!==transactionTitle)anchor.after(transactionTitle);
       groups.forEach(group=>group.sections.forEach(section=>section.classList.toggle('sales-product-inline-inactive',group.definition.key!==activeKey)));
       const transactionNames=['sales_sale_date','sales_warranty_start','sales_warranty_end','sales_invoice_no','sales_payment_type','sales_payment_amount','sales_total_discount_rate'];
       const transactionFields=transactionNames.map(name=>body.querySelector(`[name="${name}"]`)?.closest('label'));
       transactionFields.push(body.querySelector('#sales_total_sgk')?.closest('label'),body.querySelector('[aria-label="Kasa"]'));
-      [transactionTitle,...transactionFields].filter(Boolean).forEach(element=>element.classList.toggle('sales-transaction-tab-hidden',activeKey!=='hearing'));
+      transactionFields.filter(Boolean).forEach(element=>element.classList.toggle('sales-transaction-tab-hidden',activeKey!=='hearing'));
       modal.querySelector('#sales-add-second-hearing')?.classList.toggle('sales-product-inline-inactive',activeKey!=='hearing');
       actions.querySelectorAll('button').forEach(button=>{
         const selected=keyForLabel(button.textContent.trim())===activeKey;
