@@ -95,7 +95,7 @@
     return sections(form).map((section,index)=>{
       const prefix=index===0?'':index===1?'extra_':'payment'+(index+1)+'_';
       const value=name=>section.querySelector(`[name="${prefix}${name}"]`)?.value||'';
-      const data={id:Number(section.dataset.recordId||records()[index]?.id||0)};
+      const data={id:Number(records()[index]?.id||0)};
       ['transaction_date','payment_type','amount','description','bank_name','current_account_id','installment_count','commission_rate'].forEach(name=>data[name]=value(name));
       if(data.payment_type==='term'){
         const dates=index<2?section.querySelectorAll(`[name="${prefix}term_date[]"]`):section.querySelectorAll('[data-stage-date]');
@@ -144,6 +144,7 @@
     if(!summary.dataset.aggregateStyled){summary.dataset.aggregateStyled='1';summary.style.cssText='margin-left:auto;color:#e6525d;font-size:13px;font-weight:700;white-space:nowrap';}
   }
   let saving=false;
+  let paymentDirty=false;
   async function save(form, closeAfterSave = false) {
     if(saving)return;
     const invalid=[...form.querySelectorAll('.vox-date-editor')].find(input=>input.getClientRects().length&&(!input.value||!input.validity.valid));
@@ -161,13 +162,14 @@
     }
     const total=payments.reduce((sum,p)=>sum+(p.payment_type==='term'?p.term_schedule.reduce((n,row)=>n+money(row.amount),0):money(p.amount)),0);
     const saleTotal=money(document.querySelector('#sales-details-modal [name="sales_payment_amount"]')?.value);
-    if(saleTotal>0&&Math.abs(total-saleTotal)>0.009){alert('Dört ödeme kaydının toplamı satış tutarına eşit olmalıdır. Satış tutarı: '+format(saleTotal)+' ₺');return;}
+    if(Math.abs(total-saleTotal)>0.009){alert('Ödeme kayıtlarının toplamı satış tutarına eşit olmalıdır. Satış tutarı: '+format(saleTotal)+' ₺');return;}
     saving=true;
     try{
       const data=new FormData();data.set('csrf',form.querySelector('[name="csrf"]').value);data.set('action','cash_update_only');data.set('ajax','1');data.set('edit_id',editId);data.set('payment_records_json',JSON.stringify(payments));
       const response=await fetch(endpoint,{method:'POST',body:data,credentials:'same-origin'});
       const result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Ödemeler kaydedilemedi.');
       window.__savedCashRecords=result.records;
+      paymentDirty=false;
       syncSalePaymentSummary(form);
       sections(form).forEach((section,i)=>section.dataset.recordId=String(result.records[i]?.id||''));
       const id=form.querySelector('[name="id"]');if(id)id.value=result.records[0]?.id||'';
@@ -178,12 +180,61 @@
       }else alert('Ödeme kayıtları kaydedildi.');
     }catch(error){alert(error.message);}finally{saving=false;}
   }
+  async function cancelLastStage(form) {
+    if(saving)return;
+    const panels=sections(form), last=panels.at(-1);
+    if(!last)return;
+    const id=Number(records()[panels.length-1]?.id||0);
+    saving=true;
+    try {
+      if(!await window.voxConfirm(panels.length+'. gelir kaydını iptal etmek istiyor musunuz?',{cancelLabel:'Vazgeç',confirmLabel:'Tamam'}))return;
+      if(id){
+        const data=new FormData();
+        data.set('csrf',form.querySelector('[name="csrf"]').value);
+        data.set('action','cash_cancel_last_income');data.set('edit_id',editId);data.set('cash_delete_id',id);
+        const response=await fetch(endpoint,{method:'POST',body:data,credentials:'same-origin'});
+        const result=await response.json();
+        if(!response.ok||!result.success)throw new Error(result.message||'Gelir kaydı iptal edilemedi.');
+        window.__savedCashRecords=result.records;
+      }
+      if(panels.length>1){
+        last.remove();
+        form.dataset.activePayment=String(panels.length-2);
+      }else{
+        // Keep the first empty panel available for the next attempt; do not save it on cancel.
+        form.reset();
+        for(const name of ['id','amount','payment_type','bank_name','current_account_id','commission_rate']){
+          const field=form.querySelector(`[name="${name}"]`);if(field)field.value='';
+        }
+        last.dataset.recordId='';
+        form.dataset.saved='';form.dataset.paymentOpened='1';
+        form.querySelector('[name="action"]').value='save_transaction';
+        form.parentElement.hidden=true;form.parentElement.style.display='none';
+      }
+      sections(form).forEach((panel,index)=>panel.dataset.recordId=String(records()[index]?.id||''));
+      if(!records().length){
+        const summary=document.querySelector('#sales-details-modal [name="sales_payment_type"]');
+        if(summary){summary.disabled=false;summary.value='';summary.title='';}
+      }
+      updateAdd(form);syncPaymentVisibility(form);
+    }catch(error){alert(error.message);}finally{saving=false;}
+  }
+  window.addEventListener('click',event=>{
+    const button=event.target.closest('[data-cancel-last-income]');
+    if(!button||!isSale())return;
+    event.preventDefault();event.stopImmediatePropagation();cancelLastStage(button.closest('form'));
+  },true);
   // Capture X before the legacy close listener can discard the form.
   window.addEventListener('click',event=>{
     const close=event.target.closest(formSelector+' header [data-cash-close]');
     if(!close||!isSale())return;
     event.preventDefault();event.stopImmediatePropagation();
     if(saving)return;
+    if(!paymentDirty){
+      const modal=close.closest('form')?.parentElement;
+      if(modal){modal.hidden=true;modal.style.display='none';}
+      return;
+    }
     if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return;
     save(close.closest('form'),true);
   },true);
@@ -193,7 +244,7 @@
     const form=button.closest('form');
     if(button.matches('[aria-label="Bir gelir kaydı daha ekle"]')){
       if(sections(form).length<2)return;
-      event.preventDefault();event.stopImmediatePropagation();createStage(form);return;
+      event.preventDefault();event.stopImmediatePropagation();paymentDirty=true;createStage(form);return;
     }
     if(button.matches('[data-cash-close]'))return;
     event.preventDefault();event.stopImmediatePropagation();save(form);
@@ -270,7 +321,20 @@
   const initialize=()=>{
     const form=document.querySelector(formSelector);if(!form||!isSale()||initialized.has(form))return;
     initialized.add(form);
+    form.addEventListener('input',event=>{if(event.isTrusted)paymentDirty=true;});
+    form.addEventListener('change',event=>{if(event.isTrusted)paymentDirty=true;});
+    form.addEventListener('click',event=>{if(event.isTrusted&&event.target.closest('[aria-label="Bir gelir kaydı daha ekle"]'))paymentDirty=true;});
     form.dataset.aggregateIncomeTotal='1';
+    const style=document.createElement('style');
+    style.textContent=`${formSelector} [aria-label="Gelir kaydını sil"],${formSelector} [aria-label="İkinci gelir kaydını sil"]{display:none!important}`;
+    form.append(style);
+    const cancel=document.createElement('button');cancel.type='button';cancel.dataset.cancelLastIncome='1';
+    cancel.title='Kaydı Sil';cancel.setAttribute('aria-label','Kaydı Sil');
+    cancel.textContent='X';
+    cancel.style.cssText='display:inline-flex!important;align-items:center;justify-content:center;gap:5px;width:29px!important;min-width:29px!important;max-width:29px!important;height:29px!important;min-height:29px!important;max-height:29px!important;white-space:nowrap!important;flex-shrink:0!important;padding:0!important;margin:0!important;border:1px solid #c62828;border-radius:3px;background:#e53935!important;color:#fff!important;font:700 12px Tahoma,sans-serif;cursor:pointer';
+    const footer=form.querySelector('footer');
+    footer?.insertBefore(cancel,footer.querySelector('[aria-label="Bir gelir kaydı daha ekle"]'));
+
     form.addEventListener('input',()=>syncIncomeTotal(form));
     const restore=()=>{
       if(records().length>1&&!form.querySelector('[data-extra-income]'))return;

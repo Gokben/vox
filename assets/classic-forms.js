@@ -51,7 +51,7 @@
     };
     const isBackControl = control => {
       if (!(control instanceof HTMLAnchorElement || control instanceof HTMLButtonElement)) return false;
-      if (control.matches('.brand-back-link,.patient-card-return-button,[data-patient-back],[aria-label="Kapat"],[title="Kapat"]')) return false;
+      if (control.matches('.brand-back-link,.patient-card-return-button,[data-patient-back],[data-vox-confirm-cancel],[aria-label="Kapat"],[title="Kapat"]')) return false;
       if (control.matches('.home-link,.profile-home-link,.price-list-cancel,.service-back-link,.company-visits-back,.unit-visits-back,.cancel-link,.vox-cancel-action')) return true;
       const label = cleanLabel(control.textContent || control.getAttribute('aria-label') || control.getAttribute('title')).toLocaleLowerCase('tr-TR');
       return label === '↶' || /^(?:geri dön|listeye dön|vazgeç|.+[ae] dön)$/u.test(label);

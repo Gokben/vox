@@ -8,6 +8,7 @@
     if (!match || !validDate(+match[3], +match[2], +match[1]) || (timed && (+match[4] > 23 || +match[5] > 59))) return null;
     return `${match[3]}-${match[2]}-${match[1]}` + (timed ? `T${match[4]}:${match[5]}` : '');
   };
+  const parseField = (value, timed = false, name = '') => name === 'birth_date' && !timed && value === '00.00.0000' ? '' : parse(value, timed);
   const format = value => String(value || '').replace(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2})?)?$/, (_, y, m, d, h, min) => `${d}.${m}.${y}` + (h === undefined ? '' : ` ${h}:${min}`));
   const age = (iso, today = new Date()) => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
@@ -16,7 +17,7 @@
     const years = today.getFullYear() - y - ((today.getMonth() + 1 < m || (today.getMonth() + 1 === m && today.getDate() < d)) ? 1 : 0);
     return years < 0 ? null : years;
   };
-  globalThis.VoxDateFormat = { parse, format, age, pad };
+  globalThis.VoxDateFormat = { parse, parseField, format, age, pad };
   if (typeof document === 'undefined') return;
   const controls = new Map();
   const valueProperty = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
@@ -53,7 +54,7 @@
       editor.readOnly = source.readOnly;
     };
     const validate = () => {
-      const iso = parse(editor.value, timed);
+      const iso = parseField(editor.value, timed, source.name);
       let message = iso === null ? 'Geçerli bir tarihi gg.aa.yyyy biçiminde girin.' : '';
       if (iso && source.min && iso < source.min) message = `Tarih ${format(source.min)} veya sonrası olmalıdır.`;
       if (iso && source.max && iso > source.max) message = `Tarih ${format(source.max)} veya öncesi olmalıdır.`;
@@ -66,9 +67,9 @@
       set(value) { valueProperty.set.call(this, value); sync(); if (!editing) validate(); }
     });
     const update = event => {
-      editor.value = pad(editor.value);
+      if (!/\.0000$/.test(editor.value)) editor.value = pad(editor.value);
       editing = true;
-      source.value = parse(editor.value, timed) || '';
+      source.value = parseField(editor.value, timed, source.name) || '';
       validate();
       source.dispatchEvent(new Event(event.type, { bubbles: true }));
       editing = false;
@@ -88,8 +89,8 @@
     editor.maxLength = 10;
     editor.pattern = '[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}';
     const validate = () => {
-      editor.value = pad(editor.value);
-      const parsed = parse(editor.value);
+      if (!/\.0000$/.test(editor.value)) editor.value = pad(editor.value);
+      const parsed = parseField(editor.value, false, editor.name);
       editor.setCustomValidity(parsed === null ? 'Geçerli bir tarihi gg.aa.yyyy biçiminde girin.' : '');
       return editor.validity.valid;
     };

@@ -28,6 +28,8 @@ function vox_normalize_dates(array $values): array
         if (vox_is_date_field((string)$key)) {
             $convert = static function ($item) use ($key): string {
                 if (!is_string($item)) throw new InvalidArgumentException('Geçersiz tarih alanı.');
+                // Unknown birth dates are stored as empty, never as an invalid SQL date.
+                if ($key === 'birth_date' && $item === '00.00.0000') return '';
                 return vox_date_to_iso($item, $key === 'delivered_at');
             };
             $values[$key] = is_array($value) ? array_map($convert, $value) : $convert($value);

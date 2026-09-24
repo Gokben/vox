@@ -38,3 +38,23 @@ check(patient_identity_validate($pdo,'12345678901','patients',0)!=='');
 echo "Passport bypass, duplicate exclusion and restored T.C. validation tests passed\n";
 
 check(patient_identity_audit([["id"=>99,"national_id"=>"   ","passport_no"=>""]])===[]);
+
+// The unknown-identity placeholder can be reused in both patient sources.
+check(patient_identity_error('00000000000')==='');
+foreach(['patients','external_technical_patients'] as $table){
+ foreach([10,11] as $id){
+  check(patient_identity_validate($pdo,'00000000000',$table,0)==='');
+  $pdo->exec("INSERT INTO $table(id,full_name,national_id) VALUES($id,'Unknown identity','00000000000')");
+ }
+ check(patient_identity_validate($pdo,'00000000000',$table,10)==='');
+ foreach(['0000000000','000000000000','0000000000a',' 00000000000'] as $invalid){
+  check(patient_identity_validate($pdo,$invalid,$table,0)!=='');
+ }
+ // Real identifiers remain unique, including across patient sources.
+ check(patient_identity_validate($pdo,'12345678901',$table,0)!=='');
+}
+check(patient_identity_audit(patient_identity_rows($pdo))===[]);
+$pdo->exec("INSERT INTO external_technical_patients(id,full_name,national_id) VALUES(12,'Real duplicate','12345678901')");
+check(count(patient_identity_audit(patient_identity_rows($pdo)))===2);
+check(count(patient_identity_audit([['id'=>99,'national_id'=>' 00000000000','passport_no'=>'']]))===1);
+echo "Unknown identity reuse, format boundaries and preserved duplicate checks passed\n";

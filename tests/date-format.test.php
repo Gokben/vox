@@ -35,3 +35,11 @@ foreach ([['sales_details','broken'], ['repair_details','1'], ['term_schedule_js
     catch (InvalidArgumentException $expected) {}
 }
 echo "Service action flags and nested date validation passed\n";
+
+expect(vox_normalize_dates(['birth_date'=>'00.00.0000'])['birth_date'], '');
+expect(vox_normalize_dates(['birth_date'=>'29.02.2024'])['birth_date'], '2024-02-29');
+foreach ([['record_date'=>'00.00.0000'], ['birth_date'=>'00.01.2000'], ['birth_date'=>'01.00.2000'], ['birth_date'=>'01.01.0000']] as $invalid) {
+    try { vox_normalize_dates($invalid); throw new RuntimeException('Invalid date accepted'); }
+    catch (InvalidArgumentException $expected) {}
+}
+echo "Unknown birth date exception and ordinary date validation passed\n";

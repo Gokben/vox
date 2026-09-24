@@ -26,7 +26,7 @@ function patient_identity_rows(PDO $pdo): array {
 }
 function patient_identity_audit(array $rows): array {
     $counts=[];
-    foreach ($rows as $row) { if (trim((string)($row['passport_no']??''))!=='') continue; $key=trim((string)$row['national_id']); if ($key!=='' && patient_identity_error($key)==='') $counts[$key]=($counts[$key]??0)+1; }
+    foreach ($rows as $row) { if (trim((string)($row['passport_no']??''))!=='') continue; $key=trim((string)$row['national_id']); if ($key!=='' && $key!=='00000000000' && patient_identity_error($key)==='') $counts[$key]=($counts[$key]??0)+1; }
     $issues=[];
     foreach ($rows as $row) {
         if (trim((string)($row['passport_no']??''))!=='') continue;
@@ -41,7 +41,8 @@ function patient_identity_audit(array $rows): array {
 function patient_identity_validate(PDO $pdo, string $number, string $table, int $id, string $passport = ''): string {
     if (trim($passport)!=='') return '';
     $error=patient_identity_error($number);
-    if ($error!=='' || $number==='') return $error;
+    // Eleven zeros represent a patient without a national identity number.
+    if ($error!=='' || $number==='' || $number==='00000000000') return $error;
     // Keep the lock until the request ends, including the subsequent INSERT/UPDATE.
     // Existing duplicate records can therefore be reviewed without deleting them.
     if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql') {

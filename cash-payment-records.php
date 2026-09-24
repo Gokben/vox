@@ -10,6 +10,33 @@ function cash_payment_money(mixed $value): float
     return round((float)$text, 2);
 }
 
+// The sale total is the amount payable by the customer, excluding SGK.
+// Derive it from product amounts so older cards with a stale saved total can still be paid correctly.
+function cash_payment_sale_total(array $details): float
+{
+    $amount = 0.0;
+    $hasProductAmount = false;
+    foreach (['sales_device_net_price', 'sales_device_2_net_price'] as $key) {
+        if (trim((string)($details[$key] ?? '')) === '') continue;
+        $hasProductAmount = true;
+        $amount += cash_payment_money($details[$key]);
+    }
+    if (($details['sales_charger_promotion'] ?? '') !== 'Evet' && trim((string)($details['sales_charger_net_price'] ?? '')) !== '') {
+        $hasProductAmount = true;
+        $amount += cash_payment_money($details['sales_charger_net_price']);
+    }
+    if (($details['sales_consumable_promotion'] ?? '') !== 'Evet' && !empty($details['sales_consumable_stock_id'])) {
+        $hasProductAmount = true;
+        $items = json_decode((string)($details['sales_consumable_items'] ?? ''), true);
+        if (is_array($items) && $items !== []) {
+            foreach ($items as $item) $amount += cash_payment_money($item['price'] ?? 0);
+        } else {
+            $amount += cash_payment_money($details['sales_consumable_price'] ?? 0) * (int)($details['sales_consumable_quantity'] ?? 0);
+        }
+    }
+    return $hasProductAmount ? round($amount, 2) : cash_payment_money($details['sales_payment_amount'] ?? 0);
+}
+
 // A payment's date belongs to that payment, never to the preceding payment.
 function cash_payment_record(array $data): array
 {
@@ -124,7 +151,7 @@ function cash_payment_save_batch(PDO $pdo, array $payments, string $source, int 
     }
 }
 
-function cash_payment_decode_records(string $json, float $saleTotal = 0): array
+function cash_payment_decode_records(string $json, float $saleTotal): array
 {
     $rows = json_decode($json, true, 32, JSON_THROW_ON_ERROR);
     if (!is_array($rows) || !array_is_list($rows) || count($rows) < 1 || count($rows) > 4) throw new RuntimeException('Bir satış için en fazla 4 ödeme kaydı girilebilir.');
@@ -140,6 +167,28 @@ function cash_payment_decode_records(string $json, float $saleTotal = 0): array
             : $record['amount'];
         $payments[] = ['id'=>$id,'record'=>$record];
     }
-    if ($saleTotal > 0 && abs($total - $saleTotal) > 0.009) throw new RuntimeException('Ödeme kayıtları toplamı satış tutarına eşit olmalıdır.');
+    if (abs($total - $saleTotal) > 0.009) throw new RuntimeException('Ödeme kayıtları toplamı satış tutarına eşit olmalıdır.');
     return $payments;
+}
+
+// Cancel one saved stage at a time, in reverse order, within the patient's income source.
+function cash_payment_cancel_last(PDO $pdo, string $source, int $id): array
+{
+    if ($source === '' || $id <= 0) throw new RuntimeException('Geçersiz gelir kaydı.');
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
+        $query = $pdo->prepare("SELECT * FROM cash_transactions WHERE source_url=? AND transaction_type='income' ORDER BY id" . $lock);
+        $query->execute([$source]);
+        $rows = $query->fetchAll(PDO::FETCH_ASSOC);
+        $last = $rows ? $rows[count($rows)-1] : null;
+        if (!$last || (int)$last['id'] !== $id) throw new RuntimeException('Gelir kayıtlarını son kayıttan başlayarak geriye doğru iptal edin.');
+        $pdo->prepare("DELETE FROM cash_transactions WHERE id=? AND source_url=? AND transaction_type='income'")->execute([$id, $source]);
+        array_pop($rows);
+        $pdo->commit();
+        return $rows;
+    } catch (Throwable $error) {
+        $pdo->rollBack();
+        throw $error;
+    }
 }

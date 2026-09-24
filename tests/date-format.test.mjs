@@ -17,3 +17,12 @@ test('age changes on birthday', () => {
 });
 
 test('single digit day and month padding',()=>{assert.equal(VoxDateFormat.pad('1.2.2026'),'01.02.2026');assert.equal(VoxDateFormat.pad('1.12.2026'),'01.12.2026');assert.equal(parse(VoxDateFormat.pad('31.2.2026')),null);});
+
+test('unknown birth date is accepted without calculating age', () => {
+  assert.equal(VoxDateFormat.parseField('00.00.0000', false, 'birth_date'), '');
+  assert.equal(age(VoxDateFormat.parseField('00.00.0000', false, 'birth_date')), null);
+  for (const value of ['00.01.2000','01.00.2000','00.00.2000','01.01.0000','0.0.0000'])
+    assert.equal(VoxDateFormat.parseField(value, false, 'birth_date'), null);
+  assert.equal(VoxDateFormat.parseField('00.00.0000', false, 'record_date'), null);
+  assert.equal(VoxDateFormat.parseField('29.02.2024', false, 'birth_date'), '2024-02-29');
+});
