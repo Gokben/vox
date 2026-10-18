@@ -30,7 +30,7 @@ start_patient_staff_ui_link($staffNames, [], $staffOrders);
 
 $q = trim($_GET['q'] ?? '');
 $databaseDriver = db()->getAttribute(PDO::ATTR_DRIVER_NAME);
-$isRestrictedPatientList = in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_SECRETARY, ROLE_ACCOUNTING], true);
+$isRestrictedPatientList = in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_AUDIOLOGIST, ROLE_SECRETARY, ROLE_ACCOUNTING], true);
 // Reuse list preferences across pagination and reopening this patient list.
 foreach (['length','sort','search_columns'] as $preference) {
     if (array_key_exists($preference, $_GET)) $_SESSION['patient_list_preferences'][$preference] = (string)$_GET[$preference];

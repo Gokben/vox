@@ -7,7 +7,7 @@ require_login();
 require __DIR__ . '/patient-layout.php';
 
 $pdo = db();
-$isRestrictedResultList = in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_SECRETARY, ROLE_ACCOUNTING], true);
+$isRestrictedResultList = in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_AUDIOLOGIST, ROLE_SECRETARY, ROLE_ACCOUNTING], true);
 $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
 $dateFrom = trim((string)($_GET['date_from'] ?? ''));
 $dateTo = trim((string)($_GET['date_to'] ?? ''));

@@ -150,7 +150,7 @@ standaloneUnitsMenuLink.removeAttribute('aria-haspopup');
 standaloneUnitsMenuLink.removeAttribute('aria-expanded');
 unitsGroup.replaceWith(standaloneUnitsMenuLink);
 standaloneUnitsMenuLink.after(companiesMenuLink);
-<?php if (current_role() === ROLE_AUDIOMETRIST): ?>
+<?php if (in_array(current_role(), [ROLE_AUDIOMETRIST, ROLE_AUDIOLOGIST], true)): ?>
 standaloneUnitsMenuLink.remove();
 companiesMenuLink.remove();
 <?php endif; ?>
