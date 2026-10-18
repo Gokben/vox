@@ -2,7 +2,8 @@
   'use strict';
   const settings = document.currentScript.dataset;
   const endpoint = settings.endpoint;
-  const editId = settings.editId;
+  const currentEditId = () => Number(document.querySelector('#service-card-form [name="edit_id"]')?.value || new URLSearchParams(location.search).get('edit') || settings.editId) || 0;
+  const salePersisted = () => settings.salePersisted === '1';
   const formSelector = 'form[action*="cash.php"]';
   const money = value => {
     let text = String(value ?? '').replace(/[^0-9,.-]/g, '');
@@ -165,6 +166,13 @@
     if(Math.abs(total-saleTotal)>0.009){alert('Ödeme kayıtlarının toplamı satış tutarına eşit olmalıdır. Satış tutarı: '+format(saleTotal)+' ₺');return;}
     saving=true;
     try{
+      if(!salePersisted()){
+        if(typeof window.voxSaveSalesDetails!=='function')throw new Error('Satış kartı kaydedilemedi. Lütfen yeniden deneyin.');
+        const sale=await window.voxSaveSalesDetails({forPayment:true});
+        if(!sale?.success)throw new Error(sale?.message||'Satış kartı kaydedilemedi.');
+      }
+      const editId=currentEditId();
+      if(!editId)throw new Error('Satış kartı kaydedilemedi. Lütfen yeniden deneyin.');
       const data=new FormData();data.set('csrf',form.querySelector('[name="csrf"]').value);data.set('action','cash_update_only');data.set('ajax','1');data.set('edit_id',editId);data.set('payment_records_json',JSON.stringify(payments));
       const response=await fetch(endpoint,{method:'POST',body:data,credentials:'same-origin'});
       const result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Ödemeler kaydedilemedi.');
@@ -189,6 +197,8 @@
     try {
       if(!await window.voxConfirm(panels.length+'. gelir kaydını iptal etmek istiyor musunuz?',{cancelLabel:'Vazgeç',confirmLabel:'Tamam'}))return;
       if(id){
+        const editId=currentEditId();
+        if(!editId)throw new Error('Gelir kaydının bağlı olduğu satış kartı bulunamadı. Satış kartını yeniden açın.');
         const data=new FormData();
         data.set('csrf',form.querySelector('[name="csrf"]').value);
         data.set('action','cash_cancel_last_income');data.set('edit_id',editId);data.set('cash_delete_id',id);
