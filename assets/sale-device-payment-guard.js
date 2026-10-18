@@ -4,7 +4,9 @@
     const modal=document.querySelector('#sales-details-modal');
     if(!modal)return [];
     const missing=[];
+    const singleSameModelDevice=modal.dataset.hearingPair==='same'&&modal.querySelector('[name="sales_device_quantity"]')?.value==='1';
     for(let number=1;number<=4;number++){
+      if(number===2&&singleSameModelDevice)continue;
       const names=number===1?['sales_brand','sales_model','sales_device_serial','sales_device_net_price']:[`sales_device_${number}_brand`,`sales_device_${number}_model`,`sales_device_${number}_serial`,`sales_device_${number}_net_price`];
       const fields=names.map(name=>modal.querySelector(`[name="${name}"]`));
       if(number>1&&!fields.some(field=>field&&(!field.closest('.sales-device-details')?.hidden||field.value.trim())))continue;
