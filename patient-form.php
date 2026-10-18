@@ -191,6 +191,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 }
 $patientFullName = (string)$patient['full_name'];
 $patientFullNameHtml = e($patientFullName);
+$selectedSourceUnitId = (int)($patient['source_unit_id'] ?? 0);
+$selectedSourceUnitName = '';
+foreach ($sourceUnits as $sourceUnit) {
+    if ((int)$sourceUnit['id'] === $selectedSourceUnitId) {
+        $selectedSourceUnitName = trim((string)$sourceUnit['name'] . ' ' . (string)($sourceUnit['last_name'] ?? ''));
+        break;
+    }
+}
 start_patient_staff_ui_link($staffNames, ['staff_yeliz'=>!empty($patient['staff_yeliz']),'staff_gunes'=>!empty($patient['staff_gunes']),'staff_erva'=>!empty($patient['staff_erva']),'staff_merve'=>!empty($patient['staff_merve']),'staff_seyma'=>!empty($patient['staff_seyma'])]);
 patient_header($id?'Hasta Düzenle':'Yeni Hasta', 'patients');
 ?>
@@ -250,6 +258,7 @@ body#vox-app.vox-embedded-window .patient-form-page .vuexy-icon-form.classic-pat
 .classic-patient-form .check-row input{width:13px!important;height:13px!important;accent-color:#149447!important}
 .classic-patient-form .source-unit-row[hidden],body#vox-app .classic-patient-form .source-referral-row[hidden]{display:none!important}
 body#vox-app .classic-patient-form .source-account-row[hidden]{display:none!important}
+.source-unit-row .merged-input{position:relative!important;overflow:visible!important}.source-unit-picker{position:relative;flex:1;min-width:0}.source-unit-picker>.source-unit-search{box-sizing:border-box}.source-unit-options{position:absolute;z-index:1000;top:100%;left:0;right:0;max-height:220px;overflow:auto;border:1px solid #8daece;background:#fff;box-shadow:0 4px 10px rgba(0,0,0,.18)}.source-unit-options[hidden]{display:none!important}.source-unit-option{display:block;width:100%;padding:6px 8px;border:0;background:#fff;color:#26384a;text-align:left;font:11px Tahoma,"Segoe UI",sans-serif;cursor:pointer}.source-unit-option:hover,.source-unit-option:focus{background:#1d65c1;color:#fff;outline:0}.source-unit-empty{padding:7px 8px;color:#68788a;font:11px Tahoma,"Segoe UI",sans-serif}
 .classic-patient-form .field-source-account{grid-column:1 / 2!important}
 .classic-patient-form .field-source-referral{grid-column:1 / 2!important}
 .classic-patient-form .vuexy-form-actions{order:99!important;min-height:40px!important;margin:0!important;padding:4px 6px!important;display:flex!important;align-items:center!important;gap:7px!important;border:1px solid #79a5d0!important;border-radius:2px!important;background:linear-gradient(#eef7ff,#d1e4f5)!important}
@@ -288,7 +297,7 @@ body#vox-app .classic-patient-form .source-account-row[hidden]{display:none!impo
 <div class="icon-form-row"><label class="icon-form-label">Kaynak</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_id"><option value="">Seçiniz</option><?php foreach(patient_source_options($sourceDefinitions, (int)($patient['source_id'] ?? 0)) as $source):if(mb_strtolower(trim((string)$source['name']),'UTF-8')==='pazarlama')continue;$isCurrent=(int)$patient['source_id']===(int)$source['id'];$legacySource=in_array(trim($source['name']),['Kurumlar & Firmalar','Kurumlar ve Firmalar'],true);if($legacySource&&!$isCurrent)continue;if(!(int)$source['active']&&!$isCurrent)continue;?><option value="<?=(int)$source['id']?>" <?=$legacySource?'hidden':''?> <?=$isCurrent?'selected':''?>><?=e($source['name'])?><?=!(int)$source['active']?' (Pasif)':''?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row source-account-row" hidden><label class="icon-form-label" for="source-account">Kurum</label><div class="merged-input"><span class="merged-icon">◉</span><select id="source-account" name="source_account_id"><option value="">Seçiniz</option><?php foreach($sourceAccounts as $account): ?><option data-account-type="<?=e($account['account_type'])?>" value="<?=(int)$account['id']?>" <?=((int)($patient['source_account_id']??0)===(int)$account['id'])?'selected':''?>><?=e(trim((string)($account['short_name']??''))!=='' ? trim((string)$account['short_name']) : $account['title'])?></option><?php endforeach; ?></select></div></div>
 <div class="icon-form-row source-referral-row" hidden><label class="icon-form-label" for="source-referral-detail">Tanıdık / Tavsiye Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><input type="text" id="source-referral-detail" name="source_referral_detail" placeholder="Tanıdık veya tavsiye detayını yazınız" value="<?=e($patient['source_referral_detail']??'')?>"></div></div>
-<div class="icon-form-row source-unit-row" hidden><label class="icon-form-label">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><select name="source_unit_id"><option value="">Ad Soyad seçiniz</option><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e(trim((string)$unit['name'].' '.(string)($unit['last_name']??'')))?></option><?php endforeach?></select></div></div>
+<div class="icon-form-row source-unit-row" hidden><label class="icon-form-label" for="source-unit-search">Kaynak Ünitesi</label><div class="merged-input"><span class="merged-icon">◉</span><div class="source-unit-picker"><input id="source-unit-search" class="source-unit-search" type="search" placeholder="Ünite aramak için en az 3 karakter yazın" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="source-unit-options" value="<?=e($selectedSourceUnitName !== '' ? $selectedSourceUnitName : ($selectedSourceUnitId ? 'Mevcut ünite' : ''))?>"><div id="source-unit-options" class="source-unit-options" role="listbox" hidden></div></div><select name="source_unit_id" hidden><option value="">Ad Soyad seçiniz</option><?php if($selectedSourceUnitId && $selectedSourceUnitName===''):?><option value="<?=$selectedSourceUnitId?>" selected>Mevcut ünite</option><?php endif?><?php foreach($sourceUnits as $unit):?><option value="<?=(int)$unit['id']?>" <?=((int)($patient['source_unit_id']??0)===(int)$unit['id'])?'selected':''?>><?=e(trim((string)$unit['name'].' '.(string)($unit['last_name']??'')))?></option><?php endforeach?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label" for="opening-employee">İlgilenen kişi</label><div class="merged-input"><span class="merged-icon">♙</span><select id="opening-employee" name="opening_employee_id" title="Hasta kartı açılırken hastayla ilgilenen çalışan"><option value="">Çalışan seçiniz</option><?php if (!empty($patient['opening_employee_id']) && !in_array((int)$patient['opening_employee_id'], array_map('intval', array_column($openingEmployees, 'id')), true)): ?><option hidden selected value="<?=(int)$patient['opening_employee_id']?>">Mevcut atama korunuyor</option><?php endif; ?><?php foreach ($openingEmployees as $employee): ?><option value="<?=(int)$employee['id']?>" <?=((int)($patient['opening_employee_id']??0)===(int)$employee['id'])?'selected':''?>><?=e($employee['full_name'])?></option><?php endforeach; ?></select></div></div>
 <div class="icon-form-row"><label class="icon-form-label">Başvuru Detayı</label><div class="merged-input"><span class="merged-icon">⋯</span><select name="source_detail">
 <option value="">Seçiniz</option>
@@ -465,7 +474,26 @@ body#vox-app .classic-patient-form .source-account-row[hidden]{display:none!impo
   source.addEventListener('change', refresh);
   refresh();
 })();
-(()=>{const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-unit-row'),units=document.querySelector('select[name="source_unit_id"]');if(!source||!row||!units)return;const refresh=()=>{const label=(source.options[source.selectedIndex]?.textContent||'').trim();const show=/^(kaynak\s*)?ünite$/i.test(label);row.hidden=!show;if(!show)units.value='';};source.addEventListener('change',refresh);refresh()})();
+(()=>{
+  const source=document.querySelector('select[name="source_id"]'),row=document.querySelector('.source-unit-row'),units=row?.querySelector('select[name="source_unit_id"]'),search=document.getElementById('source-unit-search'),results=document.getElementById('source-unit-options');
+  if(!source||!row||!units||!search||!results)return;
+  const unitOptions=[...units.options].filter(option=>option.value);
+  const close=()=>{results.hidden=true;search.setAttribute('aria-expanded','false');};
+  const render=()=>{
+    const query=search.value.trim();
+    const current=units.selectedOptions[0]?.textContent?.trim()||'';
+    if(search.value.trim().toLocaleLowerCase('tr-TR')!==current.toLocaleLowerCase('tr-TR'))units.value='';
+    results.replaceChildren();
+    if(query.length<3){close();return;}
+    const folded=query.toLocaleLowerCase('tr-TR');
+    const matches=unitOptions.filter(option=>option.textContent.trim().toLocaleLowerCase('tr-TR').includes(folded));
+    if(!matches.length){const empty=document.createElement('div');empty.className='source-unit-empty';empty.textContent='Eşleşen ünite bulunamadı.';results.append(empty);}
+    matches.forEach(option=>{const button=document.createElement('button');button.type='button';button.className='source-unit-option';button.setAttribute('role','option');button.textContent=option.textContent.trim();button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{units.value=option.value;search.value=option.textContent.trim();close();units.dispatchEvent(new Event('change',{bubbles:true}));});results.append(button);});
+    results.hidden=false;search.setAttribute('aria-expanded','true');
+  };
+  const refresh=()=>{const label=(source.options[source.selectedIndex]?.textContent||'').trim();const show=/^(kaynak\s*)?ünite$/i.test(label);row.hidden=!show;if(!show){units.value='';search.value='';close();}else if(units.value){search.value=units.selectedOptions[0]?.textContent?.trim()||search.value;}};
+  source.addEventListener('change',refresh);search.addEventListener('input',render);search.addEventListener('keydown',event=>{if(event.key==='ArrowDown'&&!results.hidden){event.preventDefault();results.querySelector('button')?.focus();}else if(event.key==='Escape')close();});document.addEventListener('click',event=>{if(!row.contains(event.target))close();});refresh();
+})();
 (()=>{const input=document.getElementById('patient-full-name'),display=document.querySelector('.patient-name-display');if(!input||!display)return;const edit=()=>{input.focus();input.setSelectionRange(input.value.length,input.value.length)};display.addEventListener('click',edit);display.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();edit()}})})();
 </script>
 <script src="<?=url('assets/patient-fields.js?v=1')?>" defer></script>
