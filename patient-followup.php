@@ -364,9 +364,10 @@ if (isset($_GET['charger_stock_options'])) {
     exit;
 }
 
+$consumableInvoiceUnitPriceSql = "(SELECT CASE WHEN COALESCE(m.unit_cost,0)>0 THEN m.unit_cost WHEN COALESCE(m.purchase_price,0)>0 AND m.quantity>0 THEN m.purchase_price/m.quantity ELSE NULL END FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND TRIM(COALESCE(m.invoice_no,''))<>'' AND (COALESCE(m.unit_cost,0)>0 OR (COALESCE(m.purchase_price,0)>0 AND m.quantity>0)) ORDER BY m.movement_date DESC,m.id DESC LIMIT 1)";
 $consumableStocks = [];
 if ($needsStockCatalog) {
-    $consumableStatement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type IN (?,?) ORDER BY s.stock_type,s.stock_name,s.stock_code");
+    $consumableStatement = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,{$consumableInvoiceUnitPriceSql} AS invoice_unit_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type IN (?,?) ORDER BY s.stock_type,s.stock_name,s.stock_code");
     $consumableStatement->execute(['Sarf Malzeme','Pil']);
     $consumableStocks = $consumableStatement->fetchAll();
 }
@@ -1140,7 +1141,7 @@ $savedConsumableDetails = json_decode((string)($serviceCard['sales_details'] ?? 
 try { $savedConsumableIds = array_column(sale_consumable_lines($savedConsumableDetails), 'stock_id'); } catch (RuntimeException $error) { $savedConsumableIds = []; }
 $missingConsumableIds = array_values(array_diff(array_unique($savedConsumableIds), array_column($consumableStocks, 'id')));
 if ($missingConsumableIds) {
-    $query = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s WHERE s.stock_type IN ('Sarf Malzeme','Pil') AND s.id IN (" . implode(',', array_fill(0,count($missingConsumableIds),'?')) . ")");
+    $query = $pdo->prepare("SELECT s.id,s.stock_code,s.stock_name,s.stock_type,s.sale_price,{$consumableInvoiceUnitPriceSql} AS invoice_unit_price,COALESCE((SELECT NULLIF(m.unit,'') FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' ORDER BY m.movement_date DESC,m.id DESC LIMIT 1),'Adet') AS unit FROM stock_cards s WHERE s.stock_type IN ('Sarf Malzeme','Pil') AND s.id IN (" . implode(',', array_fill(0,count($missingConsumableIds),'?')) . ")");
     $query->execute($missingConsumableIds);$consumableStocks=array_merge($consumableStocks,$query->fetchAll());
 }
 patient_header($salesWindow ? 'Satış Kartı - ' . (string)$patient['full_name'] : 'Hizmetler', 'patients');
@@ -2106,7 +2107,7 @@ const initializeSalesScreen=()=>{
   const confirmLinkedSaleChange=()=>{if(!linkedSaleNeedsConfirmation||(details?.value||'')===initialSalesDetails)return true;let confirmation=form.querySelector('[name="confirm_linked_sale_change"]');if(confirmation?.value==='1')return true;if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return false;confirmation=document.createElement('input');confirmation.type='hidden';confirmation.name='confirm_linked_sale_change';confirmation.value='1';form.append(confirmation);return true;};
   form.addEventListener('submit',event=>{if(!confirmLinkedSaleChange())event.preventDefault();},true);
   detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',event=>{if(confirmLinkedSaleChange())return;event.preventDefault();event.stopImmediatePropagation();},true);
-  const salesLockButton=detailsModal?.querySelector('#sales-lock-toggle'),applySalesLock=locked=>{if(!detailsModal)return;detailsModal.dataset.salesLocked=locked?'1':'0';detailsModal.querySelectorAll('.repair-body [name]').forEach(field=>{const fixed=field.dataset.soldSerial==='1';field.disabled=locked||fixed;field.readOnly=locked||fixed;});detailsModal.querySelectorAll('.sales-brand-picker-trigger').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('.sales-product-cancel,#add-hearing-device').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('#add-hearing-device,.sales-product-actions .button,[data-sales-product-action]').forEach(button=>{button.disabled=locked;button.setAttribute('aria-disabled',locked?'true':'false');button.style.opacity=locked?'.48':'';button.style.cursor=locked?'not-allowed':'';});detailsModal.querySelectorAll('[aria-label="Kasa"]').forEach(link=>{link.style.pointerEvents=locked?'none':'';link.style.opacity=locked?'.38':'';});const saveButton=detailsModal.querySelector('#sales-details-save');if(saveButton)saveButton.disabled=locked;if(salesLockButton){salesLockButton.title=locked?'Satış kilidini aç':'Satış bilgilerini kilitle';salesLockButton.innerHTML=`<i class="ti ${locked?'tabler-lock':'tabler-lock-open'}"></i>`;salesLockButton.style.background=locked?'#e6525d':'#19a94b';}};
+  const salesLockButton=detailsModal?.querySelector('#sales-lock-toggle'),applySalesLock=locked=>{if(!detailsModal)return;detailsModal.dataset.salesLocked=locked?'1':'0';const consumablePromoted=detailsModal.querySelector('[name="sales_consumable_promotion"]')?.value==='Evet';detailsModal.querySelectorAll('.repair-body [name]').forEach(field=>{const fixed=field.dataset.soldSerial==='1';field.disabled=locked||fixed;field.readOnly=locked||fixed||field.name==='sales_consumable_price'&&consumablePromoted;});detailsModal.querySelectorAll('.sales-consumable-row-price').forEach(field=>field.readOnly=locked||consumablePromoted);detailsModal.querySelectorAll('.sales-brand-picker-trigger').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('.sales-product-cancel,#add-hearing-device').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('#add-hearing-device,.sales-product-actions .button,[data-sales-product-action]').forEach(button=>{button.disabled=locked;button.setAttribute('aria-disabled',locked?'true':'false');button.style.opacity=locked?'.48':'';button.style.cursor=locked?'not-allowed':'';});detailsModal.querySelectorAll('[aria-label="Kasa"]').forEach(link=>{link.style.pointerEvents=locked?'none':'';link.style.opacity=locked?'.38':'';});const saveButton=detailsModal.querySelector('#sales-details-save');if(saveButton)saveButton.disabled=locked;if(salesLockButton){salesLockButton.title=locked?'Satış kilidini aç':'Satış bilgilerini kilitle';salesLockButton.innerHTML=`<i class="ti ${locked?'tabler-lock':'tabler-lock-open'}"></i>`;salesLockButton.style.background=locked?'#e6525d':'#19a94b';}};
   salesLockButton?.addEventListener('click',async()=>{const locked=detailsModal?.dataset.salesLocked==='1',isAdmin=salesLockButton.dataset.admin==='1';if(locked&&!isAdmin){alert('Kilidi yalnız yönetici açabilir.');return;}salesLockButton.disabled=true;try{const data=new FormData();data.set('csrf',form.querySelector('[name="csrf"]')?.value||'');data.set('action','sales_toggle_lock');data.set('edit_id',form.querySelector('[name="edit_id"]')?.value||'');data.set('sales_locked',locked?'0':'1');const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'}),result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Kilit işlemi tamamlanamadı.');applySalesLock(!!result.locked);syncSameModel();updateTotalAmount();alert(result.locked?'Satış bilgileri kilitlendi.':'Satış kilidi açıldı.');}catch(error){alert(error.message||'Kilit işlemi tamamlanamadı.');}finally{salesLockButton.disabled=false;}});
   let savedSaleProducts={};try{savedSaleProducts=JSON.parse(details?.value||'{}')||{};}catch(_){savedSaleProducts={};}
   if(detailsModal)detailsModal.dataset.singleEarPriceCleared=savedSaleProducts.sales_device_price_cleared==='1'?'1':'0';
@@ -2277,11 +2278,11 @@ const initializeSalesScreen=()=>{
   const renameFieldLabel=(field,label)=>{const fieldLabel=field?.closest('label');if(fieldLabel?.firstChild?.nodeType===Node.TEXT_NODE)fieldLabel.firstChild.nodeValue=label;};
   renameFieldLabel(chargerModelSelect,'Model');renameFieldLabel(chargerSerialInput,'Seri No');
   const consumableDetails=document.createElement('div');
-  consumableDetails.id='consumable-details';consumableDetails.hidden=true;consumableDetails.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px';
-  consumableDetails.innerHTML='<label>Sarf Malzeme<select name="sales_consumable_stock_id"><option value="">Sarf malzeme veya pil seçiniz</option></select></label><label>Promosyon<select name="sales_consumable_promotion"><option>Hayır</option><option>Evet</option></select></label><label>Adet<input type="number" min="1" step="1" name="sales_consumable_quantity" value="1"></label><label>Birim<input name="sales_consumable_unit" value="Adet" readonly></label><label>Satış Fiyatı<input inputmode="decimal" name="sales_consumable_price" readonly></label><input type="hidden" name="sales_consumable_unit_description"><input type="hidden" data-consumable-inline-total><input type="hidden" name="sales_consumable_items">';
+  consumableDetails.id='consumable-details';consumableDetails.hidden=true;consumableDetails.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:14px';
+  consumableDetails.innerHTML='<label>Sarf Malzeme<select name="sales_consumable_stock_id"><option value="">Sarf malzeme veya pil seçiniz</option></select></label><label>Promosyon<select name="sales_consumable_promotion"><option>Hayır</option><option>Evet</option></select></label><label>Adet<input type="number" min="1" step="1" name="sales_consumable_quantity" value="1"></label><label>Birim<input name="sales_consumable_unit" value="Adet" readonly></label><label>Alış Fiyatı<input data-consumable-purchase-price readonly></label><label>Satış Fiyatı<input inputmode="decimal" name="sales_consumable_price"></label><input type="hidden" name="sales_consumable_unit_description"><input type="hidden" data-consumable-inline-total><input type="hidden" name="sales_consumable_items">';
   consumableDetails.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');
   detailsModal?.querySelector('.repair-body')?.prepend(consumableDetails);
-  const consumableSelect=consumableDetails.querySelector('[name="sales_consumable_stock_id"]'),consumableQuantityInput=consumableDetails.querySelector('[name="sales_consumable_quantity"]'),consumablePriceInput=consumableDetails.querySelector('[name="sales_consumable_price"]'),consumablePromotionInput=consumableDetails.querySelector('[name="sales_consumable_promotion"]'),consumableUnitInput=consumableDetails.querySelector('[name="sales_consumable_unit"]'),consumableDescriptionInput=consumableDetails.querySelector('[name="sales_consumable_unit_description"]'),consumableInlineTotal=consumableDetails.querySelector('[data-consumable-inline-total]');
+  const consumableSelect=consumableDetails.querySelector('[name="sales_consumable_stock_id"]'),consumableQuantityInput=consumableDetails.querySelector('[name="sales_consumable_quantity"]'),consumablePriceInput=consumableDetails.querySelector('[name="sales_consumable_price"]'),consumablePurchasePriceInput=consumableDetails.querySelector('[data-consumable-purchase-price]'),consumablePromotionInput=consumableDetails.querySelector('[name="sales_consumable_promotion"]'),consumableUnitInput=consumableDetails.querySelector('[name="sales_consumable_unit"]'),consumableDescriptionInput=consumableDetails.querySelector('[name="sales_consumable_unit_description"]'),consumableInlineTotal=consumableDetails.querySelector('[data-consumable-inline-total]');
   consumableStocks.forEach(stock=>consumableSelect?.add(new Option(`[${stock.stock_type}] ${stock.stock_code} — ${stock.stock_name}`,stock.id)));
   const consumablePicker=createStockPicker(consumableSelect,'Sarf Malzeme','Stoktaki sarf malzemeler');
   consumablePicker?.refresh();
@@ -2302,38 +2303,42 @@ const initializeSalesScreen=()=>{
 
   const syncConsumablePrice=()=>{
     const quantity=Math.max(1,Math.min(1000,Number(consumableQuantityInput.value)||1));
+    const promoted=consumablePromotionInput.value==='Evet';
     consumableQuantityInput.max='1000';
     let previous=[];try{previous=JSON.parse(consumableItemsInput.value||'[]');}catch(_){}
     const rows=Array.from({length:quantity},(_,index)=>{
       const stockId=index===0?consumableSelect.value:(previous[index]?.stock_id||consumableSelect.value);
       const stock=consumableStocks.find(item=>String(item.id)===String(stockId));
       const stockPrice=listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0);
-      const editable=!!stockId&&(parseTurkishMoney(stockPrice)||0)<=0;
       const savedPrice=String(previous[index]?.price||'');
-      const price=editable&&String(previous[index]?.stock_id||'')===String(stockId)&&parseTurkishMoney(savedPrice)>0?savedPrice:stockPrice;
-      return {stock_id:String(stockId||''),price,unit:stock?.unit||'Adet',editable};
+      const sameStock=String(previous[index]?.stock_id||'')===String(stockId);
+      const price=sameStock&&(previous[index]?.manual===true||parseTurkishMoney(savedPrice)>0)?savedPrice:stockPrice;
+      return {stock_id:String(stockId||''),price,unit:stock?.unit||'Adet',manual:sameStock&&previous[index]?.manual===true};
     });
     consumableItemsInput.value=JSON.stringify(rows);
-    consumablePriceInput.value=rows[0].price;consumableUnitInput.value=rows[0].unit;
-    consumablePriceInput.readOnly=!rows[0].editable;
+    consumablePriceInput.value=promoted?formatTurkishMoney(0):rows[0].price;consumableUnitInput.value=rows[0].unit;
+    const firstStock=consumableStocks.find(item=>String(item.id)===rows[0].stock_id);
+    consumablePurchasePriceInput.value=(parseTurkishMoney(firstStock?.invoice_unit_price)||0)>0?formatTurkishMoney(firstStock.invoice_unit_price):'';
+    consumablePriceInput.readOnly=promoted||detailsModal?.dataset.salesLocked==='1';
     consumableDescriptionInput.value=consumableSelect.selectedOptions[0]?.textContent||'';
-    consumableInlineTotal.value=formatTurkishMoney(rows.reduce((total,row)=>total+(parseTurkishMoney(row.price)||0),0));
+    consumableInlineTotal.value=formatTurkishMoney(promoted?0:rows.reduce((total,row)=>total+(parseTurkishMoney(row.price)||0),0));
     while(additionalConsumables.children.length>quantity-1)additionalConsumables.lastElementChild.remove();
     rows.slice(1).forEach((row,offset)=>{
       const index=offset+1;let line=additionalConsumables.children[offset];
       if(!line){
-        line=document.createElement('div');line.style.cssText='display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border-top:1px solid #a9c7dd;padding-top:6px';
+        line=document.createElement('div');line.style.cssText='display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:8px;border-top:1px solid #a9c7dd;padding-top:6px';
         const label=document.createElement('label');label.textContent=(index+1)+'. Sarf Malzeme';
         const select=document.createElement('select');select.innerHTML=consumableSelect.innerHTML;select.setAttribute('aria-label',(index+1)+'. Sarf Malzeme');label.append(select);
         select.stockPicker=createStockPicker(select,(index+1)+'. Sarf Malzeme','Stoktaki sarf malzemeler');
         const unit=document.createElement('label');unit.textContent='Birim';const unitInput=document.createElement('input');unitInput.readOnly=true;unit.append(unitInput);
-        const price=document.createElement('label');price.textContent='Satış Fiyatı';const priceInput=document.createElement('input');priceInput.inputMode='decimal';price.append(priceInput);
-        line.append(label,unit,price);additionalConsumables.append(line);
-        select.addEventListener('change',()=>{const items=JSON.parse(consumableItemsInput.value);items[index].stock_id=select.value;items[index].price='';consumableItemsInput.value=JSON.stringify(items);syncConsumablePrice();});
+        const purchase=document.createElement('label');purchase.textContent='Alış Fiyatı';const purchaseInput=document.createElement('input');purchaseInput.readOnly=true;purchase.append(purchaseInput);
+        const price=document.createElement('label');price.textContent='Satış Fiyatı';const priceInput=document.createElement('input');priceInput.className='sales-consumable-row-price';priceInput.inputMode='decimal';price.append(priceInput);
+        line.append(label,unit,purchase,price);additionalConsumables.append(line);
+        select.addEventListener('change',()=>{const items=JSON.parse(consumableItemsInput.value);items[index].stock_id=select.value;items[index].price='';items[index].manual=false;consumableItemsInput.value=JSON.stringify(items);syncConsumablePrice();});
         priceInput.addEventListener('input',()=>updateConsumableManualPrice(index,priceInput));
         priceInput.addEventListener('change',()=>{const amount=parseTurkishMoney(priceInput.value);priceInput.value=formatTurkishMoney(Math.max(0,amount||0));updateConsumableManualPrice(index,priceInput);});
       }
-      const rowSelect=line.querySelector('select');rowSelect.value=row.stock_id;rowSelect.stockPicker?.refresh();const inputs=line.querySelectorAll('input');inputs[0].value=row.unit;inputs[1].value=row.price;inputs[1].readOnly=!row.editable;
+      const rowSelect=line.querySelector('select');rowSelect.value=row.stock_id;rowSelect.stockPicker?.refresh();const inputs=line.querySelectorAll('input');const stock=consumableStocks.find(item=>String(item.id)===row.stock_id);inputs[0].value=row.unit;inputs[1].value=(parseTurkishMoney(stock?.invoice_unit_price)||0)>0?formatTurkishMoney(stock.invoice_unit_price):'';inputs[2].value=promoted?formatTurkishMoney(0):row.price;inputs[2].readOnly=promoted||detailsModal?.dataset.salesLocked==='1';
     });
     updateTotalAmount();
   };
@@ -2342,8 +2347,9 @@ const initializeSalesScreen=()=>{
     let rows=[];try{rows=JSON.parse(consumableItemsInput.value||'[]');}catch(_){}
     if(!rows[index])return;
     rows[index].price=input.value;
+    rows[index].manual=true;
     consumableItemsInput.value=JSON.stringify(rows);
-    consumableInlineTotal.value=formatTurkishMoney(rows.reduce((total,row)=>total+Math.max(0,parseTurkishMoney(row.price)||0),0));
+    consumableInlineTotal.value=formatTurkishMoney(consumablePromotionInput.value==='Evet'?0:rows.reduce((total,row)=>total+Math.max(0,parseTurkishMoney(row.price)||0),0));
     updateTotalAmount();
   };
   consumablePriceInput.addEventListener('input',()=>updateConsumableManualPrice(0,consumablePriceInput));
@@ -3840,6 +3846,9 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-device-details,
 #sales-details-modal #charger-device-details,
 #sales-details-modal #consumable-details{display:grid!important;grid-column:1/-1!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px 8px!important;margin:0!important;padding:6px 7px!important;border:1px solid #79a5d0!important;background:#edf5fd!important}
+#sales-details-modal #consumable-details{grid-template-columns:2fr repeat(3,minmax(0,1fr))!important}
+#sales-details-modal #consumable-details [data-consumable-rows]>div{grid-template-columns:2fr repeat(3,minmax(0,1fr))!important}
+@media(max-width:720px){#sales-details-modal #consumable-details [data-consumable-rows]>div{grid-template-columns:1fr!important}}
 #sales-details-modal .sales-device-details[hidden],#sales-details-modal #charger-device-details[hidden],#sales-details-modal #consumable-details[hidden]{display:none!important}
 #sales-details-modal .repair-body>label,
 #sales-details-modal .sales-sale-info>label,
