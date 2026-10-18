@@ -215,7 +215,8 @@ echo '<div style="padding:8px 20px"><a href="'.e(url('patient-identity-audit.php
   .vox-patient-classic-list .vox-patient-list-actions form{margin:0}
 }
 
-.vox-patient-classic-list .vox-patient-search-columns{position:relative;z-index:4;align-self:center}
+.vox-patient-classic-list .vox-patient-search-columns{position:relative;z-index:4;align-self:center;margin-left:auto}
+.vox-patient-classic-list .vox-patient-search-columns + .vox-patient-list-search{margin-left:0}
 .vox-patient-classic-list .vox-patient-search-columns summary{cursor:pointer;list-style:none;white-space:nowrap;padding:5px 8px;border:1px solid #8daece;border-radius:2px;background:#fff;color:#26384a}
 .vox-patient-classic-list .vox-patient-search-columns summary::-webkit-details-marker{display:none}
 .vox-patient-classic-list .vox-patient-search-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:20;box-sizing:border-box;width:230px;max-height:340px;overflow:auto;padding:8px;border:1px solid #8daece;border-radius:3px;background:#fff;box-shadow:0 4px 12px #0002}
@@ -252,13 +253,13 @@ body .vox-patient-list-actions>a,body .vox-patient-list-actions>form>button{font
  const yearSelect=document.createElement('select');yearSelect.className='year-select';yearSelect.setAttribute('aria-label','Hasta kayıt yılı');
  yearSelect.innerHTML='<option value="all" <?=$showAll?'selected':''?>>Tüm Kayıtlar (<?=$allPatientCount?> kayıt)</option><option value="2023" <?=!$showAll&&$year===2023?'selected':''?>>2023 (<?=(int)($yearCounts[2023]??0)?> kayıt)</option><option value="2024" <?=!$showAll&&$year===2024?'selected':''?>>2024 (<?=(int)($yearCounts[2024]??0)?> kayıt)</option><option value="2025" <?=!$showAll&&$year===2025?'selected':''?>>2025 (<?=(int)($yearCounts[2025]??0)?> kayıt)</option><option value="2026" <?=!$showAll&&$year===2026?'selected':''?>>2026 (<?=(int)($yearCounts[2026]??0)?> kayıt)</option>';
  yearSelect.addEventListener('change',()=>{const url=new URL(window.location.href);url.searchParams.delete('page');if(yearSelect.value==='all'){url.searchParams.set('all','1');url.searchParams.delete('q')}else{url.searchParams.set('year',yearSelect.value);url.searchParams.delete('all');if(!url.searchParams.get('q'))url.searchParams.delete('q')}window.location.href=url.toString()});
- if(!restricted)toolbar.insertBefore(yearSelect,toolbar.querySelector('.vox-patient-list-search'));
+ if(!restricted)toolbar.insertBefore(yearSelect,toolbar.querySelector('.vox-patient-search-columns'));
  const searchFieldsInput=toolbar.querySelector('input[name="search_fields"]');
  const syncSearchFields=()=>{searchFieldsInput.value=[...toolbar.querySelectorAll('[data-search-column]:checked')].map(input=>input.value).join(',')};
  toolbar.querySelectorAll('[data-search-column]').forEach(input=>input.addEventListener('change',syncSearchFields));
  document.querySelectorAll('[data-search-columns-select]').forEach(button=>button.addEventListener('click',()=>{const checked=button.dataset.searchColumnsSelect==='all';toolbar.querySelectorAll('[data-search-column]').forEach(input=>{input.checked=checked});syncSearchFields()}));
  document.getElementById('vox-patient-table-filter')?.addEventListener('submit',event=>{const form=event.currentTarget;form.querySelector('input[name="search_fields"]').value=[...form.querySelectorAll('[data-search-column]:checked')].map(input=>input.value).join(',');let all=form.querySelector('input[name="all"]');if(!all){all=document.createElement('input');all.type='hidden';all.name='all';form.appendChild(all)}all.value=yearSelect.value==='all'?'1':''});
- const excelLink=document.createElement('a');excelLink.className='excel-export-button';excelLink.href='<?=url('patients-export.php?year='.$year)?>';excelLink.title='<?=$year?> yılı hasta kayıtlarını Excel’e aktar';excelLink.setAttribute('aria-label',excelLink.title);excelLink.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 12l4 6m0-6-4 6m7-6h2m-2 3h2m-2 3h2"/></svg>';if(!restricted)toolbar.insertBefore(excelLink,toolbar.querySelector('.vox-patient-list-search'));
+ const excelLink=document.createElement('a');excelLink.className='excel-export-button';excelLink.href='<?=url('patients-export.php?year='.$year)?>';excelLink.title='<?=$year?> yılı hasta kayıtlarını Excel’e aktar';excelLink.setAttribute('aria-label',excelLink.title);excelLink.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 12l4 6m0-6-4 6m7-6h2m-2 3h2m-2 3h2"/></svg>';if(!restricted)toolbar.insertBefore(excelLink,toolbar.querySelector('.vox-patient-search-columns'));
  const autoWidthButton=document.createElement('button');autoWidthButton.type='button';autoWidthButton.className='vox-patient-auto-width';autoWidthButton.title='Tüm sütunları otomatik sabit genişliğe ayarla';autoWidthButton.setAttribute('aria-label',autoWidthButton.title);autoWidthButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM9 5v14M15 5v14"/><path d="M6.5 12h-1.5m14 0h-1.5M5 12l2-2m-2 2 2 2m12-2-2-2m2 2-2 2"/></svg>';
  const widthLimits=[[54,70],[82,102],[135,220],[108,145],[94,130],[94,130],[92,122],[220,380],[105,170],[105,190],[95,155],[135,260],[105,190],[105,190],[155,320],[82,125],[125,220],[158,158]];
  const measureCanvas=document.createElement('canvas'),measureContext=measureCanvas.getContext('2d');if(measureContext)measureContext.font='11px Tahoma, Arial, sans-serif';
@@ -280,7 +281,7 @@ body .vox-patient-list-actions>a,body .vox-patient-list-actions>form>button{font
    if(scrollHost)scrollHost.scrollLeft=0;
    autoWidthButton.classList.add('is-done');autoWidthButton.title='Sütun genişlikleri sabitlendi';setTimeout(()=>{autoWidthButton.classList.remove('is-done');autoWidthButton.title='Tüm sütunları otomatik sabit genişliğe ayarla'},1200);
  });
- if(!restricted)toolbar.insertBefore(autoWidthButton,toolbar.querySelector('.vox-patient-list-search'));
+ if(!restricted)toolbar.insertBefore(autoWidthButton,toolbar.querySelector('.vox-patient-search-columns'));
 })();
 </script>
 <script>
