@@ -52,6 +52,21 @@ $patientsStatement = $pdo->prepare("SELECT p.id,p.full_name,b.name AS branch_nam
 $patientsStatement->execute([$unitId]);
 $patients = $patientsStatement->fetchAll();
 $salesTotals = [];
+$hearingDevicePurchaseBySerial = [];
+if ($patients) {
+    $devicePurchaseStatement = $pdo->query("SELECT m.unit_cost,m.purchase_price,m.quantity,m.serial_numbers FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE s.stock_type='İşitme Cihazı' AND m.movement_type='Giriş' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.id");
+    foreach ($devicePurchaseStatement as $movement) {
+        $unitCost = (float)($movement['unit_cost'] ?? 0);
+        if ($unitCost <= 0) $unitCost = (float)($movement['purchase_price'] ?? 0) / max(1, (int)($movement['quantity'] ?? 1));
+        $serials = json_decode((string)$movement['serial_numbers'], true);
+        if (!is_array($serials)) continue;
+        foreach ($serials as $serial) {
+            $serial = trim((string)$serial);
+            if ($serial !== '' && $unitCost > 0) $hearingDevicePurchaseBySerial[$serial] = $unitCost;
+        }
+    }
+}
+$hearingDevicePurchaseTotals = [];
 if ($patients) {
     $patientIds = array_map(static fn(array $patient): int => (int)$patient['id'], $patients);
     $salesStatement = $pdo->prepare('SELECT patient_id,sales_details FROM patient_services WHERE patient_id IN (' . implode(',', array_fill(0, count($patientIds), '?')) . ") AND service_name='Satış'");
@@ -61,7 +76,17 @@ if ($patients) {
         $value = (string)(is_array($details) ? ($details['sales_payment_amount'] ?? '') : '');
         $value = preg_replace('/[^0-9,.-]/u', '', $value) ?? '';
         $amount = str_contains($value, ',') ? (float)str_replace(',', '.', str_replace('.', '', $value)) : (float)$value;
-        $salesTotals[(int)$sale['patient_id']] = ($salesTotals[(int)$sale['patient_id']] ?? 0) + $amount;
+        $patientId = (int)$sale['patient_id'];
+        $salesTotals[$patientId] = ($salesTotals[$patientId] ?? 0) + $amount;
+        if (!is_array($details)) continue;
+        $saleSerials = [];
+        foreach (['sales_device_serial', 'sales_device_2_serial', 'sales_device_3_serial', 'sales_device_4_serial'] as $serialKey) {
+            $serial = trim((string)($details[$serialKey] ?? ''));
+            if ($serial !== '' && !in_array($serial, $saleSerials, true)) $saleSerials[] = $serial;
+        }
+        foreach ($saleSerials as $serial) {
+            $hearingDevicePurchaseTotals[$patientId] = ($hearingDevicePurchaseTotals[$patientId] ?? 0) + ($hearingDevicePurchaseBySerial[$serial] ?? 0);
+        }
     }
 }
 $financialsStatement = $pdo->prepare('SELECT patient_id,entitlement_amount,payment_amount FROM unit_patient_financials WHERE unit_id=?');
@@ -70,6 +95,15 @@ $financials = [];
 foreach ($financialsStatement as $financial) {
     $financials[(int)$financial['patient_id']] = $financial;
 }
+ $entitlementDisplayByPatient = [];
+foreach ($patients as &$patient) {
+    $patientId = (int)$patient['id'];
+    $savedEntitlement = (float)($financials[$patientId]['entitlement_amount'] ?? 0);
+    $calculatedEntitlement = max(0, (($salesTotals[$patientId] ?? 0) - ($hearingDevicePurchaseTotals[$patientId] ?? 0)) * .20);
+    $patient['entitlement_display'] = $savedEntitlement > 0 ? $savedEntitlement : $calculatedEntitlement;
+    $entitlementDisplayByPatient[$patientId] = $patient['entitlement_display'];
+}
+unset($patient);
 $unitPaid = 0.0;
 try {
     $unitPaidStatement = $pdo->prepare('SELECT COALESCE(SUM(payment_amount),0) FROM unit_visits WHERE unit_id=?');
@@ -95,4 +129,5 @@ patient_header('Pazarlama Hastaları', 'patients');
 <script>document.querySelectorAll('tr[data-patient-url]').forEach(row=>row.addEventListener('dblclick',()=>location.href=row.dataset.patientUrl));(()=>{const table=document.querySelector('.unit-patients-table');if(!table)return;const header=table.tHead?.rows[0]?.children[5];if(header)header.textContent='ÖDENEN';table.querySelectorAll('tbody tr[data-patient-url]').forEach(row=>{const cell=row.children[5],input=cell?.querySelector('input[name="payment_amount"]');if(!cell||!input)return;const value=input.value.trim();cell.textContent=value?value+' TL':'—';});const style=document.createElement('style');style.textContent='.unit-patients-table th:nth-child(6),.unit-patients-table td:nth-child(6){display:table-cell!important}';document.head.append(style)})();</script>
 <script>(()=>{const amount=<?=json_encode($unitPaid)?>,formatted=amount>0?new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)+' TL':'—';document.querySelectorAll('.unit-patients-table tbody tr[data-patient-url]').forEach(row=>{const cell=row.children[5];if(cell)cell.textContent=formatted;});})();</script>
 <script>(()=>{document.querySelectorAll('.unit-patient-actions').forEach(actions=>{actions.querySelector('.unit-patient-edit')?.remove();const save=actions.querySelector('.unit-patient-financial-save');if(!save)return;save.textContent='Kaydet';save.setAttribute('aria-label','Kaydet');save.removeAttribute('title');});})();</script>
+<script>(()=>{const values=<?=json_encode($entitlementDisplayByPatient,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)?>,format=value=>new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(value);document.querySelectorAll('.unit-patients-table tbody tr[data-patient-url]').forEach(row=>{const id=new URL(row.dataset.patientUrl,location.href).searchParams.get('id'),field=row.querySelector('input[name="entitlement_amount"]'),value=Number(values[id]||0);if(field&&!field.value&&value>0)field.value=format(value);});})();</script>
 <?php patient_footer(); ?>
