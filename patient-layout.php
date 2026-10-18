@@ -734,6 +734,36 @@ if(setupTabPages[currentSettingsPage]){
     }`;
   document.head.append(style);
 })();
-</script><link rel="stylesheet" href="<?=e(url('assets/price-list-help.css'))?>"><script src="<?=e(url('assets/price-list-help.js'))?>" data-endpoint="<?=e(url('price-list-help.php'))?>" defer></script></body></html>
+</script><link rel="stylesheet" href="<?=e(url('assets/price-list-help.css'))?>"><script src="<?=e(url('assets/price-list-help.js'))?>" data-endpoint="<?=e(url('price-list-help.php'))?>" defer></script><script>
+(()=>{
+  const selector='input[name*="phone" i],input[id*="phone" i],input[name*="telefon" i],input[id*="telefon" i],input[name*="mobile" i],input[id*="mobile" i],input[type="tel"],input[inputmode="tel"],input[autocomplete^="tel"]';
+  const format=value=>{
+    let digits=String(value||'').replace(/\D/g,'');
+    if(digits.length===13&&digits.startsWith('90')&&digits.charAt(2)==='0')digits=digits.slice(2);
+    else if(digits.length===12&&digits.startsWith('90'))digits='0'+digits.slice(2);
+    else if(digits.length===10&&digits.startsWith('5'))digits='0'+digits;
+    digits=digits.slice(0,11);
+    return [digits.slice(0,4),digits.slice(4,7),digits.slice(7,9),digits.slice(9,11)].filter(Boolean).join(' ');
+  };
+  const apply=input=>{
+    if(!(input instanceof HTMLInputElement)||input.type==='hidden'||input.dataset.phoneFormatReady==='1')return;
+    input.dataset.phoneFormatReady='1';input.inputMode='tel';input.maxLength=14;
+    input.value=format(input.value);
+  };
+  document.querySelectorAll(selector).forEach(apply);
+  document.addEventListener('input',event=>{
+    const input=event.target;
+    if(!(input instanceof HTMLInputElement)||!input.matches(selector))return;
+    const cursor=input.selectionStart??input.value.length;
+    const digitsBeforeCursor=input.value.slice(0,cursor).replace(/\D/g,'').length;
+    const formatted=format(input.value);
+    if(formatted===input.value)return;
+    input.value=formatted;
+    let nextCursor=0,digitsSeen=0;
+    while(nextCursor<formatted.length&&digitsSeen<digitsBeforeCursor){if(/\d/.test(formatted[nextCursor]))digitsSeen++;nextCursor++;}
+    try{input.setSelectionRange(nextCursor,nextCursor)}catch(error){}
+  },true);
+})();
+</script></body></html>
 <?php
 }

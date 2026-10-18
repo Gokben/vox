@@ -289,6 +289,23 @@ $patientStatement = $pdo->prepare('SELECT patients.id,patients.full_name,patient
 $patientStatement->execute([$id]);
 $patient = $patientStatement->fetch();
 if (!$patient) { http_response_code(404); exit('Hasta kaydı bulunamadı.'); }
+if (isset($_GET['download_sales_invoice'])) {
+    $invoiceServiceId = (int)$_GET['download_sales_invoice'];
+    $invoiceStatement = $pdo->prepare("SELECT sales_details FROM patient_services WHERE id=? AND patient_id=? AND service_name='Satış'");
+    $invoiceStatement->execute([$invoiceServiceId, $id]);
+    $invoiceDetails = json_decode((string)$invoiceStatement->fetchColumn(), true);
+    $storedInvoice = is_array($invoiceDetails) ? (string)($invoiceDetails['sales_invoice_file_stored'] ?? '') : '';
+    if (!preg_match('/^[a-f0-9]{32}\\.(?:pdf|jpe?g)$/i', $storedInvoice)) { http_response_code(404); exit('Fatura dosyası bulunamadı.'); }
+    $invoicePath = __DIR__ . '/storage/sales-invoices/' . $storedInvoice;
+    if (!is_file($invoicePath)) { http_response_code(404); exit('Fatura dosyası bulunamadı.'); }
+    $invoiceExtension = strtolower(pathinfo($storedInvoice, PATHINFO_EXTENSION));
+    header('Content-Type: ' . ($invoiceExtension === 'pdf' ? 'application/pdf' : 'image/jpeg'));
+    header('Content-Length: ' . (string)filesize($invoicePath));
+    header('Content-Disposition: attachment; filename="fatura.' . $invoiceExtension . '"');
+    header('X-Content-Type-Options: nosniff');
+    readfile($invoicePath);
+    exit;
+}
 $patientOutcome = !empty($patient['approval']) ? 'Onay' : (!empty($patient['considering']) ? 'Düşünecek' : (!empty($patient['rejected']) ? 'Ret' : ''));
 $branches = $pdo->query('SELECT id,name FROM branches ORDER BY name')->fetchAll();
 $branchNamesById = [];
@@ -734,6 +751,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['return_to_sales_details']) || isset($_POST['save_sales_details'])) $postedServiceName = 'Satış';
     $postedSalesDetails = json_decode((string)($_POST['sales_details'] ?? ''), true);
     if (!is_array($postedSalesDetails)) $postedSalesDetails = [];
+    $savedInvoiceDetails = json_decode((string)($serviceCard['sales_details'] ?? ''), true);
+    if (is_array($savedInvoiceDetails)) {
+        foreach (['sales_invoice_file_name', 'sales_invoice_file_stored'] as $invoiceFileKey) {
+            if (!array_key_exists($invoiceFileKey, $postedSalesDetails) && isset($savedInvoiceDetails[$invoiceFileKey])) {
+                $postedSalesDetails[$invoiceFileKey] = (string)$savedInvoiceDetails[$invoiceFileKey];
+            }
+        }
+    }
+    $pendingSalesInvoiceUpload = null;
+    $invoiceUpload = $_FILES['sales_invoice_file'] ?? null;
+    if (is_array($invoiceUpload) && (int)($invoiceUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        $uploadError = '';
+        if ((int)($invoiceUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) $uploadError = 'Fatura dosyası yüklenemedi.';
+        elseif ((int)($invoiceUpload['size'] ?? 0) > 10485760) $uploadError = 'Fatura dosyası en fazla 10 MB olabilir.';
+        else {
+            $originalName = basename((string)($invoiceUpload['name'] ?? ''));
+            $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string)($invoiceUpload['tmp_name'] ?? ''));
+            $validInvoiceType = ($mime === 'application/pdf' && $extension === 'pdf')
+                || ($mime === 'image/jpeg' && in_array($extension, ['jpg', 'jpeg'], true));
+            if (!$validInvoiceType) $uploadError = 'Yalnızca PDF veya JPEG fatura yükleyebilirsiniz.';
+            elseif (!is_uploaded_file((string)$invoiceUpload['tmp_name'])) $uploadError = 'Fatura dosyası doğrulanamadı.';
+            else {
+                $storedExtension = $mime === 'application/pdf' ? 'pdf' : ($extension === 'jpeg' ? 'jpeg' : 'jpg');
+                $storedName = bin2hex(random_bytes(16)) . '.' . $storedExtension;
+                $pendingSalesInvoiceUpload = [
+                    'temporary_file' => (string)$invoiceUpload['tmp_name'],
+                    'stored_name' => $storedName,
+                    'original_name' => mb_substr($originalName, 0, 255),
+                ];
+                $postedSalesDetails['sales_invoice_file_name'] = $pendingSalesInvoiceUpload['original_name'];
+                $postedSalesDetails['sales_invoice_file_stored'] = $storedName;
+            }
+        }
+        if ($uploadError !== '') {
+            http_response_code(422);
+            header('Content-Type: text/plain; charset=utf-8');
+            exit($uploadError);
+        }
+    }
     foreach ($_POST as $key => $value) {
         if ($key === 'sales_details' || !str_starts_with((string)$key, 'sales_')) continue;
         $postedSalesDetails[(string)$key] = is_scalar($value) ? (string)$value : '';
@@ -1066,6 +1123,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     if ($values['record_no'] === '' || preg_match('/^HK\d+$/', $values['record_no'])) $values['record_no'] = next_service_record_no($pdo);
+    $newInvoicePath = '';
+    if ($pendingSalesInvoiceUpload) {
+        $invoiceDirectory = __DIR__ . '/storage/sales-invoices';
+        if (!is_dir($invoiceDirectory) && !mkdir($invoiceDirectory, 0775, true) && !is_dir($invoiceDirectory)) {
+            http_response_code(500);
+            exit('Fatura klasörü oluşturulamadı.');
+        }
+        $newInvoicePath = $invoiceDirectory . '/' . $pendingSalesInvoiceUpload['stored_name'];
+        if (!move_uploaded_file($pendingSalesInvoiceUpload['temporary_file'], $newInvoicePath)) {
+            http_response_code(500);
+            exit('Fatura dosyası kaydedilemedi.');
+        }
+    }
     $savedServiceId = $postedEditId;
     if ($postedEditId) {
         $set = implode(',', array_map(static fn(string $column): string => $column . '=?', array_keys($values)));
@@ -1075,6 +1145,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare('INSERT INTO patient_services (' . implode(',', $columns) . ') VALUES (' . implode(',', array_fill(0, count($columns), '?')) . ')')->execute([$id, ...array_values($values)]);
         $savedServiceId = (int)$pdo->lastInsertId();
         $pdo->prepare('UPDATE patients SET service_location=NULL WHERE id=?')->execute([$id]);
+    }
+    if ($newInvoicePath !== '' && is_array($savedInvoiceDetails)) {
+        $previousInvoiceName = (string)($savedInvoiceDetails['sales_invoice_file_stored'] ?? '');
+        if (preg_match('/^[a-f0-9]{32}\\.(?:pdf|jpe?g)$/i', $previousInvoiceName)) {
+            $previousInvoicePath = __DIR__ . '/storage/sales-invoices/' . $previousInvoiceName;
+            if (is_file($previousInvoicePath)) @unlink($previousInvoicePath);
+        }
     }
     // Cari hareketindeki miktar, satıştaki cihaz adetleri üzerinden oluşan stok çıkışlarının toplamıdır.
     // Satış kartı her kaydedildiğinde yalnız bu hizmet kartına bağlı eski çıkışlar yenilenir.
@@ -1347,7 +1424,7 @@ html body#vox-app>main.services-list-page .services-table .service-row-actions>f
 }
 </style><?php endif; ?>
 <main class="patient-container services-page<?=$showForm?' services-form-page':' services-list-page'?>"><section class="services-card">
-<?php if($showForm): ?><header class="services-head service-form-head"><h2><?= $editId ? 'Hizmet Kartı Düzenle' : 'Yeni Hizmet Kartı' ?> - <?=e($patient['full_name'])?></h2><span class="service-form-actions"><a class="service-back-link" href="<?=e(url('patient-followup.php?id='.$id.$serviceNavigationContext))?>">Listeye dön</a></span></header><form id="service-card-form" class="service-form" method="post"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=$editId?>"><?php if($fromPatientCard):?><input type="hidden" name="from_patient_card" value="1"><?php endif?><?php if($fromPatientList):?><input type="hidden" name="from_patient_list" value="1"><?php endif?><input type="hidden" id="repair_details" name="repair_details" value="<?=e((string)$form['repair_details'])?>"><input type="hidden" id="sales_stock_id" name="stock_id" value="<?=e((string)($form['stock_id'] ?? ''))?>"><input type="hidden" id="sales_details" name="sales_details" value="<?=e((string)($form['sales_details'] ?? ''))?>">
+<?php if($showForm): ?><header class="services-head service-form-head"><h2><?= $editId ? 'Hizmet Kartı Düzenle' : 'Yeni Hizmet Kartı' ?> - <?=e($patient['full_name'])?></h2><span class="service-form-actions"><a class="service-back-link" href="<?=e(url('patient-followup.php?id='.$id.$serviceNavigationContext))?>">Listeye dön</a></span></header><form id="service-card-form" class="service-form" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf" value="<?=csrf()?>"><input type="hidden" name="edit_id" value="<?=$editId?>"><?php if($fromPatientCard):?><input type="hidden" name="from_patient_card" value="1"><?php endif?><?php if($fromPatientList):?><input type="hidden" name="from_patient_list" value="1"><?php endif?><input type="hidden" id="repair_details" name="repair_details" value="<?=e((string)$form['repair_details'])?>"><input type="hidden" id="sales_stock_id" name="stock_id" value="<?=e((string)($form['stock_id'] ?? ''))?>"><input type="hidden" id="sales_details" name="sales_details" value="<?=e((string)($form['sales_details'] ?? ''))?>">
 <label class="service-field">Kayıt No<input name="record_no" value="<?=e((string)$form['record_no'])?>"></label><label class="service-field">Kayıt Tarihi<input type="date" name="record_date" value="<?=e((string)$form['service_date'])?>"></label>
 <div class="service-three"><label class="service-field">Randevu Tarihi<input type="date" name="appointment_date" value="<?=e((string)$form['appointment_date'])?>"></label><label class="service-field">Başlangıç Saati<select name="start_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if($hour===19&&$minute>0)continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['start_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label><label class="service-field">Bitiş Saati<select name="end_time" required><?php for($hour=9;$hour<=19;$hour++):foreach([0,15,30,45] as $minute):if(($hour===9&&$minute<15)||($hour===19&&$minute>0))continue;$time=sprintf('%02d:%02d',$hour,$minute);?><option value="<?=$time?>" <?=((string)$form['end_time']===$time)?'selected':''?>><?=$time?></option><?php endforeach;endfor;?></select></label></div>
 <label class="service-field">Hizmet Tipi<select name="service_type"><option value="">Seçiniz</option><?php foreach($serviceCardTypes as $type):?><option value="<?=e($type['name'])?>" <?=((string)$form['service_type']===(string)$type['name'])?'selected':''?>><?=e($type['name'])?></option><?php endforeach?></select></label><label class="service-field">Hizmet Yeri<select name="service_location"><option value="">Seçiniz</option><?php foreach($serviceLocations as $location):?><option value="<?=e($location['name'])?>" <?=((string)$form['service_location']===(string)$location['name'])?'selected':''?>><?=e($location['name'])?></option><?php endforeach?></select></label>
@@ -1730,7 +1807,7 @@ document.addEventListener('click',event=>{
 <script>(()=>{document.querySelector('[name="repair_target"]')?.closest('label')?.remove();const technicianLabel=document.querySelector('[name="repair_technician"]')?.closest('label');if(!technicianLabel)return;technicianLabel.setAttribute('aria-label','Teknik Servis');[...technicianLabel.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).forEach(node=>node.remove());technicianLabel.prepend(document.createTextNode('Teknik Servis'));})();</script>
 <?php if($showForm): ?>
 <div id="sales-stock-modal" class="repair-modal" hidden aria-hidden="true"><div class="repair-modal-backdrop" data-sales-close></div><section class="repair-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-stock-title"><header><h2 id="sales-stock-title">Satış Stoğu Seç</h2><button type="button" class="repair-close" data-sales-close aria-label="Kapat">×</button></header><div class="repair-body"><input id="sales-stock-search" type="search" placeholder="Stok kodu, adı, marka veya model ara" autocomplete="off"><div id="sales-stock-list"><?php foreach($stockCards as $stock): $label=trim((string)$stock['stock_code'].' — '.(string)$stock['stock_name']); ?><button type="button" class="sales-stock-item" data-id="<?=(int)$stock['id']?>" data-label="<?=e($label)?>" data-search="<?=e(mb_strtolower($label.' '.(string)$stock['brand'].' '.(string)$stock['model'], 'UTF-8'))?>"><?=e($label)?></button><?php endforeach; if(!$stockCards): ?><p>Stok kartı bulunamadı.</p><?php endif; ?></div></div><footer><button type="button" class="repair-cancel" data-sales-close>İptal</button></footer></section></div>
-<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true" data-sales-locked="<?=$salesDetailsLocked?'1':'0'?>"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="false" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Kartı - <?=e($patient['full_name'])?></h2><span class="sales-window-controls"><button type="button" data-sales-window-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-sales-window-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></span></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><div class="sales-sale-info"><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label></div><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>EFT / Havale</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Salt cihaz<input inputmode="decimal" name="sales_payment_amount" autocomplete="off"></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><?php if($serviceNameLocked): ?><button type="button" id="sales-lock-toggle" class="button" data-admin="<?=$canManageSalesLock?'1':'0'?>" title="<?=$salesDetailsLocked?'Satış kilidini aç':'Satış bilgilerini kilitle'?>" aria-label="Satış kilidi"><i class="ti <?=$salesDetailsLocked?'tabler-lock':'tabler-lock-open'?>"></i></button><?php endif; ?><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer><span class="sales-window-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span></section></div>
+<div id="sales-details-modal" class="repair-modal" hidden aria-hidden="true" data-sales-locked="<?=$salesDetailsLocked?'1':'0'?>"><div class="repair-modal-backdrop" data-sales-details-close></div><section class="repair-dialog sales-details-dialog" role="dialog" aria-modal="false" aria-labelledby="sales-details-title"><header><h2 id="sales-details-title">Satış Kartı - <?=e($patient['full_name'])?></h2><span class="sales-window-controls"><button type="button" data-sales-window-action="minimize" title="Simge durumuna küçült" aria-label="Simge durumuna küçült">_</button><button type="button" data-sales-window-action="maximize" title="Büyüt" aria-label="Büyüt">□</button><button type="button" class="repair-close" data-sales-details-close aria-label="Kapat">×</button></span></header><div class="repair-body"><button type="button" id="add-hearing-device" class="button sales-device-button">+ İşitme Cihazı Ekle</button><div id="hearing-device-details" class="sales-device-details" hidden><label>Marka<input name="sales_brand" autocomplete="off"></label><label>Model<input name="sales_model" autocomplete="off"></label><label>Seri No<select name="sales_device_serial" disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>SGK<input inputmode="decimal" name="sales_device_sgk" autocomplete="off"></label><label>İskonto % - TL<input inputmode="decimal" name="sales_device_discount_rate" autocomplete="off"></label><label>Net Fiyat<input inputmode="decimal" name="sales_device_net_price" autocomplete="off"></label></div><div class="sales-sale-info"><label>Satış Tarihi<input type="date" name="sales_sale_date" value="<?=date('Y-m-d')?>"></label><label>Garanti Başlangıç<input type="date" name="sales_warranty_start"></label><label>Garanti Bitiş<input type="date" name="sales_warranty_end"></label><label>Fatura No<input name="sales_invoice_no" autocomplete="off"></label><label>Fatura Yükle<input type="file" form="service-card-form" name="sales_invoice_file" accept=".pdf,.jpg,.jpeg,application/pdf,image/jpeg"><?php if(!empty($savedSalesDetailsForIncome["sales_invoice_file_stored"])): ?><small class="sales-invoice-download"><a href="<?=e(url('patient-followup.php?id='.$id.'&download_sales_invoice='.$editId))?>">Yüklü fatura: <?=e((string)($savedSalesDetailsForIncome['sales_invoice_file_name'] ?? 'Faturayı indir'))?></a></small><?php endif ?></label></div><label>Ödeme Şekli<select name="sales_payment_type" disabled><option value="">Seçiniz</option><option>Nakit</option><option>EFT / Havale</option><option>Kredi Kartı</option><option>Mail Order</option><option>Vadeli</option></select></label><label>Salt cihaz<input inputmode="decimal" name="sales_payment_amount" autocomplete="off"></label></div><footer><button type="button" class="repair-cancel" data-sales-details-close>İptal</button><?php if($serviceNameLocked): ?><button type="button" id="sales-lock-toggle" class="button" data-admin="<?=$canManageSalesLock?'1':'0'?>" title="<?=$salesDetailsLocked?'Satış kilidini aç':'Satış bilgilerini kilitle'?>" aria-label="Satış kilidi"><i class="ti <?=$salesDetailsLocked?'tabler-lock':'tabler-lock-open'?>"></i></button><?php endif; ?><button type="submit" form="service-card-form" name="save_sales_details" value="1" class="button" id="sales-details-save">Tamam</button></footer><span class="sales-window-resizer" title="Pencere boyutunu değiştir" aria-hidden="true"></span></section></div>
 <?php if ($salesWindow): ?>
 <style>
 main.services-page{display:none!important}
@@ -1756,7 +1833,7 @@ document.addEventListener('click',async event=>{
   event.preventDefault();
   event.stopImmediatePropagation();
   const data=new FormData(form),salesDetails={};
-  modal.querySelectorAll('[name]').forEach(field=>salesDetails[field.name]=field.value);
+  modal.querySelectorAll('[name]').forEach(field=>{if(field instanceof HTMLInputElement&&field.type==='file')return;salesDetails[field.name]=field.value;});
   data.set('sales_invoice_no',salesDetails.sales_invoice_no||'');
   data.set('service_name','Satış');
   data.set('save_sales_details','1');
@@ -1778,6 +1855,7 @@ document.addEventListener('click',async event=>{
     }
     history.replaceState(null,'',responseUrl.pathname+(responseUrl.search||''));
     const detailsInput=document.getElementById('sales_details');if(detailsInput)detailsInput.value=JSON.stringify(salesDetails);
+    const invoiceFile=modal.querySelector('[name="sales_invoice_file"]');if(invoiceFile?.files?.length){location.assign(responseUrl.pathname+(responseUrl.search||''));return;}
     alert('Kayıt tamamlandı');
   }catch(error){alert(error.message||'Satış bilgileri kaydedilemedi.');}
   finally{saveButton.disabled=false;}
@@ -2994,7 +3072,7 @@ const initializeSalesScreen=()=>{
   if(initialPairMode==='same')syncSameModel();
   updateDeviceAddButton();
   service.addEventListener('change',()=>{if(isSales()){close();openDetails();}else{value.value='';close();closeDetails()}});
-  modal.querySelectorAll('[data-sales-close]').forEach(x=>x.addEventListener('click',close));items.forEach(item=>item.addEventListener('click',()=>{value.value=item.dataset.id||'';close();openDetails()}));search?.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('tr-TR');items.forEach(item=>item.hidden=!!q&&!(item.dataset.search||'').includes(q))});detailsModal?.querySelectorAll('[data-sales-details-close]').forEach(x=>x.addEventListener('click',()=>{persistDetails();closeDetails()}));const saveSalesDetails=async ({forPayment=false}={})=>{if(service.value.trim()!=='Satış'){service.value='Satış';service.dispatchEvent(new Event('change',{bubbles:true}));}syncInvoice();let returnToSales=form.querySelector('[name="return_to_sales_details"]');if(!productWasRemoved){if(!returnToSales){returnToSales=document.createElement('input');returnToSales.type='hidden';returnToSales.name='return_to_sales_details';form.append(returnToSales);}returnToSales.value='1';}else{returnToSales?.remove();}const button=detailsModal?.querySelector('#sales-details-save');if(button)button.disabled=true;try{const saleData=new FormData(form);saleData.set('save_sales_details','1');const response=await fetch(form.action||location.href,{method:'POST',body:saleData,credentials:'same-origin'});if(!response.ok)throw new Error((await response.text()).trim()||'Kayıt işlemi tamamlanamadı.');const responseUrl=new URL(response.url);const savedEditId=responseUrl.searchParams.get('edit');if(!savedEditId||Number(savedEditId)<=0)throw new Error('Satış kartı kaydedilemedi. Lütfen tekrar deneyin.');if(savedEditId){const editInput=form.querySelector('[name="edit_id"]');if(editInput)editInput.value=savedEditId;const saleStagesScript=document.querySelector('script[src*="sale-payment-stages.js"]');if(saleStagesScript)saleStagesScript.dataset.salePersisted='1';if(new URL(location.href).searchParams.has('sales_window')){responseUrl.searchParams.set('open_sales_details','1');responseUrl.searchParams.set('sales_window','1');}history.replaceState(null,'',responseUrl.pathname+'?'+responseUrl.searchParams.toString());}returnToSales?.remove();updateTotalAmount();if(productWasRemoved){closeDetails();const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',cleanUrl.pathname+'?'+cleanUrl.searchParams.toString());productWasRemoved=false;}if(!forPayment)alert('Kaydedildi');return {success:true,id:Number(savedEditId)};}catch(error){if(!forPayment)alert(error.message||'Kayıt işlemi tamamlanamadı.');return {success:false,message:error.message||'Kayıt işlemi tamamlanamadı.'};}finally{if(button)button.disabled=false;}};window.voxSaveSalesDetails=saveSalesDetails;detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',event=>{event.preventDefault();saveSalesDetails();});form.addEventListener('submit',persistDetails);if(<?=json_encode($openSalesDetails)?>)setTimeout(openDetails,0);
+ modal.querySelectorAll('[data-sales-close]').forEach(x=>x.addEventListener('click',close));items.forEach(item=>item.addEventListener('click',()=>{value.value=item.dataset.id||'';close();openDetails()}));search?.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('tr-TR');items.forEach(item=>item.hidden=!!q&&!(item.dataset.search||'').includes(q))});detailsModal?.querySelectorAll('[data-sales-details-close]').forEach(x=>x.addEventListener('click',()=>{persistDetails();closeDetails()}));const saveSalesDetails=async ({forPayment=false}={})=>{if(service.value.trim()!=='Satış'){service.value='Satış';service.dispatchEvent(new Event('change',{bubbles:true}));}syncInvoice();let returnToSales=form.querySelector('[name="return_to_sales_details"]');if(!productWasRemoved){if(!returnToSales){returnToSales=document.createElement('input');returnToSales.type='hidden';returnToSales.name='return_to_sales_details';form.append(returnToSales);}returnToSales.value='1';}else{returnToSales?.remove();}const button=detailsModal?.querySelector('#sales-details-save');if(button)button.disabled=true;try{const saleData=new FormData(form);saleData.set('save_sales_details','1');const response=await fetch(form.action||location.href,{method:'POST',body:saleData,credentials:'same-origin'});if(!response.ok)throw new Error((await response.text()).trim()||'Kayıt işlemi tamamlanamadı.');const responseUrl=new URL(response.url);const savedEditId=responseUrl.searchParams.get('edit');if(!savedEditId||Number(savedEditId)<=0)throw new Error('Satış kartı kaydedilemedi. Lütfen tekrar deneyin.');if(savedEditId){const editInput=form.querySelector('[name="edit_id"]');if(editInput)editInput.value=savedEditId;const saleStagesScript=document.querySelector('script[src*="sale-payment-stages.js"]');if(saleStagesScript)saleStagesScript.dataset.salePersisted='1';if(new URL(location.href).searchParams.has('sales_window')){responseUrl.searchParams.set('open_sales_details','1');responseUrl.searchParams.set('sales_window','1');}history.replaceState(null,'',responseUrl.pathname+'?'+responseUrl.searchParams.toString());}returnToSales?.remove();updateTotalAmount();if(detailsModal?.querySelector('[name="sales_invoice_file"]')?.files?.length){location.assign(responseUrl.pathname+'?'+responseUrl.searchParams.toString());return {success:true,id:Number(savedEditId)};}if(productWasRemoved){closeDetails();const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('open_sales_details');history.replaceState(null,'',cleanUrl.pathname+'?'+cleanUrl.searchParams.toString());productWasRemoved=false;}if(!forPayment)alert('Kaydedildi');return {success:true,id:Number(savedEditId)};}catch(error){if(!forPayment)alert(error.message||'Kayıt işlemi tamamlanamadı.');return {success:false,message:error.message||'Kayıt işlemi tamamlanamadı.'};}finally{if(button)button.disabled=false;}};window.voxSaveSalesDetails=saveSalesDetails;detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',event=>{event.preventDefault();saveSalesDetails();});form.addEventListener('submit',persistDetails);if(<?=json_encode($openSalesDetails)?>)setTimeout(openDetails,0);
 };
 if('requestIdleCallback' in window)window.requestIdleCallback(initializeSalesScreen,{timeout:300});else setTimeout(initializeSalesScreen,0);
 </script>
@@ -3951,6 +4029,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-device-details>label,
 #sales-details-modal #charger-device-details>label,
 #sales-details-modal #consumable-details>label{display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .sales-sale-info input[type=file]{height:28px!important;min-height:28px!important;padding:2px!important;font:10px Tahoma,"Segoe UI",sans-serif!important}
+#sales-details-modal .sales-invoice-download{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;font:10px Tahoma,"Segoe UI",sans-serif}
 #sales-details-modal .repair-body input:not([type=checkbox]),
 #sales-details-modal .repair-body select,
 #sales-details-modal .repair-body textarea{box-sizing:border-box!important;width:100%!important;height:23px!important;min-height:23px!important;margin:0!important;padding:2px 5px!important;border:1px solid #8daece!important;border-radius:0!important;background:#fff!important;color:#26384a!important;font:11px/15px Tahoma,"Segoe UI",sans-serif!important;box-shadow:inset 1px 1px 2px rgba(25,70,115,.08)!important}
