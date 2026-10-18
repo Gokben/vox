@@ -58,10 +58,10 @@ function unit_parse_date(string $value): ?DateTimeImmutable {
     if (preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/D', $value, $parts)) {
         $value = $parts[3] . '.' . $parts[2] . '.' . $parts[1];
     } elseif (preg_match('/^([0-9]{2})([0-9]{2})([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
-        $year = strlen($parts[3]) === 2 ? '20' . $parts[3] : $parts[3];
+        $year = strlen($parts[3]) === 2 ? ((int)$parts[3] <= 49 ? '20' : '19') . $parts[3] : $parts[3];
         $value = $parts[1] . '.' . $parts[2] . '.' . $year;
     } elseif (preg_match('/^([0-9]{1,2})[.\/-]([0-9]{1,2})[.\/-]([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
-        $year = strlen($parts[3]) === 2 ? '20' . $parts[3] : $parts[3];
+        $year = strlen($parts[3]) === 2 ? ((int)$parts[3] <= 49 ? '20' : '19') . $parts[3] : $parts[3];
         $value = str_pad($parts[1], 2, '0', STR_PAD_LEFT) . '.' . str_pad($parts[2], 2, '0', STR_PAD_LEFT) . '.' . $year;
     }
     if (!preg_match('/^[0-9]{2}\.[0-9]{2}\.[0-9]{4}$/D', $value)) {
@@ -222,23 +222,32 @@ document.querySelectorAll('.unit-actions').forEach(actions=>{if(actions.querySel
   const form = fields[0]?.form;
   const birth = document.querySelector('input[name="birth_date"]');
   const age = document.querySelector('input[name="age"]');
-  const normalize = value => {
+  const normalize = (value, allowSixDigit = true) => {
     value = value.trim();
     let match = /^(\d{2})(\d{2})(\d{2}|\d{4})$/.exec(value);
-    if (match) value = `${match[1]}.${match[2]}.${match[3].length === 2 ? `20${match[3]}` : match[3]}`;
+    if (match && !(match[3].length === 2 && !allowSixDigit)) {
+      const year = match[3].length === 2 ? `${Number(match[3]) <= 49 ? '20' : '19'}${match[3]}` : match[3];
+      value = `${match[1]}.${match[2]}.${year}`;
+    }
     else {
       match = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2}|\d{4})$/.exec(value);
-      if (match) value = `${match[1].padStart(2,'0')}.${match[2].padStart(2,'0')}.${match[3].length === 2 ? `20${match[3]}` : match[3]}`;
+      if (match) {
+        const year = match[3].length === 2 ? `${Number(match[3]) <= 49 ? '20' : '19'}${match[3]}` : match[3];
+        value = `${match[1].padStart(2,'0')}.${match[2].padStart(2,'0')}.${year}`;
+      }
     }
     if (!/^\d{2}\.\d{2}\.\d{4}$/.test(value)) return null;
     const [day, month, year] = value.split('.').map(Number);
     const date = new Date(0); date.setHours(0,0,0,0); date.setFullYear(year, month - 1, day);
     return year > 0 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? {text:value,date} : null;
   };
-  const update = () => {
+  const update = (allowSixDigit = true) => {
     const today = new Date(); today.setHours(0,0,0,0);
     fields.forEach(field => {
-      const result = normalize(field.value);
+      const digits = field.value.trim();
+      const isStillTypingCompactDate = /^\d+$/.test(digits) && digits.length < 8 && !allowSixDigit;
+      if (isStillTypingCompactDate) { field.setCustomValidity(''); return; }
+      const result = normalize(field.value, allowSixDigit);
       if (result && result.text !== field.value) field.value = result.text;
       field.setCustomValidity(field.value && !result ? 'Geçerli bir tarih giriniz (gg.aa.yyyy).' : field === birth && result && result.date > today ? 'Doğum tarihi gelecekte olamaz.' : '');
     });
@@ -247,8 +256,8 @@ document.querySelectorAll('.unit-actions').forEach(actions=>{if(actions.querySel
     const date = result?.date;
     age.value = date && date <= today ? String(today.getFullYear() - date.getFullYear() - (today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate()) ? 1 : 0)) : '';
   };
-  fields.forEach(field => { field.addEventListener('input', update); field.addEventListener('change', update); field.addEventListener('blur', update); });
-  form?.addEventListener('submit', event => { update(); if (!form.reportValidity()) event.preventDefault(); }, true);
+  fields.forEach(field => { field.addEventListener('input', () => update(false)); field.addEventListener('change', () => update(true)); field.addEventListener('blur', () => update(true)); });
+  form?.addEventListener('submit', event => { update(true); if (!form.reportValidity()) event.preventDefault(); }, true);
   update();
 })();
 </script>
