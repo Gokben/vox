@@ -2269,7 +2269,7 @@ const initializeSalesScreen=()=>{
   const toggleChargerDetails=show=>{chargerDetails.hidden=!show;chargerDetails.style.display=show?'grid':'none';if(show)queueMicrotask(()=>{if(chargerModelSelect.value)refreshChargerSerials();});};
   toggleChargerDetails(false);
   const chargerBrandSelect=chargerDetails.querySelector('[name="sales_charger_brand"]'),chargerModelSelect=chargerDetails.querySelector('[name="sales_charger_model"]'),chargerPriceInput=chargerDetails.querySelector('[name="sales_charger_price"]'),chargerSerialInput=chargerDetails.querySelector('[name="sales_charger_serial"]');
-  const chargerBrandPicker=createStockPicker(chargerBrandSelect,'Şarj Cihazı Markası','Stoktaki şarj cihazı markaları');
+  const chargerBrandPicker=createStockPicker(chargerBrandSelect,'Şarj Cihazı Markası','Stoktaki şarj cihazı markaları',true);
   const chargerModelPicker=createStockPicker(chargerModelSelect,'Model','Stoktaki şarj cihazı modelleri');
   const chargerSerialPicker=createStockPicker(chargerSerialInput,'Seri No','Stoktaki şarj cihazı seri numaraları',true);
   const chargerDiscountInput=chargerDetails.querySelector('[name="sales_charger_discount_rate"]'),chargerNetPriceInput=chargerDetails.querySelector('[name="sales_charger_net_price"]');
@@ -2297,6 +2297,7 @@ const initializeSalesScreen=()=>{
   const promotionLabel=consumablePromotionInput.closest('label');
   const promotionRow=document.createElement('div');promotionRow.className='sales-consumable-promotion-row';
   promotionRow.append(promotionLabel);consumableDetails.append(promotionRow);
+  const consumablePromotionPicker=createStockPicker(consumablePromotionInput,'Promosyon','Promosyon seçimi');
   consumableRowsStyle.textContent+='#sales-details-modal #consumable-details .sales-consumable-promotion-row{grid-column:1/-1;display:flex;justify-content:center;margin-top:16px;padding-bottom:6px}#sales-details-modal #consumable-details .sales-consumable-promotion-row>label{display:flex;flex-direction:column;gap:2px;width:180px;max-width:100%;font:700 11px/15px Tahoma,"Segoe UI",sans-serif}';
 
   const syncConsumablePrice=()=>{
@@ -2306,11 +2307,15 @@ const initializeSalesScreen=()=>{
     const rows=Array.from({length:quantity},(_,index)=>{
       const stockId=index===0?consumableSelect.value:(previous[index]?.stock_id||consumableSelect.value);
       const stock=consumableStocks.find(item=>String(item.id)===String(stockId));
-      const price=listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0);
-      return {stock_id:String(stockId||''),price,unit:stock?.unit||'Adet'};
+      const stockPrice=listPriceForStock(stock)||formatTurkishMoney(stock?.sale_price||0);
+      const editable=!!stockId&&(parseTurkishMoney(stockPrice)||0)<=0;
+      const savedPrice=String(previous[index]?.price||'');
+      const price=editable&&String(previous[index]?.stock_id||'')===String(stockId)&&parseTurkishMoney(savedPrice)>0?savedPrice:stockPrice;
+      return {stock_id:String(stockId||''),price,unit:stock?.unit||'Adet',editable};
     });
     consumableItemsInput.value=JSON.stringify(rows);
     consumablePriceInput.value=rows[0].price;consumableUnitInput.value=rows[0].unit;
+    consumablePriceInput.readOnly=!rows[0].editable;
     consumableDescriptionInput.value=consumableSelect.selectedOptions[0]?.textContent||'';
     consumableInlineTotal.value=formatTurkishMoney(rows.reduce((total,row)=>total+(parseTurkishMoney(row.price)||0),0));
     while(additionalConsumables.children.length>quantity-1)additionalConsumables.lastElementChild.remove();
@@ -2322,14 +2327,27 @@ const initializeSalesScreen=()=>{
         const select=document.createElement('select');select.innerHTML=consumableSelect.innerHTML;select.setAttribute('aria-label',(index+1)+'. Sarf Malzeme');label.append(select);
         select.stockPicker=createStockPicker(select,(index+1)+'. Sarf Malzeme','Stoktaki sarf malzemeler');
         const unit=document.createElement('label');unit.textContent='Birim';const unitInput=document.createElement('input');unitInput.readOnly=true;unit.append(unitInput);
-        const price=document.createElement('label');price.textContent='Satış Fiyatı';const priceInput=document.createElement('input');priceInput.readOnly=true;price.append(priceInput);
+        const price=document.createElement('label');price.textContent='Satış Fiyatı';const priceInput=document.createElement('input');priceInput.inputMode='decimal';price.append(priceInput);
         line.append(label,unit,price);additionalConsumables.append(line);
-        select.addEventListener('change',()=>{const items=JSON.parse(consumableItemsInput.value);items[index].stock_id=select.value;consumableItemsInput.value=JSON.stringify(items);syncConsumablePrice();});
+        select.addEventListener('change',()=>{const items=JSON.parse(consumableItemsInput.value);items[index].stock_id=select.value;items[index].price='';consumableItemsInput.value=JSON.stringify(items);syncConsumablePrice();});
+        priceInput.addEventListener('input',()=>updateConsumableManualPrice(index,priceInput));
+        priceInput.addEventListener('change',()=>{const amount=parseTurkishMoney(priceInput.value);priceInput.value=formatTurkishMoney(Math.max(0,amount||0));updateConsumableManualPrice(index,priceInput);});
       }
-      const rowSelect=line.querySelector('select');rowSelect.value=row.stock_id;rowSelect.stockPicker?.refresh();const inputs=line.querySelectorAll('input');inputs[0].value=row.unit;inputs[1].value=row.price;
+      const rowSelect=line.querySelector('select');rowSelect.value=row.stock_id;rowSelect.stockPicker?.refresh();const inputs=line.querySelectorAll('input');inputs[0].value=row.unit;inputs[1].value=row.price;inputs[1].readOnly=!row.editable;
     });
     updateTotalAmount();
   };
+  const updateConsumableManualPrice=(index,input)=>{
+    if(input.readOnly)return;
+    let rows=[];try{rows=JSON.parse(consumableItemsInput.value||'[]');}catch(_){}
+    if(!rows[index])return;
+    rows[index].price=input.value;
+    consumableItemsInput.value=JSON.stringify(rows);
+    consumableInlineTotal.value=formatTurkishMoney(rows.reduce((total,row)=>total+Math.max(0,parseTurkishMoney(row.price)||0),0));
+    updateTotalAmount();
+  };
+  consumablePriceInput.addEventListener('input',()=>updateConsumableManualPrice(0,consumablePriceInput));
+  consumablePriceInput.addEventListener('change',()=>{if(consumablePriceInput.readOnly)return;const amount=parseTurkishMoney(consumablePriceInput.value);consumablePriceInput.value=formatTurkishMoney(Math.max(0,amount||0));updateConsumableManualPrice(0,consumablePriceInput);});
   consumableSelect?.addEventListener('change',syncConsumablePrice);consumableQuantityInput?.addEventListener('input',syncConsumablePrice);consumablePromotionInput?.addEventListener('change',syncConsumablePrice);
   const toggleConsumableDetails=show=>{consumableDetails.hidden=!show;consumableDetails.style.display=show?'grid':'none';};
   const consumableModal=document.createElement('div');
@@ -2348,12 +2366,13 @@ const initializeSalesScreen=()=>{
   const openConsumableModal=()=>{setProductType('Sarf Malzeme');showConsumableDetails();syncConsumablePrice();setTimeout(()=>consumableSelect?.focus(),0);};
   modalConsumableSelect.addEventListener('change',syncConsumableModal);modalConsumableQuantity.addEventListener('input',syncConsumableModal);modalConsumablePromotion.addEventListener('change',syncConsumableModal);
   consumableModal.querySelectorAll('[data-consumable-close]').forEach(button=>button.addEventListener('click',()=>{consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');}));
-  consumableModal.querySelector('[data-consumable-apply]').addEventListener('click',()=>{if(!modalConsumableSelect.value){alert('Sarf malzeme seçiniz.');modalConsumableSelect.focus();return;}consumableSelect.value=modalConsumableSelect.value;consumablePicker?.refresh();consumableQuantityInput.value=Math.max(1,Number(modalConsumableQuantity.value)||1);consumablePriceInput.value=modalConsumablePrice.value;consumableDetails.querySelector('[name="sales_consumable_promotion"]').value=modalConsumablePromotion.value;consumableDetails.querySelector('[name="sales_consumable_unit"]').value=modalConsumableUnit.value;consumableDetails.querySelector('[name="sales_consumable_unit_description"]').value=modalConsumableDescription.value;setProductType('Sarf Malzeme');showConsumableDetails();updateTotalAmount();consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');});
+  consumableModal.querySelector('[data-consumable-apply]').addEventListener('click',()=>{if(!modalConsumableSelect.value){alert('Sarf malzeme seçiniz.');modalConsumableSelect.focus();return;}consumableSelect.value=modalConsumableSelect.value;consumablePicker?.refresh();consumableQuantityInput.value=Math.max(1,Number(modalConsumableQuantity.value)||1);consumablePriceInput.value=modalConsumablePrice.value;consumableDetails.querySelector('[name="sales_consumable_promotion"]').value=modalConsumablePromotion.value;consumablePromotionPicker?.refresh();consumableDetails.querySelector('[name="sales_consumable_unit"]').value=modalConsumableUnit.value;consumableDetails.querySelector('[name="sales_consumable_unit_description"]').value=modalConsumableDescription.value;setProductType('Sarf Malzeme');showConsumableDetails();updateTotalAmount();consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');});
   toggleConsumableDetails(false);
   const syncChargerModels=()=>{const brand=chargerBrandSelect?.value||'';if(!brand){chargerModelSelect.replaceChildren(new Option('Önce marka seçiniz',''));chargerModelSelect.disabled=true;chargerModelPicker?.refresh();return;}const current=chargerModelSelect.dataset.value||chargerModelSelect.value||'';fillSelect(chargerModelSelect,chargerDeviceStocks.filter(stock=>stock.brand===brand).map(stock=>stock.model),'Model seçiniz',current);chargerModelSelect.disabled=false;chargerModelPicker?.refresh();};
   const fillChargerSerial=()=>{const stocks=chargerDeviceStocks.filter(item=>item.brand===(chargerBrandSelect?.value||'')&&item.model===(chargerModelSelect?.value||'')),stock=stocks[0];setListPriceHint([chargerBrandSelect,chargerModelSelect,chargerSerialInput],stock);if(chargerPriceInput)chargerPriceInput.value=stock?(listPriceForStock(stock)||formatTurkishMoney(stock.sale_price||0)):'';applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput);if(!chargerSerialInput)return;const savedSerial=String(savedSaleProducts.sales_charger_serial||'').trim(),current=String(chargerSerialInput.dataset.value||chargerSerialInput.value||'').trim(),serials=[...new Set(stocks.flatMap(item=>{try{const values=JSON.parse(item.serial_numbers||'[]');return Array.isArray(values)?values.map(value=>String(value).trim()).filter(Boolean):[];}catch(_){return [];}}))],isSavedSelection=!!savedSerial&&current===savedSerial&&chargerBrandSelect?.value===savedSaleProducts.sales_charger_brand&&chargerModelSelect?.value===savedSaleProducts.sales_charger_model;chargerSerialInput.dataset.soldSerial=isSavedSelection?'1':'';if(isSavedSelection&&!serials.includes(savedSerial))serials.push(savedSerial);chargerSerialInput.replaceChildren(new Option(serials.length?'Seçiniz':'Seri numarası bulunamadı',''));serials.forEach(serial=>chargerSerialInput.add(new Option(serial+(isSavedSelection&&serial===savedSerial?' (Satıldı)':''),serial)));chargerSerialInput.value=serials.includes(current)?current:'';delete chargerSerialInput.dataset.value;chargerSerialInput.disabled=isSavedSelection||serials.length===0;chargerSerialInput.title=isSavedSelection?'Satılan şarj cihazının seri numarası değiştirilemez.':(serials.length?'Stokta bulunan seri numarasını seçin.':'Bu model için kullanılabilir seri numarası bulunmuyor.');chargerSerialPicker?.refresh();};
   let chargerRefreshSequence = 0;
   const refreshChargerSerials = async () => {
+    if(!chargerBrandSelect.value||!chargerModelSelect.value)return;
     const sequence = ++chargerRefreshSequence;
     const endpoint = new URL(window.location.href);
     endpoint.searchParams.set('charger_stock_options', '1');
@@ -2379,7 +2398,7 @@ const initializeSalesScreen=()=>{
   window.addEventListener('focus', () => {
     if (!chargerDetails.hidden && chargerModelSelect.value) refreshChargerSerials();
   });
-  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Marka seçiniz');chargerBrandPicker?.refresh();syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}chargerSerialPicker?.refresh();if(chargerPriceInput)chargerPriceInput.value='';if(chargerNetPriceInput)chargerNetPriceInput.value='';syncChargerModels();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
+  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Seçiniz');chargerBrandPicker?.refresh();syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{++chargerRefreshSequence;chargerModelSelect.dataset.value='';if(chargerSerialInput){chargerSerialInput.replaceChildren(new Option('Önce marka ve model seçiniz',''));chargerSerialInput.disabled=true;delete chargerSerialInput.dataset.value;delete chargerSerialInput.dataset.soldSerial;}chargerSerialPicker?.refresh();chargerPriceInput.value='';chargerNetPriceInput.value='';chargerDiscountInput.value='';chargerDetails.querySelector('[name="sales_charger_sgk"]').value='';chargerDetails.querySelector('[name="sales_charger_unit"]').value=chargerBrandSelect.value?'Adet':'';if(!chargerBrandSelect.value)chargerDetails.querySelector('[name="sales_charger_promotion"]').value='Hayır';syncChargerModels();updateTotalAmount();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
   chargerDetails.querySelector('[name="sales_charger_promotion"]').addEventListener('change',()=>{
     const promoted=chargerDetails.querySelector('[name="sales_charger_promotion"]').value==='Evet';
     if(!promoted){
@@ -2613,7 +2632,7 @@ const initializeSalesScreen=()=>{
   // Keep typed digits untouched; decorate the value only after editing finishes.
   cashSourceForm?.addEventListener('focus',editIncomeMoney,true);
   cashSourceForm?.addEventListener('blur',formatIncomeMoneyOnBlur,true);
-  restoreDetails();chargerBrandPicker?.refresh();consumablePicker?.refresh();if(!<?=json_encode($savedCashRecord !== [])?>&&paymentSelect)paymentSelect.value='';if(<?=json_encode($savedCashRecord !== [])?>&&paymentSelect){paymentSelect.disabled=true;paymentSelect.title='Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.';}setTimeout(()=>{renderPrimaryTermSchedule();placePrimaryTermTotal();loadSavedCashCards();setTimeout(restoreSavedTermSchedule,60);[80,180,360].forEach(delay=>setTimeout(restoreExtraTermSchedule,delay));},0);syncCashIcon();syncDeviceModels();fillDeviceSerial();syncChargerModels();fillChargerSerial();if(['sales_charger_brand','sales_charger_model','sales_charger_serial'].some(name=>detailFields.find(field=>field.name===name)?.value.trim()))toggleChargerDetails(true);if(detailFields.find(field=>field.name==='sales_consumable_stock_id')?.value){toggleConsumableDetails(true);syncConsumablePrice();}
+  restoreDetails();chargerBrandPicker?.refresh();consumablePicker?.refresh();consumablePromotionPicker?.refresh();if(!<?=json_encode($savedCashRecord !== [])?>&&paymentSelect)paymentSelect.value='';if(<?=json_encode($savedCashRecord !== [])?>&&paymentSelect){paymentSelect.disabled=true;paymentSelect.title='Gelir kaydı bulunduğu için ödeme şekli değiştirilemez.';}setTimeout(()=>{renderPrimaryTermSchedule();placePrimaryTermTotal();loadSavedCashCards();setTimeout(restoreSavedTermSchedule,60);[80,180,360].forEach(delay=>setTimeout(restoreExtraTermSchedule,delay));},0);syncCashIcon();syncDeviceModels();fillDeviceSerial();syncChargerModels();fillChargerSerial();if(['sales_charger_brand','sales_charger_model','sales_charger_serial'].some(name=>detailFields.find(field=>field.name===name)?.value.trim()))toggleChargerDetails(true);if(detailFields.find(field=>field.name==='sales_consumable_stock_id')?.value){toggleConsumableDetails(true);syncConsumablePrice();}
   const toggleDeviceDetails=show=>{if(deviceDetails)deviceDetails.hidden=!show;};
   const hasDeviceDetails=['sales_brand','sales_model','sales_device_serial'].some(name=>detailFields.find(field=>field.name===name)?.value.trim());
   toggleDeviceDetails(hasDeviceDetails);
@@ -2886,6 +2905,7 @@ document.addEventListener('DOMContentLoaded',()=>{const salesSave=document.getEl
 #sales-details-modal .sales-product-section-heading{position:static!important;z-index:1;display:flex!important;grid-column:1/-1!important;align-items:center!important;box-sizing:border-box!important;width:100%!important;min-height:32px!important;margin:0!important;padding:4px!important;color:#16404b;font-size:13px;font-weight:700;line-height:24px}
 #sales-details-modal .sales-hearing-side-toggle{display:inline-flex!important;align-items:center!important;gap:4px!important;margin-left:6px!important;padding:0 3px!important;border:0!important;background:transparent!important;color:#159447!important;font:700 12px Tahoma,"Segoe UI",sans-serif!important;cursor:pointer!important}
 #sales-details-modal .sales-hearing-side-toggle .ti{display:inline-block!important;width:15px!important;height:15px!important;font-size:15px!important;color:#159447!important}
+#sales-details-modal .sales-hearing-side-toggle[data-side="sağ"] .ti{color:#d83b40!important}
 #sales-details-modal .sales-hearing-side-toggle[data-side="sol"],#sales-details-modal .sales-hearing-side-toggle[data-side="sol"] .ti{color:#1874b9!important}
 #sales-details-modal .sales-serial-caption{display:inline-flex!important;align-items:center!important;gap:4px!important;min-height:15px!important}
 #sales-details-modal .sales-serial-caption .sales-hearing-side-toggle{height:16px!important;min-height:16px!important;max-height:16px!important;margin-left:0!important;padding:0 2px!important;font-size:11px!important;line-height:16px!important}
