@@ -316,7 +316,8 @@ $stockMovementColumns = $sqlite
 if (!in_array('service_id', $stockMovementColumns, true)) {
     $pdo->exec('ALTER TABLE stock_movements ADD COLUMN service_id ' . ($sqlite ? 'INTEGER NULL' : 'BIGINT NULL'));
 }
-$stockCards = $pdo->query('SELECT id,stock_code,stock_name,brand,model,stock_type FROM stock_cards ORDER BY stock_name,stock_code')->fetchAll();
+$chargerInvoiceUnitPriceSql = "(SELECT CASE WHEN COALESCE(m.unit_cost,0)>0 THEN m.unit_cost WHEN COALESCE(m.purchase_price,0)>0 AND m.quantity>0 THEN m.purchase_price/m.quantity ELSE NULL END FROM stock_movements m WHERE m.stock_id=s.id AND m.movement_type='Giriş' AND TRIM(COALESCE(m.invoice_no,''))<>'' AND (COALESCE(m.unit_cost,0)>0 OR (COALESCE(m.purchase_price,0)>0 AND m.quantity>0)) ORDER BY m.movement_date DESC,m.id DESC LIMIT 1)";
+$stockCards = $pdo->query("SELECT s.id,s.stock_code,s.stock_name,s.brand,s.model,s.stock_type,s.sale_price,{$chargerInvoiceUnitPriceSql} AS invoice_unit_price FROM stock_cards s ORDER BY s.stock_name,s.stock_code")->fetchAll();
 $stockPriceItems = $pdo->query('SELECT i.stock_id,i.list_price,l.valid_from,l.valid_until,l.id AS price_list_id FROM stock_price_list_items i INNER JOIN stock_price_lists l ON l.id=i.price_list_id ORDER BY l.valid_from DESC,l.id DESC')->fetchAll();
 $hearingDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND q.stock_quantity>=1 WHERE s.stock_type=? ORDER BY s.brand,s.model,s.id");
 $hearingDeviceStatement->execute(['İşitme Cihazı']);
@@ -326,7 +327,7 @@ $chargerEditStatement->execute([(int)($_GET['edit'] ?? 0), $id]);
 $chargerEditService = $chargerEditStatement->fetch() ?: [];
 $chargerEditId = (int)($chargerEditService['id'] ?? 0);
 $chargerEditDescription = $chargerEditId > 0 ? 'Hizmet kartı satışı: ' . (string)$chargerEditService['record_no'] : '';
-$chargerDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND (q.stock_quantity>=1 OR (? > 0 AND EXISTS (SELECT 1 FROM stock_movements own_exit WHERE own_exit.stock_id=s.id AND own_exit.movement_type='Çıkış' AND (own_exit.service_id=? OR own_exit.description=?)))) WHERE s.stock_type=? ORDER BY s.brand,s.model,s.id");
+$chargerDeviceStatement = $pdo->prepare("SELECT s.id,s.brand,s.model,s.sale_price,{$chargerInvoiceUnitPriceSql} AS invoice_unit_price FROM stock_cards s INNER JOIN (SELECT stock_id,SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END) AS stock_quantity FROM stock_movements GROUP BY stock_id) q ON q.stock_id=s.id AND (q.stock_quantity>=1 OR (? > 0 AND EXISTS (SELECT 1 FROM stock_movements own_exit WHERE own_exit.stock_id=s.id AND own_exit.movement_type='Çıkış' AND (own_exit.service_id=? OR own_exit.description=?)))) WHERE s.stock_type=? ORDER BY s.brand,s.model,s.id");
 $chargerDeviceStatement->execute([$chargerEditId, $chargerEditId, $chargerEditDescription, 'Şarj Cihazı']);
 $chargerDeviceStocks = $chargerDeviceStatement->fetchAll();
 $salesExitSerialStatement = $pdo->query("SELECT s.id,s.stock_type,s.brand,s.model,m.invoice_no,m.serial_numbers FROM stock_movements m INNER JOIN stock_cards s ON s.id=m.stock_id WHERE m.movement_type='Çıkış' AND COALESCE(m.invoice_no,'')<>'' AND COALESCE(m.serial_numbers,'') NOT IN ('','[]') ORDER BY m.id DESC");
@@ -988,6 +989,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $currentRecordNo = trim((string)($serviceCard['record_no'] ?? ''));
                 $chargerStockId = 0;
                 $serialEntered = false;
+                $serialAlreadySold = false;
                 foreach ($chargerStockIds as $candidateStockId) {
                     $chargerSerialStatement->execute([$candidateStockId]);
                     $candidateEntered = false;
@@ -1006,9 +1008,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (!$belongsToCurrentSale) $candidateSold = true;
                     }
                     if ($candidateEntered) $serialEntered = true;
+                    if ($candidateSold) $serialAlreadySold = true;
                     if ($candidateEntered && !$candidateSold) { $chargerStockId = $candidateStockId; break; }
                 }
-                if (!$serialEntered) throw new RuntimeException('Seçilen seri numarası şarj cihazları stok listesinde bulunamadı.');
+                if (!$serialEntered && !$serialAlreadySold) {
+                    $hasSelectableSerial = false;
+                    foreach ($chargerStockIds as $candidateStockId) {
+                        $chargerSerialStatement->execute([$candidateStockId]);
+                        $availableForStock = [];
+                        foreach ($chargerSerialStatement as $serialMovement) {
+                            $movementSerials = json_decode((string)$serialMovement['serial_numbers'], true);
+                            if (!is_array($movementSerials)) continue;
+                            foreach ($movementSerials as $movementSerial) {
+                                $movementSerial = trim((string)$movementSerial);
+                                if ($movementSerial === '') continue;
+                                if ((string)$serialMovement['movement_type'] === 'Giriş') $availableForStock[$movementSerial] = true;
+                                else unset($availableForStock[$movementSerial]);
+                            }
+                        }
+                        if ($availableForStock) { $hasSelectableSerial = true; break; }
+                    }
+                    if (!$hasSelectableSerial) {
+                        $manualStockStatement = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN movement_type='Giriş' THEN quantity WHEN movement_type='Çıkış' THEN -quantity ELSE 0 END),0) FROM stock_movements WHERE stock_id=?");
+                        foreach ($chargerStockIds as $candidateStockId) {
+                            $manualStockStatement->execute([$candidateStockId]);
+                            if ((float)$manualStockStatement->fetchColumn() > 0) { $chargerStockId = $candidateStockId; break; }
+                            if ($postedEditId > 0) {
+                                $ownExitStatement = $pdo->prepare("SELECT serial_numbers FROM stock_movements WHERE stock_id=? AND movement_type='Çıkış' AND (service_id=? OR description=?)");
+                                $ownExitStatement->execute([$candidateStockId, $postedEditId, 'Hizmet kartı satışı: ' . $currentRecordNo]);
+                                foreach ($ownExitStatement as $ownExit) {
+                                    $ownSerials = json_decode((string)$ownExit['serial_numbers'], true);
+                                    if (is_array($ownSerials) && in_array($chargerSerial, array_map('strval', $ownSerials), true)) { $chargerStockId = $candidateStockId; break 2; }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!$chargerStockId && !$serialEntered && !$serialAlreadySold) throw new RuntimeException('Seçilen seri numarası şarj cihazları stok listesinde bulunamadı.');
                 if (!$chargerStockId) throw new RuntimeException('Seçilen şarj cihazı seri numarası daha önce satılmış. Başka bir seri numarası seçin.');
                 $validatedSalesDetails['sales_charger_stock_id'] = $chargerStockId;
                 $values['sales_details'] = json_encode($validatedSalesDetails, JSON_UNESCAPED_UNICODE);
@@ -1714,7 +1750,7 @@ document.addEventListener('click',async event=>{
   const form=document.getElementById('service-card-form'),modal=document.getElementById('sales-details-modal');
   if(!form||!modal)return;
   const chargerBrand=modal.querySelector('[name="sales_charger_brand"]')?.value||'',chargerModel=modal.querySelector('[name="sales_charger_model"]')?.value||'',chargerSerial=modal.querySelector('[name="sales_charger_serial"]')?.value||'';
-  if((chargerBrand||chargerModel||chargerSerial)&&(!chargerBrand||!chargerModel||!chargerSerial)){event.preventDefault();event.stopImmediatePropagation();alert('Şarj cihazı satışına devam etmek için marka, model ve stokta bulunan bir seri numarası seçmelisiniz.');modal.querySelector('[name="sales_charger_serial"]')?.focus();return;}
+  if((chargerBrand||chargerModel||chargerSerial)&&(!chargerBrand||!chargerModel||!chargerSerial)){event.preventDefault();event.stopImmediatePropagation();alert('Şarj cihazı satışına devam etmek için marka, model ve seri numarası giriniz.');const manualSerial=modal.querySelector('[data-charger-manual-serial]');(manualSerial&&!manualSerial.hidden?manualSerial:modal.querySelector('.sales-brand-picker-trigger'))?.focus();return;}
   if(<?=json_encode((bool)($saleEditLinks['sale'] && ($saleEditLinks['cash'] || $saleEditLinks['stock'])))?>&&!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return;
   if(modal.dataset.salesLocked==='1'){alert('Satış bilgileri kilitli. Yalnız yönetici kilidi açabilir.');return;}
   event.preventDefault();
@@ -2264,12 +2300,12 @@ const initializeSalesScreen=()=>{
   const setListPriceHint=()=>{};
   const chargerDetails=document.createElement('div');
   chargerDetails.id='charger-device-details';chargerDetails.hidden=true;chargerDetails.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px';
-  chargerDetails.innerHTML='<label>Şarj Cihazı Markası<select name="sales_charger_brand"></select></label><label>Şarj Cihazı Modeli<select name="sales_charger_model"></select></label><label>Seri No<select name="sales_charger_serial" required disabled><option value="">Önce marka ve model seçiniz</option></select></label><label>Birim<input name="sales_charger_unit" value="Adet" readonly></label><label>Fiyat<input name="sales_charger_price" inputmode="decimal" readonly></label><input type="hidden" name="sales_charger_sgk"><input type="hidden" name="sales_charger_discount_rate"><input type="hidden" name="sales_charger_net_price"><label class="charger-promotion-field">Promosyon<select name="sales_charger_promotion" style="max-width:180px"><option value="Hayır">Hayır</option><option value="Evet">Evet</option></select></label>';
+  chargerDetails.innerHTML='<label>Şarj Cihazı Markası<select name="sales_charger_brand"></select></label><label>Şarj Cihazı Modeli<select name="sales_charger_model"></select></label><label>Seri No<select name="sales_charger_serial" required disabled><option value="">Önce marka ve model seçiniz</option></select><input data-charger-manual-serial name="sales_charger_serial_manual" type="text" placeholder="Seri no giriniz" autocomplete="off" hidden></label><label>Birim<input name="sales_charger_unit" value="Adet" readonly></label><label>Alış Fiyatı<input data-charger-purchase-price readonly></label><label>Satış Fiyatı<input name="sales_charger_price" inputmode="decimal" readonly></label><input type="hidden" name="sales_charger_sgk"><input type="hidden" name="sales_charger_discount_rate"><input type="hidden" name="sales_charger_net_price"><label class="charger-promotion-field">Promosyon<select name="sales_charger_promotion" style="max-width:180px"><option value="Hayır">Hayır</option><option value="Evet">Evet</option></select></label>';
   chargerDetails.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');
   detailsModal?.querySelector('.repair-body')?.prepend(chargerDetails);
   const toggleChargerDetails=show=>{chargerDetails.hidden=!show;chargerDetails.style.display=show?'grid':'none';if(show)queueMicrotask(()=>{if(chargerModelSelect.value)refreshChargerSerials();});};
   toggleChargerDetails(false);
-  const chargerBrandSelect=chargerDetails.querySelector('[name="sales_charger_brand"]'),chargerModelSelect=chargerDetails.querySelector('[name="sales_charger_model"]'),chargerPriceInput=chargerDetails.querySelector('[name="sales_charger_price"]'),chargerSerialInput=chargerDetails.querySelector('[name="sales_charger_serial"]');
+  const chargerBrandSelect=chargerDetails.querySelector('[name="sales_charger_brand"]'),chargerModelSelect=chargerDetails.querySelector('[name="sales_charger_model"]'),chargerPriceInput=chargerDetails.querySelector('[name="sales_charger_price"]'),chargerSerialInput=chargerDetails.querySelector('[name="sales_charger_serial"]'),chargerPurchasePriceInput=chargerDetails.querySelector('[data-charger-purchase-price]'),chargerManualSerialInput=chargerDetails.querySelector('[data-charger-manual-serial]');
   const chargerBrandPicker=createStockPicker(chargerBrandSelect,'Şarj Cihazı Markası','Stoktaki şarj cihazı markaları',true);
   const chargerModelPicker=createStockPicker(chargerModelSelect,'Model','Stoktaki şarj cihazı modelleri');
   const chargerSerialPicker=createStockPicker(chargerSerialInput,'Seri No','Stoktaki şarj cihazı seri numaraları',true);
@@ -2299,6 +2335,9 @@ const initializeSalesScreen=()=>{
   const promotionRow=document.createElement('div');promotionRow.className='sales-consumable-promotion-row';
   promotionRow.append(promotionLabel);consumableDetails.append(promotionRow);
   const consumablePromotionPicker=createStockPicker(consumablePromotionInput,'Promosyon','Promosyon seçimi');
+  const isConsumableSalePrice=field=>field instanceof HTMLInputElement&&field.matches('[name="sales_consumable_price"],.sales-consumable-row-price');
+  consumableDetails.addEventListener('focusin',event=>{const field=event.target;if(!isConsumableSalePrice(field)||field.readOnly||field.disabled)return;if((parseTurkishMoney(field.value)||0)===0)field.value='';requestAnimationFrame(()=>{if(document.activeElement===field)field.setSelectionRange(0,0);});});
+  consumableDetails.addEventListener('click',event=>{const field=event.target;if(isConsumableSalePrice(field)&&!field.readOnly&&!field.disabled)field.setSelectionRange(0,0);});
   consumableRowsStyle.textContent+='#sales-details-modal #consumable-details .sales-consumable-promotion-row{grid-column:1/-1;display:flex;justify-content:center;margin-top:16px;padding-bottom:6px}#sales-details-modal #consumable-details .sales-consumable-promotion-row>label{display:flex;flex-direction:column;gap:2px;width:180px;max-width:100%;font:700 11px/15px Tahoma,"Segoe UI",sans-serif}';
 
   const syncConsumablePrice=()=>{
@@ -2375,7 +2414,38 @@ const initializeSalesScreen=()=>{
   consumableModal.querySelector('[data-consumable-apply]').addEventListener('click',()=>{if(!modalConsumableSelect.value){alert('Sarf malzeme seçiniz.');modalConsumableSelect.focus();return;}consumableSelect.value=modalConsumableSelect.value;consumablePicker?.refresh();consumableQuantityInput.value=Math.max(1,Number(modalConsumableQuantity.value)||1);consumablePriceInput.value=modalConsumablePrice.value;consumableDetails.querySelector('[name="sales_consumable_promotion"]').value=modalConsumablePromotion.value;consumablePromotionPicker?.refresh();consumableDetails.querySelector('[name="sales_consumable_unit"]').value=modalConsumableUnit.value;consumableDetails.querySelector('[name="sales_consumable_unit_description"]').value=modalConsumableDescription.value;setProductType('Sarf Malzeme');showConsumableDetails();updateTotalAmount();consumableModal.hidden=true;consumableModal.setAttribute('aria-hidden','true');});
   toggleConsumableDetails(false);
   const syncChargerModels=()=>{const brand=chargerBrandSelect?.value||'';if(!brand){chargerModelSelect.replaceChildren(new Option('Önce marka seçiniz',''));chargerModelSelect.disabled=true;chargerModelPicker?.refresh();return;}const current=chargerModelSelect.dataset.value||chargerModelSelect.value||'';fillSelect(chargerModelSelect,chargerDeviceStocks.filter(stock=>stock.brand===brand).map(stock=>stock.model),'Model seçiniz',current);chargerModelSelect.disabled=false;chargerModelPicker?.refresh();};
-  const fillChargerSerial=()=>{const stocks=chargerDeviceStocks.filter(item=>item.brand===(chargerBrandSelect?.value||'')&&item.model===(chargerModelSelect?.value||'')),stock=stocks[0];setListPriceHint([chargerBrandSelect,chargerModelSelect,chargerSerialInput],stock);if(chargerPriceInput)chargerPriceInput.value=stock?(listPriceForStock(stock)||formatTurkishMoney(stock.sale_price||0)):'';applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput);if(!chargerSerialInput)return;const savedSerial=String(savedSaleProducts.sales_charger_serial||'').trim(),current=String(chargerSerialInput.dataset.value||chargerSerialInput.value||'').trim(),serials=[...new Set(stocks.flatMap(item=>{try{const values=JSON.parse(item.serial_numbers||'[]');return Array.isArray(values)?values.map(value=>String(value).trim()).filter(Boolean):[];}catch(_){return [];}}))],isSavedSelection=!!savedSerial&&current===savedSerial&&chargerBrandSelect?.value===savedSaleProducts.sales_charger_brand&&chargerModelSelect?.value===savedSaleProducts.sales_charger_model;chargerSerialInput.dataset.soldSerial=isSavedSelection?'1':'';if(isSavedSelection&&!serials.includes(savedSerial))serials.push(savedSerial);chargerSerialInput.replaceChildren(new Option(serials.length?'Seçiniz':'Seri numarası bulunamadı',''));serials.forEach(serial=>chargerSerialInput.add(new Option(serial+(isSavedSelection&&serial===savedSerial?' (Satıldı)':''),serial)));chargerSerialInput.value=serials.includes(current)?current:'';delete chargerSerialInput.dataset.value;chargerSerialInput.disabled=isSavedSelection||serials.length===0;chargerSerialInput.title=isSavedSelection?'Satılan şarj cihazının seri numarası değiştirilemez.':(serials.length?'Stokta bulunan seri numarasını seçin.':'Bu model için kullanılabilir seri numarası bulunmuyor.');chargerSerialPicker?.refresh();};
+  const fillChargerSerial=()=>{
+    const stocks=chargerDeviceStocks.filter(item=>item.brand===(chargerBrandSelect?.value||'')&&item.model===(chargerModelSelect?.value||'')),stock=stocks[0];
+    setListPriceHint([chargerBrandSelect,chargerModelSelect,chargerSerialInput],stock);
+    chargerPurchasePriceInput.value=stock&&Number(stock.invoice_unit_price)>0?formatTurkishMoney(stock.invoice_unit_price):'';
+    if(chargerPriceInput)chargerPriceInput.value=stock?(listPriceForStock(stock)||formatTurkishMoney(stock.sale_price||0)):'';
+    applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput);
+    const savedSerial=String(savedSaleProducts.sales_charger_serial||'').trim(),current=String(chargerSerialInput.dataset.value||chargerSerialInput.value||chargerManualSerialInput.value||'').trim();
+    const serials=[...new Set(stocks.flatMap(item=>{try{const values=JSON.parse(item.serial_numbers||'[]');return Array.isArray(values)?values.map(value=>String(value).trim()).filter(Boolean):[];}catch(_){return [];}}))];
+    const isSavedSelection=!!savedSerial&&current===savedSerial&&chargerBrandSelect.value===savedSaleProducts.sales_charger_brand&&chargerModelSelect.value===savedSaleProducts.sales_charger_model;
+    const manualMode=!!stock&&serials.length===0&&!isSavedSelection;
+    chargerSerialInput.dataset.soldSerial=isSavedSelection?'1':'';
+    if(isSavedSelection&&!serials.includes(savedSerial))serials.push(savedSerial);
+    chargerSerialInput.replaceChildren(new Option(serials.length?'Seçiniz':manualMode?'Seri no giriniz':'Önce marka ve model seçiniz',''));
+    serials.forEach(serial=>chargerSerialInput.add(new Option(serial+(isSavedSelection&&serial===savedSerial?' (Satıldı)':''),serial)));
+    if(manualMode&&current)chargerSerialInput.add(new Option(current,current));
+    chargerSerialInput.value=(serials.includes(current)||manualMode&&current)?current:'';
+    chargerManualSerialInput.value=manualMode?current:'';
+    delete chargerSerialInput.dataset.value;
+    chargerSerialInput.disabled=isSavedSelection||manualMode||serials.length===0;
+    chargerManualSerialInput.hidden=!manualMode;
+    chargerManualSerialInput.readOnly=detailsModal?.dataset.salesLocked==='1';
+    chargerSerialPicker?.trigger.parentElement.toggleAttribute('hidden',manualMode);
+    chargerSerialInput.title=isSavedSelection?'Satılan şarj cihazının seri numarası değiştirilemez.':manualMode?'Stokta seri no bulunmadığı için elle giriniz.':'Stokta bulunan seri numarasını seçin.';
+    chargerSerialPicker?.refresh();
+  };
+  chargerManualSerialInput.addEventListener('input',()=>{
+    const serial=chargerManualSerialInput.value.trim();
+    chargerSerialInput.replaceChildren(new Option('Seri no giriniz',''));
+    if(serial)chargerSerialInput.add(new Option(serial,serial));
+    chargerSerialInput.value=serial;
+    persistDetails();
+  });
   let chargerRefreshSequence = 0;
   const refreshChargerSerials = async () => {
     if(!chargerBrandSelect.value||!chargerModelSelect.value)return;
@@ -2404,7 +2474,7 @@ const initializeSalesScreen=()=>{
   window.addEventListener('focus', () => {
     if (!chargerDetails.hidden && chargerModelSelect.value) refreshChargerSerials();
   });
-  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Seçiniz');chargerBrandPicker?.refresh();syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{++chargerRefreshSequence;chargerModelSelect.dataset.value='';if(chargerSerialInput){chargerSerialInput.replaceChildren(new Option('Önce marka ve model seçiniz',''));chargerSerialInput.disabled=true;delete chargerSerialInput.dataset.value;delete chargerSerialInput.dataset.soldSerial;}chargerSerialPicker?.refresh();chargerPriceInput.value='';chargerNetPriceInput.value='';chargerDiscountInput.value='';chargerDetails.querySelector('[name="sales_charger_sgk"]').value='';chargerDetails.querySelector('[name="sales_charger_unit"]').value=chargerBrandSelect.value?'Adet':'';if(!chargerBrandSelect.value)chargerDetails.querySelector('[name="sales_charger_promotion"]').value='Hayır';syncChargerModels();updateTotalAmount();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
+  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Seçiniz');chargerBrandPicker?.refresh();syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{++chargerRefreshSequence;chargerModelSelect.dataset.value='';chargerManualSerialInput.value='';chargerManualSerialInput.hidden=true;chargerSerialPicker?.trigger.parentElement.removeAttribute('hidden');if(chargerSerialInput){chargerSerialInput.replaceChildren(new Option('Önce marka ve model seçiniz',''));chargerSerialInput.disabled=true;delete chargerSerialInput.dataset.value;delete chargerSerialInput.dataset.soldSerial;}chargerSerialPicker?.refresh();chargerPriceInput.value='';chargerPurchasePriceInput.value='';chargerNetPriceInput.value='';chargerDiscountInput.value='';chargerDetails.querySelector('[name="sales_charger_sgk"]').value='';chargerDetails.querySelector('[name="sales_charger_unit"]').value=chargerBrandSelect.value?'Adet':'';if(!chargerBrandSelect.value)chargerDetails.querySelector('[name="sales_charger_promotion"]').value='Hayır';syncChargerModels();updateTotalAmount();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';chargerManualSerialInput.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
   chargerDetails.querySelector('[name="sales_charger_promotion"]').addEventListener('change',()=>{
     const promoted=chargerDetails.querySelector('[name="sales_charger_promotion"]').value==='Evet';
     if(!promoted){
@@ -3874,7 +3944,8 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal .sales-details-dialog.sales-window-maximized{left:0!important;top:0!important;transform:none!important;width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}
 #sales-details-modal .sales-details-dialog.sales-window-minimized{left:8px!important;top:auto!important;bottom:8px!important;transform:none!important;width:320px!important;height:29px!important;max-height:29px!important}
 #sales-details-modal .sales-details-dialog.sales-window-minimized>.repair-body,#sales-details-modal .sales-details-dialog.sales-window-minimized>footer,#sales-details-modal .sales-details-dialog.sales-window-minimized>.sales-window-resizer{display:none!important}
-#sales-details-modal #charger-device-details{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+#sales-details-modal #charger-device-details{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+#sales-details-modal #charger-device-details [hidden]{display:none!important}
 #sales-details-modal #charger-device-details>label.charger-promotion-field{grid-column:1/-1!important;justify-self:center!important;width:180px!important;max-width:100%!important;margin:16px 0 6px!important}
 @media(max-width:720px){#sales-details-modal .sales-details-dialog>.repair-body,#sales-details-modal .sales-device-details,#sales-details-modal .sales-sale-info,#sales-details-modal #charger-device-details,#sales-details-modal #consumable-details{grid-template-columns:1fr!important}#sales-details-modal .sales-product-actions{flex-wrap:wrap!important}}
 #sales-details-modal .sales-device-details>label:has(.sales-brand-picker.is-open),#sales-details-modal #charger-device-details>label:has(.sales-brand-picker.is-open),#sales-details-modal #consumable-details label:has(.sales-brand-picker.is-open){position:relative!important;z-index:90!important}
