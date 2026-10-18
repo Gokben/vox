@@ -2638,12 +2638,12 @@ const initializeSalesScreen=()=>{
     const toggle=document.createElement('button');toggle.type='button';toggle.className='sales-hearing-side-toggle';toggle.dataset.sideField=fieldName;toggle.title='Kulak yönünü değiştir';
     const ear=document.createElement('i');ear.className='icon-base ti tabler-ear';ear.setAttribute('aria-hidden','true');
     const label=document.createElement('span');
-    const renderSide=()=>{label.textContent=side.value==='sol'?'Sol':'Sağ';toggle.dataset.side=side.value;toggle.setAttribute('aria-label',(second?'İşitme Cihazı 2':'İşitme Cihazı 1')+' kulak: '+label.textContent+'. Yönü değiştir');detailsModal?.querySelector(`[name="${second?'sales_device_2_serial':'sales_device_serial'}"]`)?.setAttribute('aria-label','Seri No ('+label.textContent+')');ear.style.transform=side.value==='sol'?'scaleX(-1)':'';};
+    const renderSide=()=>{label.textContent=side.value==='sol'?'Sol':'Sağ';toggle.dataset.side=side.value;const singleEar=detailsModal?.dataset.singleEar==='1';toggle.setAttribute('aria-label',singleEar?label.textContent+' kulağı seç':(second?'İşitme Cihazı 2':'İşitme Cihazı 1')+' kulak: '+label.textContent+'. Yönü değiştir');toggle.setAttribute('aria-pressed',String(singleEar&&!second));detailsModal?.querySelector(`[name="${second?'sales_device_2_serial':'sales_device_serial'}"]`)?.setAttribute('aria-label','Seri No ('+label.textContent+')');ear.style.transform=side.value==='sol'?'scaleX(-1)':'';};
     const opposite=value=>value==='sağ'?'sol':'sağ';
     const peer=detailsModal?.querySelector(second?'#hearing-device-details [name="sales_device_side"]':'#hearing-device-details-2 [name="sales_device_2_side"]');
     if(peer&&peer.value===side.value){side.value=second?opposite(peer.value):side.value;if(!second)peer.value=opposite(side.value);sideToggleFor(peer.name)?.dispatchEvent(new Event('hearing-side-sync'));}
     toggle.addEventListener('hearing-side-sync',renderSide);
-    toggle.append(ear,label);toggle.addEventListener('click',()=>{side.value=opposite(side.value);renderSide();const other=detailsModal?.querySelector(second?'#hearing-device-details [name="sales_device_side"]':'#hearing-device-details-2 [name="sales_device_2_side"]');if(other){other.value=opposite(side.value);sideToggleFor(other.name)?.dispatchEvent(new Event('hearing-side-sync'));}persistDetails();});renderSide();
+    toggle.append(ear,label);toggle.addEventListener('click',()=>{if(detailsModal?.dataset.hearingPair==='same'&&detailsModal.dataset.singleEar==='1'){if(second){const first=detailsModal.querySelector('[name="sales_device_side"]');if(first){first.value=side.value;side.value=opposite(first.value);sideToggleFor(first.name)?.dispatchEvent(new Event('hearing-side-sync'));}}renderSide();persistDetails();return;}side.value=opposite(side.value);renderSide();const other=detailsModal?.querySelector(second?'#hearing-device-details [name="sales_device_side"]':'#hearing-device-details-2 [name="sales_device_2_side"]');if(other){other.value=opposite(side.value);sideToggleFor(other.name)?.dispatchEvent(new Event('hearing-side-sync'));}persistDetails();});renderSide();
     heading.append(toggle,side);container.prepend(heading);
   }return container;};
   detailsModal?.addEventListener('change',event=>{if(event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)refreshProductDeleteButtons();});
@@ -2690,8 +2690,6 @@ const initializeSalesScreen=()=>{
   const sameRealSaleTotal=makeSameModelField('Gerçek satış');sameRealSaleTotal.id='sales-real-sale-total';sameRealSaleTotal.title='SGK Rapor + Salt cihaz';
   const sameModelSummary=document.createElement('div');sameModelSummary.className='sales-same-model-summary';deviceDetails?.append(sameModelSummary);
   const sameSerialLabels=()=>({first:deviceSerialInput?.closest('label'),second:detailsModal?.querySelector('[name="sales_device_2_serial"]')?.closest('label')});
-  const singleEarChoices=document.createElement('span');singleEarChoices.className='sales-single-ear-choices';singleEarChoices.setAttribute('role','group');singleEarChoices.setAttribute('aria-label','Tek cihaz için kulak seçimi');
-  ['sağ','sol'].forEach(value=>{const button=document.createElement('button');button.type='button';button.dataset.earChoice=value;button.textContent=value==='sağ'?'Sağ':'Sol';button.addEventListener('click',()=>{if(detailsModal?.dataset.salesLocked==='1')return;const first=detailsModal.querySelector('[name="sales_device_side"]'),second=detailsModal.querySelector('[name="sales_device_2_side"]');if(!first)return;first.value=value;if(second)second.value=value==='sağ'?'sol':'sağ';sideToggleFor('sales_device_side')?.dispatchEvent(new Event('hearing-side-sync'));sideToggleFor('sales_device_2_side')?.dispatchEvent(new Event('hearing-side-sync'));singleEarChoices.querySelectorAll('button').forEach(choice=>choice.setAttribute('aria-pressed',String(choice.dataset.earChoice===value)));persistDetails();});singleEarChoices.append(button);});
   const placeSerialSideToggle=(label,fieldName,inSerialLabel)=>{
     if(!label)return;
     const toggle=sideToggleFor(fieldName),heading=detailsModal?.querySelector(`[name="${fieldName}"]`)?.closest('.sales-product-section-heading');
@@ -2732,11 +2730,9 @@ const initializeSalesScreen=()=>{
     if(!second.querySelector('[name="sales_device_2_sgk"]').value)second.querySelector('[name="sales_device_2_sgk"]').value=detailsModal?.querySelector('[name="sales_device_sgk"]')?.value||'';
     const single=sameQuantity.value==='1';if(single)serial.value='';detailsModal.dataset.singleEar=single?'1':'0';
     const firstSideToggle=sideToggleFor('sales_device_side');
-    if(firstSideToggle){firstSideToggle.disabled=detailsModal.dataset.salesLocked==='1';firstSideToggle.title=single?'Sağ veya sol kulağı seçmek için tıklayın':'Kulak yönünü değiştir';}
-    const firstCaption=sameSerialLabels().first?.querySelector(':scope > .sales-serial-caption');if(firstCaption&&singleEarChoices.parentElement!==firstCaption)firstCaption.append(singleEarChoices);
-    const selectedSide=detailsModal.querySelector('[name="sales_device_side"]')?.value;singleEarChoices.querySelectorAll('button').forEach(choice=>{choice.disabled=detailsModal.dataset.salesLocked==='1';choice.setAttribute('aria-pressed',String(choice.dataset.earChoice===selectedSide));});
-    sideToggleFor('sales_device_2_side')?.toggleAttribute('disabled',single||detailsModal.dataset.salesLocked==='1');
-    sameSerialLabels().second?.classList.toggle('sales-hearing-inactive',single);
+    if(firstSideToggle){firstSideToggle.disabled=detailsModal.dataset.salesLocked==='1';firstSideToggle.title=single?'Seçili kulak':'Kulak yönünü değiştir';}
+    const secondSideToggle=sideToggleFor('sales_device_2_side');if(secondSideToggle){secondSideToggle.disabled=detailsModal.dataset.salesLocked==='1';secondSideToggle.title=single?'Bu kulağı seç':'Kulak yönünü değiştir';}
+    firstSideToggle?.dispatchEvent(new Event('hearing-side-sync'));secondSideToggle?.dispatchEvent(new Event('hearing-side-sync'));
     hideSelectedSerials();updateTotalAmount();
   };
   sameQuantity.addEventListener('change',()=>{
@@ -2890,12 +2886,8 @@ document.addEventListener('DOMContentLoaded',()=>{const salesSave=document.getEl
 #sales-details-modal .sales-hearing-side-toggle[data-side="sol"],#sales-details-modal .sales-hearing-side-toggle[data-side="sol"] .ti{color:#1874b9!important}
 #sales-details-modal .sales-serial-caption{display:inline-flex!important;align-items:center!important;gap:4px!important;min-height:15px!important}
 #sales-details-modal .sales-serial-caption .sales-hearing-side-toggle{height:16px!important;min-height:16px!important;max-height:16px!important;margin-left:0!important;padding:0 2px!important;font-size:11px!important;line-height:16px!important}
-#sales-details-modal .sales-single-ear-choices{display:none!important;gap:3px!important;margin-left:5px!important}
-#sales-details-modal[data-single-ear="1"] .sales-single-ear-choices{display:inline-flex!important}
-#sales-details-modal[data-single-ear="1"] .sales-serial-caption .sales-hearing-side-toggle[data-side-field="sales_device_side"]{display:none!important}
-#sales-details-modal .sales-single-ear-choices button{display:inline-block!important;min-width:32px!important;min-height:20px!important;padding:1px 5px!important;border:1px solid #80a4c5!important;border-radius:3px!important;background:#fff!important;color:#154973!important;font:700 11px Tahoma,"Segoe UI",sans-serif!important;cursor:pointer!important}
-#sales-details-modal .sales-single-ear-choices button[aria-pressed="true"]{border-color:#159447!important;background:#159447!important;color:#fff!important}
-#sales-details-modal .sales-single-ear-choices button:disabled{opacity:.5!important;cursor:not-allowed!important}
+#sales-details-modal[data-single-ear="1"] .sales-hearing-side-toggle[aria-pressed="true"]{border-radius:3px!important;background:#d9f3e1!important;box-shadow:inset 0 0 0 1px #159447!important}
+#sales-details-modal[data-single-ear="1"] .sales-hearing-side-toggle[aria-pressed="false"]{opacity:.7!important}
 #sales-details-modal .sales-product-cancel{position:absolute!important;z-index:4!important;top:4px!important;right:4px!important;display:inline-grid!important;place-items:center!important;box-sizing:border-box!important;width:32px!important;min-width:32px!important;max-width:32px!important;height:32px!important;min-height:32px!important;max-height:32px!important;margin:0!important;padding:0!important;border:1px solid #c8353d!important;border-radius:5px!important;background:linear-gradient(#ef6269,#dc454d)!important;color:#fff!important;cursor:pointer!important;box-shadow:0 1px 2px rgba(0,0,0,.12)!important}
 #sales-details-modal .sales-product-cancel:hover{background:linear-gradient(#e95058,#c9343d)!important}
 #sales-details-modal .sales-product-cancel .ti{display:block!important;font-size:17px!important;line-height:1!important;color:#fff!important}
@@ -3808,7 +3800,6 @@ form[data-repair-payment-layout="mail_order"] section{grid-template-columns:minm
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-field{display:flex!important;flex-direction:column;gap:5px}
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-list-price{line-height:16px!important}
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-field input{width:100%;box-sizing:border-box}
-#sales-details-modal .sales-hearing-inactive{opacity:.5!important}
 #sales-details-modal #hearing-device-details .sales-same-model-summary{display:none!important}
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-summary{display:grid!important;grid-column:1/-1!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px 8px!important;min-width:0!important}
 #sales-details-modal[data-hearing-pair="same"] #hearing-device-details .sales-same-model-summary>label{display:flex!important;flex-direction:column!important;min-width:0!important;gap:2px!important;margin:0!important;padding:0!important;color:#26384a!important;font:700 11px/15px Tahoma,"Segoe UI",sans-serif!important}
