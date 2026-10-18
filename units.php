@@ -53,7 +53,15 @@ try {
 }
 
 function unit_parse_date(string $value): ?DateTimeImmutable {
+    $value = trim($value);
     if ($value === '') return null;
+    if (preg_match('/^([0-9]{2})([0-9]{2})([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
+        $year = strlen($parts[3]) === 2 ? '20' . $parts[3] : $parts[3];
+        $value = $parts[1] . '.' . $parts[2] . '.' . $year;
+    } elseif (preg_match('/^([0-9]{1,2})[.\/-]([0-9]{1,2})[.\/-]([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
+        $year = strlen($parts[3]) === 2 ? '20' . $parts[3] : $parts[3];
+        $value = str_pad($parts[1], 2, '0', STR_PAD_LEFT) . '.' . str_pad($parts[2], 2, '0', STR_PAD_LEFT) . '.' . $year;
+    }
     if (!preg_match('/^[0-9]{2}\.[0-9]{2}\.[0-9]{4}$/D', $value)) {
         throw new RuntimeException('Tarih gg.aa.yyyy biçiminde olmalıdır.');
     }
@@ -113,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach (['record_date', 'birth_date', 'special_day'] as $dateField) {
             $parsed = unit_parse_date($unit[$dateField]);
             $saveValues[$dateField] = $parsed ? $parsed->format('Y-m-d') : '';
+            $unit[$dateField] = $parsed ? $parsed->format('d.m.Y') : '';
         }
         $birth = unit_parse_date($unit['birth_date']);
         $today = new DateTimeImmutable('today');
@@ -208,25 +217,36 @@ document.querySelectorAll('.unit-actions').forEach(actions=>{if(actions.querySel
 (()=>{const format=value=>{let digits=value.replace(/\D/g,'');if(digits.length===10&&digits.startsWith('5'))digits='0'+digits;return [digits.slice(0,4),digits.slice(4,7),digits.slice(7,9),digits.slice(9,11)].filter(Boolean).join(' ')};document.querySelectorAll('input[name="phone1"],input[name="phone2"]').forEach(input=>{input.value=format(input.value);input.addEventListener('input',()=>input.value=format(input.value));});})();
 (() => {
   const fields = [...document.querySelectorAll('[data-unit-date]')];
+  const form = fields[0]?.form;
   const birth = document.querySelector('input[name="birth_date"]');
   const age = document.querySelector('input[name="age"]');
-  const parse = value => {
-    if (!/^[0-9]{2}\.[0-9]{2}\.[0-9]{4}$/.test(value)) return null;
+  const normalize = value => {
+    value = value.trim();
+    let match = /^(\d{2})(\d{2})(\d{2}|\d{4})$/.exec(value);
+    if (match) value = `${match[1]}.${match[2]}.${match[3].length === 2 ? `20${match[3]}` : match[3]}`;
+    else {
+      match = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2}|\d{4})$/.exec(value);
+      if (match) value = `${match[1].padStart(2,'0')}.${match[2].padStart(2,'0')}.${match[3].length === 2 ? `20${match[3]}` : match[3]}`;
+    }
+    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(value)) return null;
     const [day, month, year] = value.split('.').map(Number);
     const date = new Date(0); date.setHours(0,0,0,0); date.setFullYear(year, month - 1, day);
-    return year > 0 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
+    return year > 0 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? {text:value,date} : null;
   };
   const update = () => {
     const today = new Date(); today.setHours(0,0,0,0);
     fields.forEach(field => {
-      const date = parse(field.value);
-      field.setCustomValidity(field.value && !date ? 'Geçerli bir tarih giriniz (gg.aa.yyyy).' : field === birth && date > today ? 'Doğum tarihi gelecekte olamaz.' : '');
+      const result = normalize(field.value);
+      if (result && result.text !== field.value) field.value = result.text;
+      field.setCustomValidity(field.value && !result ? 'Geçerli bir tarih giriniz (gg.aa.yyyy).' : field === birth && result && result.date > today ? 'Doğum tarihi gelecekte olamaz.' : '');
     });
     if (!birth || !age) return;
-    const date = parse(birth.value);
+    const result = normalize(birth.value);
+    const date = result?.date;
     age.value = date && date <= today ? String(today.getFullYear() - date.getFullYear() - (today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate()) ? 1 : 0)) : '';
   };
-  fields.forEach(field => { field.addEventListener('input', update); field.addEventListener('change', update); });
+  fields.forEach(field => { field.addEventListener('input', update); field.addEventListener('change', update); field.addEventListener('blur', update); });
+  form?.addEventListener('submit', event => { update(); if (!form.reportValidity()) event.preventDefault(); }, true);
   update();
 })();
 </script>
