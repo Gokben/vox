@@ -2448,15 +2448,24 @@ const initializeSalesScreen=()=>{
     chargerSerialPicker?.refresh();
   };
   chargerManualSerialInput.addEventListener('input',()=>persistDetails());
-  // Explicitly focus editable charger fields on mouse clicks in the sales window.
-  chargerDetails.addEventListener('click',event=>{
+  // Keep pointer focus after product pickers and their layout observers settle.
+  const focusChargerField=event=>{
     const field=event.target;
     if(field!==chargerManualSerialInput&&field!==chargerPriceInput)return;
     if(field.disabled||field.readOnly||detailsModal?.dataset.salesLocked==='1')return;
     event.preventDefault();
-    field.focus({preventScroll:true});
-    if(field===chargerPriceInput)field.setSelectionRange(0,0);
-  });
+    event.stopPropagation();
+    [chargerBrandPicker,chargerModelPicker,chargerSerialPicker,chargerPromotionPicker].forEach(picker=>picker?.close());
+    const focus=()=>{
+      if(!field.isConnected||field.hidden||field.disabled||field.readOnly||detailsModal?.dataset.salesLocked==='1')return;
+      field.focus({preventScroll:true});
+      if(field===chargerPriceInput)field.setSelectionRange(0,0);
+    };
+    focus();
+    requestAnimationFrame(focus);
+  };
+  chargerDetails.addEventListener('pointerdown',focusChargerField,true);
+  chargerDetails.addEventListener('click',focusChargerField,true);
   let chargerRefreshSequence = 0;
   const refreshChargerSerials = async () => {
     if(!chargerBrandSelect.value||!chargerModelSelect.value)return;
