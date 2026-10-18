@@ -739,7 +739,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postedSalesDetails[(string)$key] = is_scalar($value) ? (string)$value : '';
     }
     if (($postedSalesDetails['sales_charger_promotion'] ?? 'Hayır') === 'Evet') {
-        foreach (['sales_charger_net_price', 'sales_charger_sgk', 'sales_charger_discount_rate'] as $chargerMoneyKey) {
+        foreach (['sales_charger_price', 'sales_charger_net_price', 'sales_charger_sgk', 'sales_charger_discount_rate'] as $chargerMoneyKey) {
             $postedSalesDetails[$chargerMoneyKey] = '0,00';
         }
     }
@@ -2143,7 +2143,7 @@ const initializeSalesScreen=()=>{
   const confirmLinkedSaleChange=()=>{if(!linkedSaleNeedsConfirmation||(details?.value||'')===initialSalesDetails)return true;let confirmation=form.querySelector('[name="confirm_linked_sale_change"]');if(confirmation?.value==='1')return true;if(!confirm('Bu satış kartı kasa tahsilatı ve/veya stok çıkışı ile bağlıdır. Değişikliği onaylıyor musunuz?'))return false;confirmation=document.createElement('input');confirmation.type='hidden';confirmation.name='confirm_linked_sale_change';confirmation.value='1';form.append(confirmation);return true;};
   form.addEventListener('submit',event=>{if(!confirmLinkedSaleChange())event.preventDefault();},true);
   detailsModal?.querySelector('#sales-details-save')?.addEventListener('click',event=>{if(confirmLinkedSaleChange())return;event.preventDefault();event.stopImmediatePropagation();},true);
-  const salesLockButton=detailsModal?.querySelector('#sales-lock-toggle'),applySalesLock=locked=>{if(!detailsModal)return;detailsModal.dataset.salesLocked=locked?'1':'0';const consumablePromoted=detailsModal.querySelector('[name="sales_consumable_promotion"]')?.value==='Evet';detailsModal.querySelectorAll('.repair-body [name]').forEach(field=>{const fixed=field.dataset.soldSerial==='1';field.disabled=locked||fixed;field.readOnly=locked||fixed||field.name==='sales_consumable_price'&&consumablePromoted;});detailsModal.querySelectorAll('.sales-consumable-row-price').forEach(field=>field.readOnly=locked||consumablePromoted);detailsModal.querySelectorAll('.sales-brand-picker-trigger').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('.sales-product-cancel,#add-hearing-device').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('#add-hearing-device,.sales-product-actions .button,[data-sales-product-action]').forEach(button=>{button.disabled=locked;button.setAttribute('aria-disabled',locked?'true':'false');button.style.opacity=locked?'.48':'';button.style.cursor=locked?'not-allowed':'';});detailsModal.querySelectorAll('[aria-label="Kasa"]').forEach(link=>{link.style.pointerEvents=locked?'none':'';link.style.opacity=locked?'.38':'';});const saveButton=detailsModal.querySelector('#sales-details-save');if(saveButton)saveButton.disabled=locked;if(salesLockButton){salesLockButton.title=locked?'Satış kilidini aç':'Satış bilgilerini kilitle';salesLockButton.innerHTML=`<i class="ti ${locked?'tabler-lock':'tabler-lock-open'}"></i>`;salesLockButton.style.background=locked?'#e6525d':'#19a94b';}};
+  const salesLockButton=detailsModal?.querySelector('#sales-lock-toggle'),applySalesLock=locked=>{if(!detailsModal)return;detailsModal.dataset.salesLocked=locked?'1':'0';const consumablePromoted=detailsModal.querySelector('[name="sales_consumable_promotion"]')?.value==='Evet';detailsModal.querySelectorAll('.repair-body [name]').forEach(field=>{const fixed=field.dataset.soldSerial==='1';field.disabled=locked||fixed;field.readOnly=locked||fixed||field.name==='sales_consumable_price'&&consumablePromoted||field.name==='sales_charger_price'&&detailsModal.querySelector('[name="sales_charger_promotion"]')?.value==='Evet';});detailsModal.querySelectorAll('.sales-consumable-row-price').forEach(field=>field.readOnly=locked||consumablePromoted);detailsModal.querySelectorAll('.sales-brand-picker-trigger').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('.sales-product-cancel,#add-hearing-device').forEach(button=>button.disabled=locked);detailsModal.querySelectorAll('#add-hearing-device,.sales-product-actions .button,[data-sales-product-action]').forEach(button=>{button.disabled=locked;button.setAttribute('aria-disabled',locked?'true':'false');button.style.opacity=locked?'.48':'';button.style.cursor=locked?'not-allowed':'';});detailsModal.querySelectorAll('[aria-label="Kasa"]').forEach(link=>{link.style.pointerEvents=locked?'none':'';link.style.opacity=locked?'.38':'';});const saveButton=detailsModal.querySelector('#sales-details-save');if(saveButton)saveButton.disabled=locked;if(salesLockButton){salesLockButton.title=locked?'Satış kilidini aç':'Satış bilgilerini kilitle';salesLockButton.innerHTML=`<i class="ti ${locked?'tabler-lock':'tabler-lock-open'}"></i>`;salesLockButton.style.background=locked?'#e6525d':'#19a94b';}};
   salesLockButton?.addEventListener('click',async()=>{const locked=detailsModal?.dataset.salesLocked==='1',isAdmin=salesLockButton.dataset.admin==='1';if(locked&&!isAdmin){alert('Kilidi yalnız yönetici açabilir.');return;}salesLockButton.disabled=true;try{const data=new FormData();data.set('csrf',form.querySelector('[name="csrf"]')?.value||'');data.set('action','sales_toggle_lock');data.set('edit_id',form.querySelector('[name="edit_id"]')?.value||'');data.set('sales_locked',locked?'0':'1');const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'}),result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||'Kilit işlemi tamamlanamadı.');applySalesLock(!!result.locked);syncSameModel();updateTotalAmount();alert(result.locked?'Satış bilgileri kilitlendi.':'Satış kilidi açıldı.');}catch(error){alert(error.message||'Kilit işlemi tamamlanamadı.');}finally{salesLockButton.disabled=false;}});
   let savedSaleProducts={};try{savedSaleProducts=JSON.parse(details?.value||'{}')||{};}catch(_){savedSaleProducts={};}
   if(detailsModal)detailsModal.dataset.singleEarPriceCleared=savedSaleProducts.sales_device_price_cleared==='1'?'1':'0';
@@ -2300,7 +2300,7 @@ const initializeSalesScreen=()=>{
   const setListPriceHint=()=>{};
   const chargerDetails=document.createElement('div');
   chargerDetails.id='charger-device-details';chargerDetails.hidden=true;chargerDetails.style.cssText='grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px';
-  chargerDetails.innerHTML='<label>Şarj Cihazı Markası<select name="sales_charger_brand"></select></label><label>Şarj Cihazı Modeli<select name="sales_charger_model"></select></label><label>Seri No<select name="sales_charger_serial" required disabled><option value="">Önce marka ve model seçiniz</option></select><input data-charger-manual-serial name="sales_charger_serial_manual" type="text" placeholder="Seri no giriniz" autocomplete="off" hidden></label><label>Birim<input name="sales_charger_unit" value="Adet" readonly></label><label>Alış Fiyatı<input data-charger-purchase-price readonly></label><label>Satış Fiyatı<input name="sales_charger_price" inputmode="decimal" readonly></label><input type="hidden" name="sales_charger_sgk"><input type="hidden" name="sales_charger_discount_rate"><input type="hidden" name="sales_charger_net_price"><label class="charger-promotion-field">Promosyon<select name="sales_charger_promotion" style="max-width:180px"><option value="Hayır">Hayır</option><option value="Evet">Evet</option></select></label>';
+  chargerDetails.innerHTML='<label>Şarj Cihazı Markası<select name="sales_charger_brand"></select></label><label>Şarj Cihazı Modeli<select name="sales_charger_model"></select></label><label>Seri No<select name="sales_charger_serial" required disabled><option value="">Önce marka ve model seçiniz</option></select><input data-charger-manual-serial type="text" placeholder="Seri no giriniz" autocomplete="off" hidden></label><label>Birim<input name="sales_charger_unit" value="Adet" readonly></label><label>Alış Fiyatı<input data-charger-purchase-price readonly></label><label>Satış Fiyatı<input name="sales_charger_price" inputmode="decimal" readonly></label><input type="hidden" name="sales_charger_sgk"><input type="hidden" name="sales_charger_discount_rate"><input type="hidden" name="sales_charger_net_price"><label class="charger-promotion-field">Promosyon<select name="sales_charger_promotion" style="max-width:180px"><option value="Hayır">Hayır</option><option value="Evet">Evet</option></select></label>';
   chargerDetails.querySelectorAll('label').forEach(label=>label.style.cssText='display:flex;flex-direction:column;gap:7px');
   detailsModal?.querySelector('.repair-body')?.prepend(chargerDetails);
   const toggleChargerDetails=show=>{chargerDetails.hidden=!show;chargerDetails.style.display=show?'grid':'none';if(show)queueMicrotask(()=>{if(!chargerBrandSelect.value||!chargerModelSelect.value)chargerPurchasePriceInput.value='';else refreshChargerSerials();});};
@@ -2419,9 +2419,11 @@ const initializeSalesScreen=()=>{
     const stocks=chargerDeviceStocks.filter(item=>item.brand===(chargerBrandSelect?.value||'')&&item.model===(chargerModelSelect?.value||'')),stock=stocks[0];
     setListPriceHint([chargerBrandSelect,chargerModelSelect,chargerSerialInput],stock);
     chargerPurchasePriceInput.value=stock&&Number(stock.invoice_unit_price)>0?formatTurkishMoney(stock.invoice_unit_price):'';
-    if(chargerPriceInput)chargerPriceInput.value=stock?(listPriceForStock(stock)||formatTurkishMoney(stock.sale_price||0)):'';
+    const promoted=chargerPromotionInput.value==='Evet';
+    if(chargerPriceInput)chargerPriceInput.value=promoted?formatTurkishMoney(0):stock?(listPriceForStock(stock)||formatTurkishMoney(stock.sale_price||0)):'';
+    chargerPriceInput.readOnly=promoted||detailsModal?.dataset.salesLocked==='1';
     applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput);
-    const savedSerial=String(savedSaleProducts.sales_charger_serial||'').trim(),current=String(chargerSerialInput.dataset.value||chargerSerialInput.value||chargerManualSerialInput.value||'').trim();
+    const savedSerial=String(savedSaleProducts.sales_charger_serial||'').trim(),current=String(chargerManualSerialInput.value||chargerSerialInput.dataset.value||chargerSerialInput.value||'').trim();
     const serials=[...new Set(stocks.flatMap(item=>{try{const values=JSON.parse(item.serial_numbers||'[]');return Array.isArray(values)?values.map(value=>String(value).trim()).filter(Boolean):[];}catch(_){return [];}}))];
     const isSavedSelection=!!savedSerial&&current===savedSerial&&chargerBrandSelect.value===savedSaleProducts.sales_charger_brand&&chargerModelSelect.value===savedSaleProducts.sales_charger_model;
     const manualMode=!!stock&&serials.length===0&&!isSavedSelection;
@@ -2430,23 +2432,20 @@ const initializeSalesScreen=()=>{
     chargerSerialInput.replaceChildren(new Option(serials.length?'Seçiniz':manualMode?'Seri no giriniz':'Önce marka ve model seçiniz',''));
     serials.forEach(serial=>chargerSerialInput.add(new Option(serial+(isSavedSelection&&serial===savedSerial?' (Satıldı)':''),serial)));
     if(manualMode&&current)chargerSerialInput.add(new Option(current,current));
-    chargerSerialInput.value=(serials.includes(current)||manualMode&&current)?current:'';
+    chargerSerialInput.value=serials.includes(current)?current:'';
     chargerManualSerialInput.value=manualMode?current:'';
+    chargerSerialInput.name=manualMode?'':'sales_charger_serial';
+    chargerManualSerialInput.name=manualMode?'sales_charger_serial':'';
     delete chargerSerialInput.dataset.value;
     chargerSerialInput.disabled=isSavedSelection||manualMode||serials.length===0;
     chargerManualSerialInput.hidden=!manualMode;
     chargerManualSerialInput.readOnly=detailsModal?.dataset.salesLocked==='1';
+    chargerManualSerialInput.disabled=detailsModal?.dataset.salesLocked==='1';
     chargerSerialPicker?.trigger.parentElement.toggleAttribute('hidden',manualMode);
     chargerSerialInput.title=isSavedSelection?'Satılan şarj cihazının seri numarası değiştirilemez.':manualMode?'Stokta seri no bulunmadığı için elle giriniz.':'Stokta bulunan seri numarasını seçin.';
     chargerSerialPicker?.refresh();
   };
-  chargerManualSerialInput.addEventListener('input',()=>{
-    const serial=chargerManualSerialInput.value.trim();
-    chargerSerialInput.replaceChildren(new Option('Seri no giriniz',''));
-    if(serial)chargerSerialInput.add(new Option(serial,serial));
-    chargerSerialInput.value=serial;
-    persistDetails();
-  });
+  chargerManualSerialInput.addEventListener('input',()=>persistDetails());
   let chargerRefreshSequence = 0;
   const refreshChargerSerials = async () => {
     if(!chargerBrandSelect.value||!chargerModelSelect.value)return;
@@ -2463,8 +2462,10 @@ const initializeSalesScreen=()=>{
       includeSavedProduct(chargerDeviceStocks,savedSaleProducts.sales_charger_brand,savedSaleProducts.sales_charger_model,'Şarj Cihazı');
       const price = chargerPriceInput.value, net = chargerNetPriceInput.value;
       fillChargerSerial();
-      chargerPriceInput.value = price;
-      chargerNetPriceInput.value = net;
+      if(chargerPromotionInput.value!=='Evet'){
+        chargerPriceInput.value = price;
+        chargerNetPriceInput.value = net;
+      }
     } catch (error) {
       if (sequence === chargerRefreshSequence) chargerSerialInput.title = 'Stok bilgisi yenilenemedi. Sayfayı yenileyip tekrar deneyin.';
     }
@@ -2475,16 +2476,20 @@ const initializeSalesScreen=()=>{
   window.addEventListener('focus', () => {
     if (!chargerDetails.hidden && chargerModelSelect.value) refreshChargerSerials();
   });
-  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Seçiniz');chargerBrandPicker?.refresh();syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{++chargerRefreshSequence;chargerModelSelect.dataset.value='';chargerManualSerialInput.value='';chargerManualSerialInput.hidden=true;chargerSerialPicker?.trigger.parentElement.removeAttribute('hidden');if(chargerSerialInput){chargerSerialInput.replaceChildren(new Option('Önce marka ve model seçiniz',''));chargerSerialInput.disabled=true;delete chargerSerialInput.dataset.value;delete chargerSerialInput.dataset.soldSerial;}chargerSerialPicker?.refresh();chargerPriceInput.value='';chargerPurchasePriceInput.value='';chargerNetPriceInput.value='';chargerDiscountInput.value='';chargerDetails.querySelector('[name="sales_charger_sgk"]').value='';chargerDetails.querySelector('[name="sales_charger_unit"]').value=chargerBrandSelect.value?'Adet':'';if(!chargerBrandSelect.value)chargerDetails.querySelector('[name="sales_charger_promotion"]').value='Hayır';syncChargerModels();updateTotalAmount();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';chargerManualSerialInput.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
+  fillSelect(chargerBrandSelect,chargerDeviceStocks.map(stock=>stock.brand),'Seçiniz');chargerBrandPicker?.refresh();syncChargerModels();chargerBrandSelect?.addEventListener('change',()=>{++chargerRefreshSequence;chargerModelSelect.dataset.value='';chargerManualSerialInput.value='';chargerManualSerialInput.name='';chargerManualSerialInput.hidden=true;chargerSerialInput.name='sales_charger_serial';chargerSerialPicker?.trigger.parentElement.removeAttribute('hidden');if(chargerSerialInput){chargerSerialInput.replaceChildren(new Option('Önce marka ve model seçiniz',''));chargerSerialInput.disabled=true;delete chargerSerialInput.dataset.value;delete chargerSerialInput.dataset.soldSerial;}chargerSerialPicker?.refresh();chargerPriceInput.value='';chargerPurchasePriceInput.value='';chargerNetPriceInput.value='';chargerDiscountInput.value='';chargerDetails.querySelector('[name="sales_charger_sgk"]').value='';chargerDetails.querySelector('[name="sales_charger_unit"]').value=chargerBrandSelect.value?'Adet':'';if(!chargerBrandSelect.value)chargerDetails.querySelector('[name="sales_charger_promotion"]').value='Hayır';syncChargerModels();updateTotalAmount();});chargerModelSelect?.addEventListener('change',()=>{chargerModelSelect.dataset.value='';chargerManualSerialInput.value='';if(chargerSerialInput){chargerSerialInput.value='';chargerSerialInput.disabled=true;}fillChargerSerial();});chargerDiscountInput?.addEventListener('input',()=>applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput));
   chargerDetails.querySelector('[name="sales_charger_promotion"]').addEventListener('change',()=>{
     const promoted=chargerDetails.querySelector('[name="sales_charger_promotion"]').value==='Evet';
-    if(!promoted){
+    if(promoted){
+      chargerPriceInput.value=formatTurkishMoney(0);
+      chargerNetPriceInput.value=formatTurkishMoney(0);
+    }else{
       const stock=chargerDeviceStocks.find(item=>item.brand===chargerBrandSelect.value&&item.model===chargerModelSelect.value);
       chargerPriceInput.value=stock?(listPriceForStock(stock)||formatTurkishMoney(stock.sale_price||0)):'';
       chargerDiscountInput.value='';
       chargerDetails.querySelector('[name="sales_charger_sgk"]').value='';
       applyDiscount(chargerPriceInput,chargerDiscountInput,chargerNetPriceInput);
     }
+    chargerPriceInput.readOnly=promoted||detailsModal?.dataset.salesLocked==='1';
     updateTotalAmount();
   });
   const syncDeviceModels=()=>{if(!modelSelect)return;const brand=brandSelect?.value||'';if(!brand){modelSelect.replaceChildren(new Option('Önce marka seçiniz',''));modelSelect.value='';modelSelect.disabled=true;modelPicker?.refresh();return;}const current=modelSelect.dataset.value||modelSelect.value||'';fillSelect(modelSelect,hearingDeviceStocks.filter(stock=>stock.brand===brand).map(stock=>stock.model),'Model seçiniz',current);modelSelect.disabled=false;modelPicker?.refresh();};
