@@ -5,6 +5,11 @@ declare(strict_types=1);
 function vox_date_to_iso(string $value, bool $withTime = false): string
 {
     if ($value === '') return '';
+    $value = trim($value);
+    $value = preg_replace_callback('/^(\d{2})(\d{2})(\d{2}|\d{4})(?=$| )/', static function ($m): string {
+        return $m[1] . '.' . $m[2] . '.' . (strlen($m[3]) === 2 ? '20' . $m[3] : $m[3]);
+    }, $value);
+    $value = preg_replace_callback('/^(\d{1,2})\.(\d{1,2})\.(\d{2})(?=$| )/', static fn($m): string => sprintf('%02d.%02d.20%s', (int)$m[1], (int)$m[2], $m[3]), $value);
     $value = preg_replace_callback('/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?=$| )/', static fn($m) => sprintf('%02d.%02d.%s', (int)$m[1], (int)$m[2], $m[3]), $value);
     $formats = $withTime ? ['d.m.Y H:i', 'Y-m-d\TH:i', 'Y-m-d H:i:s'] : ['d.m.Y', 'Y-m-d'];
     foreach ($formats as $format) {

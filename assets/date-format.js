@@ -1,7 +1,12 @@
 (() => {
   'use strict';
   const validDate = (year, month, day) => year >= 1000 && year <= 9999 && month >= 1 && month <= 12 && day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const pad = value => String(value || '').replace(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?=$| )/, (_, d, m, y) => `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${y}`);
+  const pad = value => {
+    const text = String(value || '').trim();
+    const compact = /^(\d{2})(\d{2})(\d{2}|\d{4})(?=$| )/.exec(text);
+    if (compact) return `${compact[1]}.${compact[2]}.${compact[3].length === 2 ? '20' + compact[3] : compact[3]}` + text.slice(compact[0].length);
+    return text.replace(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})(?=$| )/, (_, d, m, y) => `${d.padStart(2,'0')}.${m.padStart(2,'0')}.${y.length === 2 ? '20' + y : y}`);
+  };
   const parse = (value, timed = false) => {
     if (!value) return '';
     const match = (timed ? /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2})$/ : /^(\d{2})\.(\d{2})\.(\d{4})$/).exec(value);
@@ -37,7 +42,7 @@
     editor.maxLength = timed ? 16 : 10;
     editor.autocomplete = 'off';
     editor.pattern = timed ? '[0-9]{2}\\.[0-9]{2}\\.[0-9]{4} [0-9]{2}:[0-9]{2}' : '[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}';
-    editor.title = timed ? 'gg.aa.yyyy ss:dd — örnek: 13.09.2026 14:30' : 'gg.aa.yyyy — örnek: 13.09.2026';
+    editor.title = timed ? 'gg.aa.yyyy ss:dd — örnek: 13.09.2026 14:30' : 'gg.aa.yyyy — 08092026 veya 081026 da yazabilirsiniz';
     editor.required = source.required;
     if (source.hasAttribute('form')) editor.setAttribute('form', source.getAttribute('form'));
     editor.setAttribute('aria-label', (source.getAttribute('aria-label') || source.labels?.[0]?.textContent?.trim() || source.closest('.icon-form-row')?.querySelector('label')?.textContent?.trim() || source.name || 'Tarih') + ' (gg.aa.yyyy)');
@@ -66,8 +71,17 @@
       get() { return valueProperty.get.call(this); },
       set(value) { valueProperty.set.call(this, value); sync(); if (!editing) validate(); }
     });
-    const update = event => {
+    const normalize = () => {
       if (!/\.0000$/.test(editor.value)) editor.value = pad(editor.value);
+      editing = true;
+      source.value = parseField(editor.value, timed, source.name) || '';
+      editing = false;
+      return validate();
+    };
+    const update = event => {
+      if (event.type === 'change' || /^\d{8}(?: \d{2}:\d{2})?$/.test(editor.value) || /^\d{1,2}\.\d{1,2}\.\d{4}(?: \d{2}:\d{2})?$/.test(editor.value)) {
+        if (!/\.0000$/.test(editor.value)) editor.value = pad(editor.value);
+      }
       editing = true;
       source.value = parseField(editor.value, timed, source.name) || '';
       validate();
@@ -76,11 +90,11 @@
     };
     editor.addEventListener('input', update);
     editor.addEventListener('change', update);
-    editor.addEventListener('blur', validate);
+    editor.addEventListener('blur', normalize);
     source.addEventListener('input', () => { sync(); if (!editing) validate(); });
     source.addEventListener('change', () => { sync(); if (!editing) validate(); });
     source.addEventListener('invalid', event => { event.preventDefault(); editor.reportValidity(); });
-    controls.set(source, { editor, sync, validate });
+    controls.set(source, { editor, sync, validate, normalize });
     sync(); validate();
   };
   const prepareText = editor => {
@@ -88,14 +102,15 @@
     editor.placeholder = 'gg.aa.yyyy';
     editor.maxLength = 10;
     editor.pattern = '[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}';
-    const validate = () => {
-      if (!/\.0000$/.test(editor.value)) editor.value = pad(editor.value);
+    const validate = (normalize = false) => {
+      if (normalize && !/\.0000$/.test(editor.value)) editor.value = pad(editor.value);
       const parsed = parseField(editor.value, false, editor.name);
       editor.setCustomValidity(parsed === null ? 'Geçerli bir tarihi gg.aa.yyyy biçiminde girin.' : '');
       return editor.validity.valid;
     };
-    editor.addEventListener('input', validate);
-    editor.addEventListener('blur', validate);
+    editor.addEventListener('input', () => validate(/^\d{8}$/.test(editor.value) || /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(editor.value)));
+    editor.addEventListener('change', () => validate(true));
+    editor.addEventListener('blur', () => validate(true));
     textControls.set(editor, { validate });
     validate();
   };
@@ -130,19 +145,19 @@
     // Validate before page-specific change handlers can send AJAX requests.
     document.addEventListener('change', event => {
       const control = textControls.get(event.target);
-      if (control && !control.validate()) {
+      if (control && !control.validate(true)) {
         event.stopImmediatePropagation(); event.preventDefault(); event.target.reportValidity();
       }
     }, true);
     document.addEventListener('submit', event => {
       for (const [editor, control] of textControls) {
-        if (editor.form === event.target && !editor.disabled && !control.validate()) {
+        if (editor.form === event.target && !editor.disabled && !control.validate(true)) {
           event.preventDefault(); event.stopImmediatePropagation(); editor.reportValidity(); return;
         }
       }
       for (const [source, control] of controls) {
         if (source.form !== event.target || source.disabled) continue;
-        if (!control.validate() || !control.editor.checkValidity()) {
+        if (!control.normalize() || !control.editor.checkValidity()) {
           event.preventDefault(); event.stopImmediatePropagation(); control.editor.reportValidity(); return;
         }
       }
@@ -151,7 +166,9 @@
       // Include the typed value for invalid input even in programmatic submissions;
       // the server then rejects it instead of silently saving an empty date.
       for (const [source, control] of controls) {
-        if (source.form === event.target && source.name && !source.disabled && !control.validate()) event.formData.set(source.name, control.editor.value);
+        if (source.form !== event.target || !source.name || source.disabled) continue;
+        if (!control.normalize()) event.formData.set(source.name, control.editor.value);
+        else event.formData.set(source.name, source.value);
       }
     });
     document.addEventListener('reset', event => setTimeout(() => {

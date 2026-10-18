@@ -18,6 +18,17 @@ test('age changes on birthday', () => {
 
 test('single digit day and month padding',()=>{assert.equal(VoxDateFormat.pad('1.2.2026'),'01.02.2026');assert.equal(VoxDateFormat.pad('1.12.2026'),'01.12.2026');assert.equal(parse(VoxDateFormat.pad('31.2.2026')),null);});
 
+test('compact date entries normalize only when complete', () => {
+  assert.equal(VoxDateFormat.pad('08092026'), '08.09.2026');
+  assert.equal(VoxDateFormat.pad('081026'), '08.10.2026');
+  assert.equal(VoxDateFormat.pad('8.10.26'), '08.10.2026');
+  assert.equal(VoxDateFormat.pad('080920'), '08.09.2020');
+  assert.equal(VoxDateFormat.pad('0809202'), '0809202');
+  assert.equal(parse(VoxDateFormat.pad('290224')), '2024-02-29');
+  assert.equal(parse(VoxDateFormat.pad('310426')), null);
+  assert.equal(parse(VoxDateFormat.pad('081026 14:30'), true), '2026-10-08T14:30');
+});
+
 test('unknown birth date is accepted without calculating age', () => {
   assert.equal(VoxDateFormat.parseField('00.00.0000', false, 'birth_date'), '');
   assert.equal(age(VoxDateFormat.parseField('00.00.0000', false, 'birth_date')), null);

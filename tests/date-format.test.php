@@ -2,8 +2,12 @@
 require __DIR__.'/../date-format.php';
 function expect($actual, $expected): void { if ($actual !== $expected) throw new RuntimeException('Date regression'); }
 expect(vox_date_to_iso('29.02.2024'), '2024-02-29');
+expect(vox_date_to_iso('08092026'), '2026-09-08');
+expect(vox_date_to_iso('081026'), '2026-10-08');
+expect(vox_date_to_iso('8.10.26'), '2026-10-08');
+expect(vox_date_to_iso('081026 14:30', true), '2026-10-08 14:30:00');
 expect(vox_date_to_iso('13.09.2026 14:30', true), '2026-09-13 14:30:00');
-foreach (['29.02.2023','31.04.2026','13/09/2026'] as $invalid) {
+foreach (['29.02.2023','31.04.2026','310426','321026','13/09/2026'] as $invalid) {
     try { vox_date_to_iso($invalid); throw new RuntimeException('Invalid date accepted'); }
     catch (InvalidArgumentException $expected) {}
 }
