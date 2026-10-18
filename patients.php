@@ -330,6 +330,32 @@ requestAnimationFrame(() => document.querySelectorAll('.vox-patient-list-actions
   const form = document.getElementById('vox-patient-table-filter');
   const input = form?.querySelector('input[name="q"]');
   if (!form || !input) return;
+  const focusKey = 'voxPatientSearchFocus';
+  const savedFocus = sessionStorage.getItem(focusKey);
+  if (savedFocus) {
+    sessionStorage.removeItem(focusKey);
+    try {
+      const saved = JSON.parse(savedFocus);
+      if (saved.value.trim() === input.value.trim()) {
+        requestAnimationFrame(() => {
+          input.focus();
+          const start = Math.min(Number(saved.start) || 0, input.value.length);
+          const end = Math.min(Number(saved.end) || start, input.value.length);
+          input.setSelectionRange(start, end, saved.direction || 'none');
+        });
+      }
+    } catch (_) {}
+  }
+  form.addEventListener('submit', () => {
+    if (document.activeElement === input) {
+      sessionStorage.setItem(focusKey, JSON.stringify({
+        value: input.value,
+        start: input.selectionStart,
+        end: input.selectionEnd,
+        direction: input.selectionDirection,
+      }));
+    }
+  });
   let timer;
   input.addEventListener('input', () => {
     clearTimeout(timer);
