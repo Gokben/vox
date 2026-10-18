@@ -55,7 +55,9 @@ try {
 function unit_parse_date(string $value): ?DateTimeImmutable {
     $value = trim($value);
     if ($value === '') return null;
-    if (preg_match('/^([0-9]{2})([0-9]{2})([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
+    if (preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/D', $value, $parts)) {
+        $value = $parts[3] . '.' . $parts[2] . '.' . $parts[1];
+    } elseif (preg_match('/^([0-9]{2})([0-9]{2})([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
         $year = strlen($parts[3]) === 2 ? '20' . $parts[3] : $parts[3];
         $value = $parts[1] . '.' . $parts[2] . '.' . $year;
     } elseif (preg_match('/^([0-9]{1,2})[.\/-]([0-9]{1,2})[.\/-]([0-9]{2}|[0-9]{4})$/D', $value, $parts)) {
